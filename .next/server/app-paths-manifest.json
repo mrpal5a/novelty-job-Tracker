@@ -1,8 +1,0 @@
-{
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/api/jobs/[id]/route": "app/api/jobs/[id]/route.js",
-  "/api/dispatch-schedules/[id]/route": "app/api/dispatch-schedules/[id]/route.js",
-  "/track/page": "app/track/page.js",
-  "/admin/page": "app/admin/page.js",
-  "/track/[po]/page": "app/track/[po]/page.js"
-}
