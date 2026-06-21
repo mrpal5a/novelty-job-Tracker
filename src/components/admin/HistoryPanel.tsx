@@ -5,11 +5,13 @@ import { useEffect, useState, useCallback } from 'react';
 import { cn, formatAdminDate, formatShortDate, formatQty } from '@/lib/utils';
 import { PIPELINE_STAGES, REPEAT_SKIPPED_STAGES } from '@/lib/constants/stages';
 import { DEPT_DISPLAY_NAME } from '@/lib/constants/departments';
-import type { JobDetail, JobStatusLog, StageComment, DispatchSchedule, PrintRun, PrintRunStage } from '@/lib/types';
+import type { JobDetail, JobStatusLog, StageComment, DispatchSchedule, PrintRun } from '@/lib/types';
 import type { Stage } from '@/lib/constants/stages';
+import { RELEASE_STAGE_DEPTS, nextReleaseStage } from '@/lib/constants/stages';
+import type { ReleaseStage } from '@/lib/constants/stages';
 import type { Department } from '@/lib/constants/departments';
 import StageComments from './StageComments';
-import { PrintRunModal } from './modals';
+import { AddReleaseModal } from './modals';
 import { SkeletonText } from '@/components/ui/Skeleton';
 import toast from 'react-hot-toast';
 
@@ -226,21 +228,6 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
 // button gated by department. When all runs are dispatched and qty
 // remains, Production/Admin see "Start Next Print Run".
 
-const NEXT_RUN_STAGE: Record<PrintRunStage, PrintRunStage | null> = {
-  Printing:   'QC',
-  QC:         'Packing',
-  Packing:    'Dispatched',
-  Dispatched: null,
-};
-
-// Mirror of the API's department gates (Admin always allowed)
-const RUN_STAGE_DEPTS: Record<PrintRunStage, Department[]> = {
-  Printing:   ['Production'],
-  QC:         ['QC'],
-  Packing:    ['Dispatch'],
-  Dispatched: ['Dispatch'],
-};
-
 function PrintRunsSection({
   job,
   dept,
@@ -267,17 +254,28 @@ function PrintRunsSection({
 
   useEffect(() => { loadRuns(); }, [loadRuns]);
 
-  if (!loaded || runs.length === 0) return null;
+  if (!loaded) return null;
 
   const totalQty       = job.label_qty ?? 0;
   const dispatchedQty  = job.total_qty_dispatched ?? 0;
   const remainingQty   = totalQty - dispatchedQty;
-  const allDispatched  = runs.every((r) => r.status === 'dispatched');
-  const awaitingNext   = job.has_partial_runs && allDispatched && remainingQty > 0;
-  const canStartNext   = awaitingNext && (dept === 'Production' || dept === 'Admin');
+  const anyInProgress  = runs.some((r) => r.status === 'in_progress');
+  const fullyDelivered = totalQty > 0 && remainingQty <= 0;
+
+  // Admin may add the next release when nothing is in progress, qty remains,
+  // and this is a scheduled-release job.
+  const canAddRelease =
+    job.is_scheduled_release &&
+    !anyInProgress &&
+    !fullyDelivered &&
+    totalQty > 0 &&
+    (dept === 'Admin');
+
+  // Hide the whole section for non-scheduled jobs that have no runs.
+  if (!job.is_scheduled_release && runs.length === 0) return null;
 
   async function advanceRun(run: PrintRun) {
-    const nextStage = NEXT_RUN_STAGE[run.current_stage];
+    const nextStage = nextReleaseStage(run.current_stage as ReleaseStage);
     if (!nextStage) return;
 
     setAdvancingId(run.id);
@@ -302,12 +300,11 @@ function PrintRunsSection({
     }
   }
 
-  async function startNextRun(payload: {
+  async function addRelease(payload: {
     qty_this_run: number;
+    planned_date: string;
     more_runs:    boolean;
-    notes:        string;
   }) {
-    setShowModal(false);
     try {
       const res  = await fetch(`/api/jobs/${job.id}/print-runs`, {
         method:  'POST',
@@ -316,10 +313,10 @@ function PrintRunsSection({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to start print run');
+        toast.error(data.error ?? 'Failed to add release');
         return;
       }
-      toast.success(`Run #${data.print_run.run_number} started — Printing`);
+      toast.success(`Release ${data.print_run.run_number} added — In Printing`);
       await loadRuns();
       onChanged();
     } catch {
@@ -330,16 +327,16 @@ function PrintRunsSection({
   return (
     <div>
       <h4 className="text-xs font-medium text-[var(--glass-muted)] uppercase tracking-wide mb-3">
-        Print Runs
+        Releases
       </h4>
 
       <div className="space-y-2">
         {runs.map((run) => {
           const isDone    = run.status === 'dispatched';
-          const nextStage = NEXT_RUN_STAGE[run.current_stage];
+          const nextStage  = nextReleaseStage(run.current_stage as ReleaseStage);
           const mayAdvance =
             !isDone && nextStage !== null &&
-            (dept === 'Admin' || RUN_STAGE_DEPTS[nextStage].includes(dept));
+            (dept === 'Admin' || RELEASE_STAGE_DEPTS[nextStage].includes(dept));
 
           return (
             <div
@@ -351,11 +348,16 @@ function PrintRunsSection({
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium text-[var(--glass-ink)]">
-                  Run #{run.run_number}
+                  Release {run.run_number}
                   <span className="ml-2 font-mono text-xs text-[var(--glass-muted)]">
                     {formatQty(run.qty_this_run)} labels
                   </span>
                 </p>
+                {run.planned_date && (
+                  <p className="text-xs text-[var(--glass-muted)] mt-0.5">
+                    Delivery: {formatShortDate(run.planned_date)}
+                  </p>
+                )}
                 <p className="text-xs text-[var(--glass-muted)] mt-0.5">
                   Stage: <strong className={isDone ? 'text-[#0B6B43]' : 'text-[var(--glass-ink)]'}>
                     {run.current_stage} {isDone ? '✅' : '🔄'}
@@ -386,7 +388,7 @@ function PrintRunsSection({
                   </button>
                 ) : (
                   <span className="shrink-0 text-xs text-[var(--glass-muted)]">
-                    🔒 {RUN_STAGE_DEPTS[nextStage].join('/')}
+                    🔒 {RELEASE_STAGE_DEPTS[nextStage].join('/')}
                   </span>
                 )
               )}
@@ -402,29 +404,40 @@ function PrintRunsSection({
         <span className="text-[#9A6510]">Remaining: <strong>{formatQty(remainingQty)}</strong></span>
       </div>
 
-      {/* Between runs */}
-      {awaitingNext && (
-        <div className="flex items-center justify-between gap-3 mt-2 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
-          <p className="text-xs text-[#9A6510]">
-            ⏳ Awaiting next print run — {formatQty(remainingQty)} labels remaining
+      {/* Fully delivered banner */}
+      {fullyDelivered && (
+        <div className="mt-2 bg-[#E7F5EE] border border-[#BFE3D0] rounded-lg px-3 py-2">
+          <p className="text-xs text-[#0B6B43]">
+            ✅ All {formatQty(totalQty)} labels delivered across {runs.length} release{runs.length === 1 ? '' : 's'}.
           </p>
-          {canStartNext && (
-            <button
-              onClick={() => setShowModal(true)}
-              className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors"
-            >
-              Start Next Print Run
-            </button>
-          )}
         </div>
       )}
 
+      {/* Add next release */}
+      {canAddRelease && (
+        <div className="mt-3">
+          <button
+            onClick={() => setShowModal(true)}
+            className="text-xs px-3 py-1.5 rounded-lg bg-brand-primary text-white font-medium hover:bg-brand-primary/90 transition-colors"
+          >
+            + Add Release
+          </button>
+        </div>
+      )}
+
+      {/* Sequential guard hint */}
+      {job.is_scheduled_release && anyInProgress && (
+        <p className="mt-2 text-xs text-[var(--glass-muted)]">
+          Finish and dispatch the active release before adding the next one.
+        </p>
+      )}
+
       {showModal && (
-        <PrintRunModal
-          totalQty={totalQty}
-          alreadyDispatched={dispatchedQty}
+        <AddReleaseModal
+          remaining={remainingQty}
+          releaseNumber={runs.length + 1}
           onCancel={() => setShowModal(false)}
-          onConfirm={startNextRun}
+          onConfirm={(payload) => { setShowModal(false); addRelease(payload); }}
         />
       )}
     </div>

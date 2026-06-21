@@ -8,6 +8,9 @@ import { cn, formatQty } from '@/lib/utils';
 import type { Stage } from '@/lib/constants/stages';
 import type { Job } from '@/lib/types';
 
+// Standalone modal defined in its own file (matches the new-modal pattern)
+export { default as AddReleaseModal } from './AddReleaseModal';
+
 // Shared glass input style for all modal text fields
 const inputCls = cn(
   'w-full px-3.5 py-2.5 rounded-xl text-sm bg-[var(--glass-bg)] border border-[var(--glass-border)]',
