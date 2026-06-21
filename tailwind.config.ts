@@ -12,28 +12,29 @@ const config: Config = {
       // ── Brand colors from spec ──────────────────────────────
       colors: {
         brand: {
-          bg:              '#F5F7F4', // warm near-white page bg
-          surface:         '#FFFFFF', // cards
-          border:          '#E4EAE6', // dividers (greenish)
-          ink:             '#0C2A20', // primary text (dark green-black)
-          accent:          '#0C2A20', // = ink. Kept so existing text-/border-/ring-brand-accent stay readable.
-          primary:         '#10553F', // brand fills / actions (green-700, the seed)
-          'primary-hover': '#0C4232', // button/link hover
-          header:          '#10553F', // header/nav bg (was near-black)
-          muted:           '#6A7A72', // secondary text (green-gray)
-          success:         '#1B7A4E',
-          warning:         '#C2740C',
-          danger:          '#C0392B',
-          hold:            '#5B6B63',
-          pending:         '#94A39B',
-          // dark-glass theme (light text on the mesh):
-          'glass-ink':     '#EAFFF5', // primary text on glass (AA on mesh)
-          'glass-muted':   '#9FBCB0', // secondary text on glass (AA on mesh)
-          'glass-line':    'rgba(255,255,255,0.14)',
-          // legacy semantic names still referenced in code:
-          green:           '#1B7A4E',
-          amber:           '#C2740C',
-          red:             '#C0392B',
+          bg:              '#F6F8F6',
+          surface:         '#FFFFFF',
+          'surface-2':     '#F1F4F1',
+          border:          '#E6EBE7',
+          ink:             '#0D241C',
+          accent:          '#0D241C', // = ink
+          primary:         '#10553F',
+          'primary-hover': '#0C4232',
+          header:          '#FFFFFF',
+          muted:           '#5C6E65',
+          subtle:          '#8A9991',
+          live:            '#16A06A', // emerald accent (focus, progress, active)
+          success:         '#0B6B43',
+          warning:         '#9A6510',
+          danger:          '#B23B2E',
+          hold:            '#9A6510',
+          pending:         '#8A9991',
+          'glass-ink':     '#0D241C',
+          'glass-muted':   '#5C6E65',
+          'glass-line':    '#E6EBE7',
+          green:           '#0B6B43',
+          amber:           '#9A6510',
+          red:             '#B23B2E',
         },
         green: {
           50:  '#F0F6F3', 100: '#DCEDE5', 200: '#B9DBCB', 300: '#8AC2A9',
@@ -51,6 +52,13 @@ const config: Config = {
       // ── Animations ──────────────────────────────────────────
       animation: {
         'pulse-dot': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+
+      // ── Shadows ─────────────────────────────────────────────
+      boxShadow: {
+        card:        '0 1px 3px rgba(13,36,28,.06), 0 10px 30px -12px rgba(13,36,28,.14)',
+        'card-hover':'0 2px 6px rgba(13,36,28,.08), 0 18px 40px -14px rgba(13,36,28,.18)',
+        lift:        '0 20px 50px -16px rgba(13,36,28,.22)',
       },
     },
   },
