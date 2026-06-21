@@ -21,7 +21,7 @@ export default function TrackPage() {
   return (
     <div className="flex flex-col items-center pt-8">
       <Reveal className="text-center">
-        <h1 className="text-3xl font-semibold text-white tracking-tight mb-2 text-center">
+        <h1 className="text-3xl font-semibold text-brand-ink tracking-tight mb-2 text-center">
           Track Your Order
         </h1>
         <p className="text-[var(--glass-muted)] text-sm text-center mb-8">

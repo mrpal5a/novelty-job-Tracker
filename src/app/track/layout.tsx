@@ -16,12 +16,12 @@ export default function TrackLayout({ children }: { children: React.ReactNode })
     <div className="min-h-screen text-[var(--glass-ink)]">
       <GradientMesh />
       {/* Minimal branded header */}
-      <header className="bg-brand-header border-b border-white/10">
+      <header className="bg-white/80 backdrop-blur-md border-b border-brand-border shadow-[0_1px_0_rgba(22,160,106,0.25)]">
         <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
           <Link href="/track" className="flex items-center gap-2">
-            <Logo onDark width={132} height={34} priority />
+            <Logo width={132} height={34} priority />
           </Link>
-          <span className="text-white/40 text-xs">Order Tracking</span>
+          <span className="text-brand-subtle text-xs">Order Tracking</span>
         </div>
       </header>
 
