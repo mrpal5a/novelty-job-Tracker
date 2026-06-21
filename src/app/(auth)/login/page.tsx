@@ -103,7 +103,7 @@ function LoginForm() {
           </Stagger>
 
           {error && (
-            <p className="text-sm text-red-200 bg-red-400/10 border border-red-300/30 rounded-lg px-3 py-2">
+            <p className="text-sm text-[#B23B2E] bg-red-50 border border-[#EBC4BE] rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -112,7 +112,7 @@ function LoginForm() {
             type="submit"
             loading={loading}
             loadingStages={['Connecting…', 'Verifying credentials…', 'Almost there…']}
-            className="w-full bg-brand-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-brand-primary/90 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-emerald-300/40"
+            className="w-full bg-brand-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-brand-primary/90 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-brand-live/40"
           >
             Sign in
           </LoadingButton>
