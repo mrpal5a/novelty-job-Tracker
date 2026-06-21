@@ -1,3 +1,5 @@
+import type { Department } from './departments';
+
 // src/lib/constants/stages.ts
 // ============================================================
 // SINGLE SOURCE OF TRUTH for the 15-stage pipeline.
@@ -168,3 +170,38 @@ export const MODAL_REQUIRED_STAGES: Stage[] = [
   'Dispatched',
   'PO Closed',
 ];
+
+// ============================================================
+// SCHEDULED-RELEASE RUN STAGES
+// A release (print_run) moves through these 6 production stages.
+// Prepress stages happen once on the job, never per release.
+// This is the single source of truth for both the API and the UI.
+// ============================================================
+
+export const RELEASE_STAGE_ORDER = [
+  'In Printing',
+  'Slitting',
+  'Quality Check',
+  'Packing',
+  'Ready to Dispatch',
+  'Dispatched',
+] as const;
+
+export type ReleaseStage = typeof RELEASE_STAGE_ORDER[number];
+
+// Which department may advance a release INTO each stage (Admin always allowed).
+export const RELEASE_STAGE_DEPTS: Record<ReleaseStage, Department[]> = {
+  'In Printing':       ['Production'],
+  'Slitting':          ['Production'],
+  'Quality Check':     ['QC'],
+  'Packing':           ['Dispatch'],
+  'Ready to Dispatch': ['Dispatch'],
+  'Dispatched':        ['Dispatch'],
+};
+
+/** The next stage a release moves to, or null if already Dispatched. */
+export function nextReleaseStage(current: ReleaseStage): ReleaseStage | null {
+  const i = RELEASE_STAGE_ORDER.indexOf(current);
+  if (i < 0 || i === RELEASE_STAGE_ORDER.length - 1) return null;
+  return RELEASE_STAGE_ORDER[i + 1];
+}
