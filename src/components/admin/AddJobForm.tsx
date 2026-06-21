@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { cn, formatQty, formatShortDate } from '@/lib/utils';
 import type { Department } from '@/lib/constants/departments';
-import type { AddJobFormData, ScheduledReleaseInput, JobType } from '@/lib/types';
+import type { AddJobFormData, JobType } from '@/lib/types';
 import { LoadingButton } from '@/components/ui/Loading';
 import toast from 'react-hot-toast';
 
@@ -45,16 +45,15 @@ const EMPTY_FORM: AddJobFormData = {
   urgent_priority:      null,
   notes:                '',
   is_scheduled_release: false,
-  scheduled_releases:   [],
+  first_release:        null,
 };
 
 export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
   const [form,       setForm]       = useState<AddJobFormData>({ ...EMPTY_FORM, ...prefillData });
   const [loading,    setLoading]    = useState(false);
   const [isOpen,     setIsOpen]     = useState(false);
-  const [releases,   setReleases]   = useState<ScheduledReleaseInput[]>([
-    { release_number: 1, planned_qty: 0, planned_date: '' },
-  ]);
+  const [firstReleaseQty,  setFirstReleaseQty]  = useState<number | ''>('');
+  const [firstReleaseDate, setFirstReleaseDate] = useState<string>('');
 
   // ── PM code typeahead ──────────────────────────────────────
   const [pmSuggestions,     setPmSuggestions]     = useState<PmSuggestion[]>([]);
@@ -113,34 +112,16 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function addRelease() {
-    setReleases((prev) => [
-      ...prev,
-      { release_number: prev.length + 1, planned_qty: 0, planned_date: '' },
-    ]);
-  }
-
-  function removeRelease(idx: number) {
-    setReleases((prev) =>
-      prev
-        .filter((_, i) => i !== idx)
-        .map((r, i) => ({ ...r, release_number: i + 1 }))
-    );
-  }
-
-  function updateRelease(idx: number, field: keyof ScheduledReleaseInput, value: string | number) {
-    setReleases((prev) =>
-      prev.map((r, i) => (i === idx ? { ...r, [field]: value } : r))
-    );
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
     const payload: AddJobFormData = {
       ...form,
-      scheduled_releases: form.is_scheduled_release ? releases : [],
+      first_release:
+        form.is_scheduled_release && firstReleaseQty && firstReleaseDate
+          ? { planned_qty: Number(firstReleaseQty), planned_date: firstReleaseDate }
+          : null,
     };
 
     try {
@@ -159,7 +140,8 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
 
       toast.success('Job added successfully');
       setForm({ ...EMPTY_FORM });
-      setReleases([{ release_number: 1, planned_qty: 0, planned_date: '' }]);
+      setFirstReleaseQty('');
+      setFirstReleaseDate('');
       setIsOpen(false);
       onSuccess?.();
     } catch {
@@ -387,50 +369,33 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
 
           {form.is_scheduled_release && (
             <div className="space-y-3">
-              {releases.map((release, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-end">
-                  <div className="col-span-1 text-center">
-                    <span className="text-xs text-[var(--glass-muted)] font-mono">R{release.release_number}</span>
-                  </div>
-                  <div className="col-span-4">
-                    <input
-                      type="number"
-                      min={1}
-                      value={release.planned_qty || ''}
-                      onChange={(e) => updateRelease(idx, 'planned_qty', Number(e.target.value))}
-                      placeholder="Qty"
-                      className={cn(inputCls, 'font-mono text-xs')}
-                    />
-                  </div>
-                  <div className="col-span-5">
-                    <input
-                      type="date"
-                      value={release.planned_date}
-                      onChange={(e) => updateRelease(idx, 'planned_date', e.target.value)}
-                      className={cn(inputCls, 'text-xs')}
-                    />
-                  </div>
-                  <div className="col-span-2 flex justify-end">
-                    {releases.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeRelease(idx)}
-                        className="text-[var(--glass-muted)] hover:text-[#B23B2E] text-lg leading-none transition-colors"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
+              <p className="text-xs text-[var(--glass-muted)]">
+                Optionally enter the first release now. You can add more releases
+                later from the job&rsquo;s detail screen as the client confirms them.
+              </p>
+              <div className="grid grid-cols-12 gap-2 items-end">
+                <div className="col-span-1 text-center">
+                  <span className="text-xs text-[var(--glass-muted)] font-mono">R1</span>
                 </div>
-              ))}
-
-              <button
-                type="button"
-                onClick={addRelease}
-                className="text-sm text-[var(--glass-muted)] hover:text-[var(--glass-ink)] transition-colors"
-              >
-                + Add release
-              </button>
+                <div className="col-span-5">
+                  <input
+                    type="number"
+                    min={1}
+                    value={firstReleaseQty}
+                    onChange={(e) => setFirstReleaseQty(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="First release qty"
+                    className={cn(inputCls, 'font-mono text-xs')}
+                  />
+                </div>
+                <div className="col-span-6">
+                  <input
+                    type="date"
+                    value={firstReleaseDate}
+                    onChange={(e) => setFirstReleaseDate(e.target.value)}
+                    className={cn(inputCls, 'text-xs')}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>
