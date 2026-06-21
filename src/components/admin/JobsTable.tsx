@@ -114,7 +114,7 @@ export default function JobsTable({ initialJobs, dept }: Props) {
 
         <table className="w-full min-w-[900px] border-collapse text-sm">
           <thead>
-            <tr className="border-b border-white/12">
+            <tr className="border-b border-brand-border bg-brand-surface-2">
               {['PO / PM', 'Party / Job', 'Dispatch', 'Delivery', 'Type', 'Status', 'Last Updated', 'Actions'].map((col) => (
                 <th key={col} className="px-4 py-3 text-left text-xs font-medium text-[var(--glass-muted)] uppercase tracking-wide whitespace-nowrap">
                   {col}
