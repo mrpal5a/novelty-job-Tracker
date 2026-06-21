@@ -66,10 +66,10 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold text-white">Result for &ldquo;{poNumber}&rdquo;</h2>
+            <h2 className="text-lg font-semibold text-brand-ink">Result for &ldquo;{poNumber}&rdquo;</h2>
             <p className="text-sm text-[var(--glass-muted)]">Single product order. Details are shown directly below.</p>
           </div>
-          <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-white shrink-0">
+          <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-brand-ink shrink-0">
             ← Search again
           </a>
         </div>
@@ -98,10 +98,10 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-white">Matching Jobs — &ldquo;{poNumber}&rdquo;</h2>
+          <h2 className="text-lg font-semibold text-brand-ink">Matching Jobs — &ldquo;{poNumber}&rdquo;</h2>
           <p className="text-sm text-[var(--glass-muted)]">Open one job at a time. Click any row to expand it smoothly.</p>
         </div>
-        <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-white shrink-0">
+        <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-brand-ink shrink-0">
           ← Search again
         </a>
       </div>
@@ -114,7 +114,7 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
               key={bundle.job.id}
               className={cn(
                 'overflow-hidden rounded-2xl border glass shadow-[0_8px_30px_rgba(0,0,0,0.18)]',
-                isOpen ? 'border-emerald-300/30 ring-1 ring-emerald-300/20' : 'border-white/12'
+                isOpen ? 'border-[#16A06A]/40 ring-1 ring-[#16A06A]/20' : 'border-brand-border'
               )}
             >
               <button
@@ -122,7 +122,7 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
                 onClick={() => handleSelect(bundle.job.id)}
                 className={cn(
                   'w-full text-left px-5 py-4 flex items-start justify-between gap-4 transition-all duration-300',
-                  isOpen ? 'bg-white/[0.08]' : 'hover:bg-white/[0.06] hover:shadow-[0_8px_30px_rgba(0,0,0,0.18)]'
+                  isOpen ? 'bg-brand-surface-2' : 'hover:bg-brand-surface-2 hover:shadow-card-hover'
                 )}
               >
                 <div className="min-w-0">
@@ -137,7 +137,7 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
                 </div>
 
                 <div className="flex flex-col items-end gap-2 shrink-0">
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[var(--glass-ink)] font-medium">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-brand-surface-2 border border-brand-border text-[var(--glass-ink)] font-medium">
                     {bundle.job.status}
                   </span>
                   <span className="text-xs text-[var(--glass-muted)]">{bundle.job.job_type}</span>
@@ -181,7 +181,7 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
                       <DeliveryCountdown deliveryDate={bundle.job.delivery_date} />
 
                       {bundle.statusLogs[bundle.statusLogs.length - 1] && (
-                        <p className="text-xs text-[var(--glass-muted)] mt-3 pt-3 border-t border-white/10">
+                        <p className="text-xs text-[var(--glass-muted)] mt-3 pt-3 border-t border-brand-border">
                           Last updated by{' '}
                           <strong className="font-medium">
                             {bundle.statusLogs[bundle.statusLogs.length - 1].department_display}
@@ -285,7 +285,7 @@ function SingleJobDetail({ bundle }: { bundle: TrackJobBundle }) {
           <DeliveryCountdown deliveryDate={bundle.job.delivery_date} />
 
           {latestLog && (
-            <p className="text-xs text-[var(--glass-muted)] mt-3 pt-3 border-t border-white/10">
+            <p className="text-xs text-[var(--glass-muted)] mt-3 pt-3 border-t border-brand-border">
               Last updated by{' '}
               <strong className="font-medium">{latestLog.department_display}</strong>
               {' · '}
@@ -363,7 +363,7 @@ function StatusPill({ status }: { status: string }) {
   return (
     <span
       ref={pillRef}
-      className="text-xs px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[var(--glass-ink)] font-medium"
+      className="text-xs px-2.5 py-1 rounded-full bg-brand-surface-2 border border-brand-border text-[var(--glass-ink)] font-medium"
     >
       {status}
     </span>

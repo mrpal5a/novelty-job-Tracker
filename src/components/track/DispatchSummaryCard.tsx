@@ -18,12 +18,12 @@ export default function DispatchSummaryCard({ total, dispatched, remaining }: Pr
 
       <div className="grid grid-cols-3 gap-3 mb-4">
         <StatBox label="Total Ordered" value={formatQty(total)}        color="text-[var(--glass-ink)]" />
-        <StatBox label="Dispatched"    value={formatQty(dispatched)}   color="text-emerald-200" />
-        <StatBox label="Remaining"     value={formatQty(remaining)}    color="text-amber-200" />
+        <StatBox label="Dispatched"    value={formatQty(dispatched)}   color="text-[#0B6B43]" />
+        <StatBox label="Remaining"     value={formatQty(remaining)}    color="text-[#9A6510]" />
       </div>
 
       {/* Fill bar */}
-      <div className="h-2 bg-white/10 rounded-full">
+      <div className="h-2 bg-brand-surface-2 rounded-full">
         <div
           className="h-full bg-emerald-400 rounded-full transition-all duration-500"
           style={{ width: `${Math.min(pct, 100)}%` }}
@@ -40,7 +40,7 @@ function StatBox({
   label: string; value: string; color: string;
 }) {
   return (
-    <div className="bg-white/10 rounded-xl p-3 text-center">
+    <div className="bg-brand-surface-2 rounded-xl p-3 text-center">
       <p className="text-xs text-[var(--glass-muted)] mb-1">{label}</p>
       <p className={`text-base font-semibold font-mono ${color}`}>{value}</p>
     </div>

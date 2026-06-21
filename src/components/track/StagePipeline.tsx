@@ -122,7 +122,7 @@ export default function StagePipeline({
               key={stage}
               className={cn(
                 'flex items-start gap-3 py-3',
-                idx < allDisplayStages.length - 1 && 'border-b border-white/10',
+                idx < allDisplayStages.length - 1 && 'border-b border-brand-border',
                 isSkipped && 'opacity-40'
               )}
             >
@@ -130,7 +130,7 @@ export default function StagePipeline({
               <div className="relative flex flex-col items-center shrink-0 pt-0.5">
                 {/* Dot */}
                 {isSkipped ? (
-                  <div data-stage-node className="w-3 h-3 rounded-full border-2 border-dashed border-white/30" />
+                  <div data-stage-node className="w-3 h-3 rounded-full border-2 border-dashed border-brand-subtle" />
                 ) : isCompleted && isOnHold ? (
                   <div data-stage-node className="w-3 h-3 rounded-full bg-amber-500" />
                 ) : isCompleted && isQC ? (
@@ -144,11 +144,11 @@ export default function StagePipeline({
                     <div data-stage-node className="w-3 h-3 rounded-full bg-emerald-400 dot-pulse" />
                   </div>
                 ) : (
-                  <div data-stage-node className="w-3 h-3 rounded-full border-2 border-white/25 bg-white/5" />
+                  <div data-stage-node className="w-3 h-3 rounded-full border-2 border-brand-subtle bg-brand-surface-2" />
                 )}
                 {/* Vertical connector line between consecutive stage nodes */}
                 {idx < allDisplayStages.length - 1 && (
-                  <div data-stage-line className="w-px flex-1 min-h-[1rem] bg-white/10 mt-1" />
+                  <div data-stage-line className="w-px flex-1 min-h-[1rem] bg-brand-surface-2 mt-1" />
                 )}
               </div>
 
@@ -158,7 +158,7 @@ export default function StagePipeline({
                   <div className="flex items-center gap-1.5 flex-wrap">
                   <span className={cn(
                     'text-sm font-medium',
-                    isCompleted ? 'text-emerald-200' :
+                    isCompleted ? 'text-[#0B6B43]' :
                     isCurrent   ? 'text-[var(--glass-ink)]' :
                     isSkipped   ? 'text-[var(--glass-muted)] line-through' :
                     'text-[var(--glass-muted)]'
@@ -184,7 +184,7 @@ export default function StagePipeline({
                   )}
 
                   {completedAt && isCompleted && (
-                    <p className="text-xs font-mono text-emerald-200 whitespace-nowrap">
+                    <p className="text-xs font-mono text-[#0B6B43] whitespace-nowrap">
                       Completed {formatClientDate(completedAt)}
                     </p>
                   )}
@@ -199,14 +199,14 @@ export default function StagePipeline({
 
                 {/* Halt remark for On Hold */}
                 {isOnHold && log?.remark && (
-                  <p className="text-xs text-amber-200 mt-1 bg-amber-400/10 rounded px-2 py-1">
+                  <p className="text-xs text-[#9A6510] mt-1 bg-[#FBF1E0] rounded px-2 py-1">
                     {log.remark}
                   </p>
                 )}
 
                 {/* QC remark (if filled) */}
                 {isQC && log?.remark && (
-                  <p className="text-xs text-sky-200 mt-1 bg-sky-400/10 rounded px-2 py-1">
+                  <p className="text-xs text-[#1E6FB8] mt-1 bg-[#E8F1FB] rounded px-2 py-1">
                     {log.remark}
                   </p>
                 )}
@@ -226,7 +226,7 @@ export default function StagePipeline({
 
       {/* Print runs — multi-cycle orders show each run as its own timeline entry */}
       {job.has_partial_runs && printRuns.length > 0 && (
-        <div className="mt-5 pt-4 border-t border-white/10">
+        <div className="mt-5 pt-4 border-t border-brand-border">
           <h4 className="text-sm font-semibold text-[var(--glass-ink)] mb-3">Production Cycles</h4>
 
           <div className="space-y-0">
@@ -237,7 +237,7 @@ export default function StagePipeline({
                   key={run.id}
                   className={cn(
                     'flex items-start gap-3 py-3',
-                    idx < printRuns.length - 1 && 'border-b border-white/10'
+                    idx < printRuns.length - 1 && 'border-b border-brand-border'
                   )}
                 >
                   {/* Dot */}
@@ -255,13 +255,13 @@ export default function StagePipeline({
                   <div className="flex-1 min-w-0 flex items-start justify-between gap-3 flex-wrap">
                     <span className={cn(
                       'text-sm font-medium',
-                      isDelivered ? 'text-emerald-200' : 'text-[var(--glass-ink)]'
+                      isDelivered ? 'text-[#0B6B43]' : 'text-[var(--glass-ink)]'
                     )}>
                       Run {run.run_number}: {formatQty(run.qty_this_run)} labels —{' '}
                       {isDelivered ? 'Delivered ✅' : `In Production (${run.current_stage}) 🔄`}
                     </span>
                     {run.dispatched_at && (
-                      <p className="text-xs font-mono text-emerald-200 whitespace-nowrap">
+                      <p className="text-xs font-mono text-[#0B6B43] whitespace-nowrap">
                         {formatClientDate(run.dispatched_at)}
                       </p>
                     )}
@@ -273,10 +273,10 @@ export default function StagePipeline({
 
           {/* Bottom summary */}
           {job.label_qty ? (
-            <p className="text-sm text-[var(--glass-ink)] bg-white/10 rounded-lg px-3 py-2 mt-2">
+            <p className="text-sm text-[var(--glass-ink)] bg-brand-surface-2 rounded-lg px-3 py-2 mt-2">
               <strong className="font-mono">{formatQty(job.total_qty_dispatched ?? 0)}</strong> of{' '}
               <strong className="font-mono">{formatQty(job.label_qty)}</strong> delivered.{' '}
-              <strong className="font-mono text-amber-200">
+              <strong className="font-mono text-[#9A6510]">
                 {formatQty(job.label_qty - (job.total_qty_dispatched ?? 0))}
               </strong>{' '}
               remaining.

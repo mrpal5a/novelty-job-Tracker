@@ -15,9 +15,9 @@ export default function DeliveryCountdown({ deliveryDate }: Props) {
   const countdown = getDeliveryCountdown(deliveryDate);
 
   const colorClass = {
-    green: 'text-emerald-200',
-    amber: 'text-amber-200 font-semibold',
-    red:   'text-red-200 font-semibold',
+    green: 'text-[#0B6B43]',
+    amber: 'text-[#9A6510] font-semibold',
+    red:   'text-[#B23B2E] font-semibold',
     muted: 'text-[var(--glass-muted)]',
   }[countdown.color];
 

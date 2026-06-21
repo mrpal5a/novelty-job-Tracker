@@ -22,7 +22,7 @@ export default function ScheduledReleaseCard({ schedules }: Props) {
             <div
               key={s.id}
               className={cn(
-                'flex items-center justify-between py-2.5 border-b border-white/10 last:border-0'
+                'flex items-center justify-between py-2.5 border-b border-brand-border last:border-0'
               )}
             >
               <div className="flex items-center gap-2.5">
@@ -45,9 +45,9 @@ export default function ScheduledReleaseCard({ schedules }: Props) {
 
               <span className={cn(
                 'text-xs font-medium px-2 py-0.5 rounded-full',
-                isDispatched ? 'bg-emerald-400/15 text-emerald-200' :
-                isPending    ? 'bg-white/10 text-white/70'         :
-                'bg-sky-400/15 text-sky-200'
+                isDispatched ? 'bg-[#E7F5EE] text-[#0B6B43]' :
+                isPending    ? 'bg-brand-surface-2 text-brand-muted'         :
+                'bg-[#E8F1FB] text-[#1E6FB8]'
               )}>
                 {isDispatched ? 'Dispatched' : isPending ? 'Planned' : 'In Progress'}
               </span>

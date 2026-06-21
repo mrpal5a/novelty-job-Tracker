@@ -20,9 +20,9 @@ export default function ProgressBar({ percent, status }: Props) {
   const state = getProgressBarState(percent, status);
 
   const trackColor = {
-    black:  'bg-white/10',
-    orange: 'bg-amber-400/15',
-    blue:   'bg-sky-400/15',
+    black:  'bg-brand-surface-2',
+    orange: 'bg-[#FBF1E0]',
+    blue:   'bg-[#E8F1FB]',
   }[state.color];
 
   const fillColor = {

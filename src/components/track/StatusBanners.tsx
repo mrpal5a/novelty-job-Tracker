@@ -78,10 +78,10 @@ function Banner({
   children: React.ReactNode;
 }) {
   const styles = {
-    green: 'bg-emerald-400/12 border-emerald-300/25 text-emerald-100',
-    amber: 'bg-amber-400/12 border-amber-300/25 text-amber-100',
-    blue:  'bg-sky-400/12 border-sky-300/25 text-sky-100',
-    red:   'bg-red-400/12 border-red-300/25 text-red-100',
+    green: 'bg-[#E7F5EE] border-[#BFE3D0] text-[#0B6B43]',
+    amber: 'bg-[#FBF1E0] border-[#EBD9AE] text-[#9A6510]',
+    blue:  'bg-[#E8F1FB] border-[#C7DDF3] text-[#1E6FB8]',
+    red:   'bg-red-50 border-[#EBC4BE] text-[#B23B2E]',
   };
 
   return (
