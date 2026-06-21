@@ -9,11 +9,11 @@ export function GradientMesh({ className }: { className?: string }) {
     <div aria-hidden className={cn('pointer-events-none fixed inset-0 -z-10 overflow-hidden mesh-bg', className)}>
       <div
         className="mesh-blob absolute -top-32 -left-24 h-96 w-96 rounded-full blur-3xl"
-        style={{ background: 'radial-gradient(circle, rgba(79,165,130,.40), transparent 70%)' }}
+        style={{ background: 'radial-gradient(circle, rgba(120,225,180,.22), transparent 70%)' }}
       />
       <div
         className="mesh-blob absolute -bottom-40 -right-20 h-[28rem] w-[28rem] rounded-full blur-3xl"
-        style={{ background: 'radial-gradient(circle, rgba(16,85,63,.55), transparent 70%)', animationDelay: '-6s' }}
+        style={{ background: 'radial-gradient(circle, rgba(90,200,160,.20), transparent 70%)', animationDelay: '-6s' }}
       />
     </div>
   );

@@ -22,9 +22,9 @@ export function AuroraBackground({ className }: { className?: string }) {
   return (
     <div ref={ref} aria-hidden className={`pointer-events-none absolute inset-0 -z-10 overflow-hidden ${className ?? ''}`}>
       <div data-blob className="absolute -top-24 -left-16 h-80 w-80 rounded-full blur-3xl"
-           style={{ background: 'radial-gradient(circle, rgba(79,165,130,.45), transparent 70%)' }} />
+           style={{ background: 'radial-gradient(circle, rgba(120,225,180,.22), transparent 70%)' }} />
       <div data-blob className="absolute -bottom-24 -right-10 h-96 w-96 rounded-full blur-3xl"
-           style={{ background: 'radial-gradient(circle, rgba(16,85,63,.55), transparent 70%)' }} />
+           style={{ background: 'radial-gradient(circle, rgba(90,200,160,.20), transparent 70%)' }} />
     </div>
   );
 }
