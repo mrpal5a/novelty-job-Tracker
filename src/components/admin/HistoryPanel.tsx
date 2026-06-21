@@ -222,11 +222,11 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
   );
 }
 
-// ── Print Runs Section ────────────────────────────────────────
-// Shown when a job has print runs (multi-cycle orders).
-// Each run card shows qty + stage; the active run gets an advance
-// button gated by department. When all runs are dispatched and qty
-// remains, Production/Admin see "Start Next Print Run".
+// ── Releases Section ──────────────────────────────────────────
+// Shown for scheduled-release jobs (and legacy multi-run jobs).
+// Each release card shows qty + delivery date + stage; the active
+// release gets an advance button gated by department. When nothing
+// is in progress and qty remains, Admin sees "+ Add Release".
 
 function PrintRunsSection({
   job,
@@ -290,7 +290,7 @@ function PrintRunsSection({
         toast.error(data.error ?? 'Failed to advance run');
         return;
       }
-      toast.success(`Run #${run.run_number} → ${nextStage}`);
+      toast.success(`Release ${run.run_number} → ${nextStage}`);
       await loadRuns();
       onChanged();   // refresh job totals in the parent panel
     } catch {
