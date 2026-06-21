@@ -464,8 +464,7 @@ const inputCls = cn(
   'w-full px-3.5 py-2.5 rounded-xl text-sm bg-[var(--glass-bg)] border border-[var(--glass-border)]',
   'text-[var(--glass-ink)] placeholder:text-[var(--glass-muted)] backdrop-blur-md',
   'focus:outline-none focus:border-[#16A06A] focus:bg-white',
-  'focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
-  '[&>option]:bg-[#0A1F18] [&>option]:text-[var(--glass-ink)]',
+  'focus:shadow-[var(--ring-focus)] transition-all',
 );
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
