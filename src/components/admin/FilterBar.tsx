@@ -48,7 +48,7 @@ export default function FilterBar({
         className={cn(
           'px-4 py-2 rounded-lg border text-sm font-medium transition-colors',
           urgentOnly
-            ? 'bg-red-400/15 border-red-300/30 text-red-200'
+            ? 'bg-red-50 border-[#EBC4BE] text-[#B23B2E]'
             : 'glass text-[var(--glass-muted)] hover:text-[var(--glass-ink)]'
         )}
       >

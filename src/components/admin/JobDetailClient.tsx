@@ -170,7 +170,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {job.has_partial_runs && (
-            <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-400/15 text-purple-200">
+            <span className="inline-flex items-center text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F1ECFB] text-[#6B46C1]">
               Partial Runs
             </span>
           )}
@@ -217,7 +217,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
                 <p className="text-sm font-mono text-[var(--glass-ink)]">
                   {formatQty(effectiveDispatched)} / {formatQty(job.label_qty)}
                 </p>
-                <div className="h-1.5 bg-white/10 rounded-full mt-1.5 w-24">
+                <div className="h-1.5 bg-brand-surface-2 rounded-full mt-1.5 w-24">
                   <div
                     className="h-full bg-emerald-400 rounded-full transition-all"
                     style={{ width: `${dispatchPct}%` }}
@@ -275,7 +275,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
 
           {job.is_scheduled_release && (
             <InfoField label="Release">
-              <span className="text-xs px-2 py-0.5 rounded bg-sky-400/15 text-sky-200 font-medium">
+              <span className="text-xs px-2 py-0.5 rounded bg-[#E8F1FB] text-[#1E6FB8] font-medium">
                 Scheduled
               </span>
             </InfoField>
@@ -284,7 +284,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
 
         {/* Notes */}
         {job.notes && (
-          <div className="mt-5 pt-5 border-t border-white/10">
+          <div className="mt-5 pt-5 border-t border-brand-border">
             <p className="text-xs font-medium text-[var(--glass-muted)] uppercase tracking-wide mb-1">Notes</p>
             <p className="text-sm text-[var(--glass-ink)]">{job.notes}</p>
           </div>
@@ -293,7 +293,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
         {/* Halt remark */}
         {job.status === 'On Hold' && job.halt_remark && (
           <div className="mt-4">
-            <p className="text-xs text-amber-200 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
+            <p className="text-xs text-[#9A6510] bg-[#FBF1E0] border border-[#EBD9AE] rounded-lg px-3 py-2">
               ⏸ On hold: {job.halt_remark}
             </p>
           </div>
@@ -302,7 +302,7 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
         {/* QC remark */}
         {job.qc_remark && (
           <div className="mt-4">
-            <p className="text-xs text-sky-200 bg-sky-400/10 border border-sky-300/25 rounded-lg px-3 py-2">
+            <p className="text-xs text-[#1E6FB8] bg-[#E8F1FB] border border-[#C7DDF3] rounded-lg px-3 py-2">
               QC note: {job.qc_remark}
             </p>
           </div>
