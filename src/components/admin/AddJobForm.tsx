@@ -221,7 +221,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
               />
               {showPmSuggestions && (
                 <div className="absolute z-20 top-full left-0 right-0 mt-1 glass-strong glass rounded-lg shadow-lg overflow-hidden">
-                  <p className="px-3 py-1.5 text-xs text-[var(--glass-muted)] bg-white/[0.06] border-b border-white/10">
+                  <p className="px-3 py-1.5 text-xs text-brand-muted bg-brand-surface-2 border-b border-brand-border">
                     Earlier jobs — click to autofill
                   </p>
                   {pmSuggestions.map((s) => (
@@ -230,7 +230,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
                       type="button"
                       // onMouseDown fires before the input's onBlur closes the list
                       onMouseDown={(e) => { e.preventDefault(); applyPmSuggestion(s); }}
-                      className="w-full text-left px-3 py-2 hover:bg-white/[0.08] transition-colors border-b border-white/10 last:border-0"
+                      className="w-full text-left px-3 py-2 hover:bg-brand-surface-2 transition-colors border-b border-brand-border last:border-0"
                     >
                       <span className="block font-mono text-xs font-medium text-[var(--glass-ink)]">
                         {s.pm_code}
@@ -347,7 +347,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
                     'w-8 h-8 rounded-full text-xs font-mono font-medium transition-colors',
                     form.urgent_priority === p
                       ? 'bg-brand-primary text-white'
-                      : 'bg-white/[0.06] border border-white/10 text-[var(--glass-muted)] hover:text-[var(--glass-ink)]'
+                      : 'bg-brand-surface-2 border border-brand-border text-brand-muted hover:text-brand-ink'
                   )}
                 >
                   {p}
@@ -369,7 +369,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
         </Field>
 
         {/* Row 6: Scheduled release toggle */}
-        <div className="border border-white/10 rounded-lg p-4 space-y-4">
+        <div className="border border-brand-border rounded-lg p-4 space-y-4">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="checkbox"
@@ -415,7 +415,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
                       <button
                         type="button"
                         onClick={() => removeRelease(idx)}
-                        className="text-[var(--glass-muted)] hover:text-red-300 text-lg leading-none transition-colors"
+                        className="text-[var(--glass-muted)] hover:text-[#B23B2E] text-lg leading-none transition-colors"
                       >
                         ×
                       </button>
@@ -463,7 +463,7 @@ export default function AddJobForm({ dept, prefillData, onSuccess }: Props) {
 const inputCls = cn(
   'w-full px-3.5 py-2.5 rounded-xl text-sm bg-[var(--glass-bg)] border border-[var(--glass-border)]',
   'text-[var(--glass-ink)] placeholder:text-[var(--glass-muted)] backdrop-blur-md',
-  'focus:outline-none focus:border-emerald-300/70 focus:bg-white/[0.14]',
+  'focus:outline-none focus:border-[#16A06A] focus:bg-white',
   'focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
   '[&>option]:bg-[#0A1F18] [&>option]:text-[var(--glass-ink)]',
 );
