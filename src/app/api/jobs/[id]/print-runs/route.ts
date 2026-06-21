@@ -47,16 +47,19 @@ export async function POST(request: NextRequest, { params }: Params) {
   const dept = parseDepartment(user.user_metadata?.department);
   if (!dept) return NextResponse.json({ error: 'Invalid department in token' }, { status: 403 });
 
-  // Print runs are created by Production (printing is their stage) or Admin
+  // Releases for a scheduled job are added by Admin; legacy print runs
+  // are created by Production. Allow both.
   if (dept !== 'Production' && dept !== 'Admin') {
     return NextResponse.json(
-      { error: 'Only Production or Admin can create print runs' },
+      { error: 'Only Production or Admin can create releases / print runs' },
       { status: 403 }
     );
   }
 
   const body: {
     qty_this_run?: number;
+    planned_qty?:  number;
+    planned_date?: string;
     more_runs?:    boolean;
     notes?:        string;
   } = await request.json();
@@ -133,8 +136,10 @@ export async function POST(request: NextRequest, { params }: Params) {
     .insert({
       job_id:              id,
       qty_this_run:        qtyThisRun,
+      planned_qty:         body.planned_qty ?? qtyThisRun,
+      planned_date:        body.planned_date || null,
       qty_remaining_after: remainingAfter,
-      current_stage:       'Printing',
+      current_stage:       'In Printing',
       status:              'in_progress',
       notes:               body.notes?.trim() || null,
     })
@@ -156,7 +161,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     .from('print_run_stage_logs')
     .insert({
       print_run_id: printRun.id,
-      stage:        'Printing',
+      stage:        'In Printing',
       changed_by:   user.id,
       notes:        body.notes?.trim() || null,
     });
