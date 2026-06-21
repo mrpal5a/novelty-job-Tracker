@@ -4,19 +4,19 @@ import React, { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 const INPUT_BASE =
-  'peer w-full rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] ' +
-  'px-3.5 pt-5 pb-2 text-sm text-[var(--glass-ink)] backdrop-blur-md outline-none ' +
+  'peer w-full rounded-xl bg-white border border-brand-border ' +
+  'px-3.5 pt-5 pb-2 text-sm text-brand-ink outline-none ' +
   'placeholder:text-transparent transition-all duration-200 ' +
   'focus:-translate-y-0.5 motion-reduce:focus:translate-y-0 ' +
-  'focus:border-emerald-300/70 focus:bg-white/[0.14] ' +
-  'focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22),0_10px_26px_rgba(0,0,0,0.25)]';
+  'focus:border-[#16A06A] focus:bg-white ' +
+  'focus:shadow-[var(--ring-focus)]';
 
 const LABEL_BASE =
-  'pointer-events-none absolute left-3.5 top-3.5 text-sm text-white/60 transition-all duration-200 ' +
-  'peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:uppercase peer-focus:tracking-wide peer-focus:text-emerald-200 ' +
+  'pointer-events-none absolute left-3.5 top-3.5 text-sm text-brand-muted transition-all duration-200 ' +
+  'peer-focus:top-1.5 peer-focus:text-[10px] peer-focus:uppercase peer-focus:tracking-wide peer-focus:text-[#0B7A4F] ' +
   'peer-[:not(:placeholder-shown)]:top-1.5 peer-[:not(:placeholder-shown)]:text-[10px] ' +
   'peer-[:not(:placeholder-shown)]:uppercase peer-[:not(:placeholder-shown)]:tracking-wide ' +
-  'peer-[:not(:placeholder-shown)]:text-emerald-200';
+  'peer-[:not(:placeholder-shown)]:text-[#0B7A4F]';
 
 type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
   label: string;
@@ -56,9 +56,8 @@ export function SelectField({ label, className, id, children, ...rest }: SelectP
         id={fieldId}
         className={cn(
           'w-full rounded-xl bg-[var(--glass-bg)] border border-[var(--glass-border)] px-3.5 pt-5 pb-2 text-sm',
-          'text-[var(--glass-ink)] backdrop-blur-md outline-none transition-all duration-200',
-          'focus:border-emerald-300/70 focus:bg-white/[0.14] focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)]',
-          '[&>option]:bg-[#0A1F18] [&>option]:text-[var(--glass-ink)]',
+          'text-[var(--glass-ink)] outline-none transition-all duration-200',
+          'focus:border-[#16A06A] focus:bg-white focus:shadow-[var(--ring-focus)]',
           className,
         )}
         {...rest}
@@ -67,7 +66,7 @@ export function SelectField({ label, className, id, children, ...rest }: SelectP
       </select>
       <label
         htmlFor={fieldId}
-        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] uppercase tracking-wide text-emerald-200"
+        className="pointer-events-none absolute left-3.5 top-1.5 text-[10px] uppercase tracking-wide text-[#0B7A4F]"
       >
         {label}
       </label>
