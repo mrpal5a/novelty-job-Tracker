@@ -5,24 +5,26 @@
 
 /* ── CSS custom properties (mirror tailwind.config.ts brand tokens) ── */
 :root {
-  --color-bg:            #F5F7F4;
+  --color-bg:            #F6F8F6;
   --color-surface:       #FFFFFF;
-  --color-border:        #E4EAE6;
-  --color-ink:           #0C2A20;
-  --color-accent:        #0C2A20; /* = ink */
+  --color-surface-2:     #F1F4F1;
+  --color-border:        #E6EBE7;
+  --color-ink:           #0D241C;
+  --color-accent:        #0D241C; /* = ink (keeps text-brand-accent readable) */
   --color-primary:       #10553F;
   --color-primary-hover: #0C4232;
-  --color-header:        #10553F;
-  --color-muted:         #6A7A72;
-  --color-success:       #1B7A4E;
-  --color-warning:       #C2740C;
-  --color-danger:        #C0392B;
-  --color-hold:          #5B6B63;
-  --color-pending:       #94A39B;
-  /* legacy aliases (mirror brand.green/amber/red) */
-  --color-green:         #1B7A4E;
-  --color-amber:         #C2740C;
-  --color-red:           #C0392B;
+  --color-header:        #FFFFFF;
+  --color-muted:         #5C6E65;
+  --color-subtle:        #8A9991;
+  --color-success:       #0B6B43;
+  --color-warning:       #9A6510;
+  --color-danger:        #B23B2E;
+  --color-hold:          #9A6510;
+  --color-pending:       #8A9991;
+  /* legacy aliases */
+  --color-green:         #0B6B43;
+  --color-amber:         #9A6510;
+  --color-red:           #B23B2E;
 
   --font-sans: var(--font-dm-sans), system-ui, sans-serif;
   --font-mono: var(--font-dm-mono), ui-monospace, monospace;
@@ -86,8 +88,8 @@ button,
 
 /* ── Modal backdrop ─────────────────────────────────────────── */
 .modal-backdrop {
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(2px);
+  background: rgba(13, 36, 28, 0.35);
+  backdrop-filter: blur(3px);
 }
 
 /* ── Responsive modal: bottom sheet on mobile, dialog on desktop ── */
@@ -118,31 +120,40 @@ button,
   }
 }
 
-/* ── Premium glass-mesh theme ───────────────────────────────── */
+/* ── Premium light theme tokens ──────────────────────────────── */
 :root {
-  --glass-bg:         rgba(255, 255, 255, 0.07);
-  --glass-bg-strong:  rgba(255, 255, 255, 0.12);
-  --glass-border:     rgba(255, 255, 255, 0.14);
-  --glass-ink:        #EAFFF5;
-  --glass-muted:      #9FBCB0;
+  --glass-bg:         #FFFFFF;
+  --glass-bg-strong:  #FFFFFF;
+  --glass-border:     #E6EBE7;
+  --glass-ink:        #0D241C;
+  --glass-muted:      #5C6E65;
+  --ink-subtle:       #8A9991;
+  --accent:           #16A06A;
+
+  --shadow-sm: 0 1px 2px rgba(13,36,28,.06);
+  --shadow-md: 0 1px 3px rgba(13,36,28,.06), 0 10px 30px -12px rgba(13,36,28,.14);
+  --shadow-lg: 0 20px 50px -16px rgba(13,36,28,.22);
+  --ring-focus: 0 0 0 4px rgba(22,160,106,.18), 0 8px 22px -10px rgba(13,36,28,.20);
 }
 
-/* Frosted panel surface */
+/* Elevated light card surface */
 .glass {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  -webkit-backdrop-filter: blur(14px);
-  backdrop-filter: blur(14px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-md);
 }
-.glass-strong { background: var(--glass-bg-strong); }
+.glass-strong {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
 
-/* Deep-green gradient-mesh page background */
+/* Warm off-white base with faint emerald/mint aurora glows */
 .mesh-bg {
   background:
-    radial-gradient(55% 55% at 10% 12%,  rgba(46,200,140,.55), transparent 60%),
-    radial-gradient(50% 50% at 92% 18%,  rgba(20,120,90,.60),  transparent 60%),
-    radial-gradient(70% 70% at 78% 105%, rgba(12,66,50,.90),   transparent 60%),
-    linear-gradient(135deg, #0F4A37, #0A1F18);
+    radial-gradient(55% 55% at 8% 10%,   rgba(120,225,180,.16), transparent 60%),
+    radial-gradient(48% 48% at 96% 14%,   rgba(90,200,160,.13),  transparent 60%),
+    radial-gradient(60% 60% at 80% 102%,  rgba(150,222,190,.15), transparent 60%),
+    var(--color-bg);
 }
 
 /* Drifting mesh blobs (layered over .mesh-bg) */
@@ -158,8 +169,7 @@ button,
   100% { background-position: -100% 0; }
 }
 .skeleton {
-  background: linear-gradient(90deg,
-    rgba(255,255,255,.07) 25%, rgba(255,255,255,.20) 37%, rgba(255,255,255,.07) 63%);
+  background: linear-gradient(90deg, #ECEFEC 25%, #F5F7F5 37%, #ECEFEC 63%);
   background-size: 400% 100%;
   animation: shimmer 1.4s ease infinite;
   border-radius: 8px;
@@ -172,8 +182,16 @@ button,
 }
 .cyc-fade { animation: cyc-fade .3s ease; }
 
+/* Satisfying confirmation flash on a status update */
+@keyframes row-flash {
+  0%   { background-color: rgba(22, 160, 106, 0.16); }
+  100% { background-color: transparent; }
+}
+.row-flash { animation: row-flash 0.6s ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
-  .skeleton  { animation: none; background: rgba(255,255,255,.12); }
+  .skeleton  { animation: none; background: #ECEFEC; }
   .mesh-blob { animation: none; }
   .cyc-fade  { animation: none; }
+  .row-flash { animation: none; }
 }
