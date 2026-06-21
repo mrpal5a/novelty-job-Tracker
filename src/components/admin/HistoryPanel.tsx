@@ -346,7 +346,7 @@ function PrintRunsSection({
               key={run.id}
               className={cn(
                 'flex items-center justify-between gap-3 rounded-lg border px-4 py-3',
-                isDone ? 'border-emerald-300/25 bg-emerald-400/10' : 'glass'
+                isDone ? 'border-[#BFE3D0] bg-[#E7F5EE]' : 'glass'
               )}
             >
               <div className="min-w-0">
