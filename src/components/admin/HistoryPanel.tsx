@@ -98,18 +98,18 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
               <div
                 key={stage}
                 className={cn(
-                  'flex items-start gap-3 py-2.5 border-b border-white/8 last:border-0',
+                  'flex items-start gap-3 py-2.5 border-b border-brand-border last:border-0',
                   isSkipped && 'opacity-40'
                 )}
               >
                 {/* Status dot */}
                 <div className="mt-0.5 shrink-0">
                   {isSkipped ? (
-                    <div className="w-2 h-2 rounded-full border border-dashed border-white/30" />
+                    <div className="w-2 h-2 rounded-full border border-dashed border-brand-subtle" />
                   ) : completedAt ? (
                     <div className="w-2 h-2 rounded-full bg-green-500" />
                   ) : (
-                    <div className="w-2 h-2 rounded-full bg-white/20" />
+                    <div className="w-2 h-2 rounded-full bg-brand-primary" />
                   )}
                 </div>
 
@@ -138,14 +138,14 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
 
                   {/* Halt remark */}
                   {stage === 'On Hold' && latestLog?.remark && (
-                    <p className="text-xs text-amber-200 mt-1">
+                    <p className="text-xs text-[#9A6510] mt-1">
                       Reason: {latestLog.remark}
                     </p>
                   )}
 
                   {/* QC remark */}
                   {stage === 'Quality Check' && latestLog?.remark && (
-                    <p className="text-xs text-sky-200 mt-1">
+                    <p className="text-xs text-[#1E6FB8] mt-1">
                       QC note: {latestLog.remark}
                     </p>
                   )}
@@ -154,7 +154,7 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
                   {comments.length > 0 && (
                     <div className="mt-1 space-y-1">
                       {comments.map((c) => (
-                        <p key={c.id} className="text-xs text-[var(--glass-muted)] bg-white/[0.06] rounded px-2 py-1">
+                        <p key={c.id} className="text-xs text-brand-muted bg-brand-surface-2 rounded px-2 py-1">
                           <span className="font-medium">{c.created_by}:</span> {c.comment}
                           <span className="ml-2 opacity-50">{formatAdminDate(c.created_at)}</span>
                         </p>
@@ -357,7 +357,7 @@ function PrintRunsSection({
                   </span>
                 </p>
                 <p className="text-xs text-[var(--glass-muted)] mt-0.5">
-                  Stage: <strong className={isDone ? 'text-emerald-200' : 'text-[var(--glass-ink)]'}>
+                  Stage: <strong className={isDone ? 'text-[#0B6B43]' : 'text-[var(--glass-ink)]'}>
                     {run.current_stage} {isDone ? '✅' : '🔄'}
                   </strong>
                   {run.dispatched_at && (
@@ -377,8 +377,8 @@ function PrintRunsSection({
                     className={cn(
                       'shrink-0 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors',
                       nextStage === 'Dispatched'
-                        ? 'bg-emerald-400/15 border-emerald-300/30 text-emerald-200 hover:bg-emerald-400/25'
-                        : 'bg-white/[0.06] border-white/10 text-[var(--glass-ink)] hover:bg-white/10',
+                        ? 'bg-[#E7F5EE] border-[#BFE3D0] text-[#0B6B43] hover:bg-[#D8EFE3]'
+                        : 'bg-brand-surface-2 border-brand-border text-brand-ink hover:bg-[#E9EDE9]',
                       'disabled:opacity-40'
                     )}
                   >
@@ -396,16 +396,16 @@ function PrintRunsSection({
       </div>
 
       {/* Totals */}
-      <div className="bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 flex gap-6 text-xs font-mono mt-2">
+      <div className="bg-brand-surface-2 border border-brand-border rounded-lg px-3 py-2 flex gap-6 text-xs font-mono mt-2">
         <span>Total: <strong>{formatQty(totalQty)}</strong></span>
-        <span className="text-emerald-200">Dispatched: <strong>{formatQty(dispatchedQty)}</strong></span>
-        <span className="text-amber-200">Remaining: <strong>{formatQty(remainingQty)}</strong></span>
+        <span className="text-[#0B6B43]">Dispatched: <strong>{formatQty(dispatchedQty)}</strong></span>
+        <span className="text-[#9A6510]">Remaining: <strong>{formatQty(remainingQty)}</strong></span>
       </div>
 
       {/* Between runs */}
       {awaitingNext && (
         <div className="flex items-center justify-between gap-3 mt-2 bg-amber-400/10 border border-amber-300/25 rounded-lg px-3 py-2">
-          <p className="text-xs text-amber-200">
+          <p className="text-xs text-[#9A6510]">
             ⏳ Awaiting next print run — {formatQty(remainingQty)} labels remaining
           </p>
           {canStartNext && (
@@ -483,10 +483,10 @@ function ScheduledReleaseTable({
         Release Schedule
       </h4>
 
-      <div className="rounded-lg border border-white/10 overflow-hidden">
+      <div className="rounded-lg border border-brand-border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-white/[0.06] border-b border-white/10">
+            <tr className="bg-brand-surface-2 border-b border-brand-border">
               <th className="px-3 py-2 text-left text-xs text-[var(--glass-muted)]">Release</th>
               <th className="px-3 py-2 text-left text-xs text-[var(--glass-muted)]">Planned Qty</th>
               <th className="px-3 py-2 text-left text-xs text-[var(--glass-muted)]">Planned Date</th>
@@ -497,16 +497,16 @@ function ScheduledReleaseTable({
           </thead>
           <tbody>
             {schedules.map((s) => (
-              <tr key={s.id} className="border-b border-white/8 last:border-0">
+              <tr key={s.id} className="border-b border-brand-border last:border-0">
                 <td className="px-3 py-2 font-mono text-xs">R{s.release_number}</td>
                 <td className="px-3 py-2 font-mono text-xs">{formatQty(s.planned_qty)}</td>
                 <td className="px-3 py-2 text-xs">{formatShortDate(s.planned_date)}</td>
                 <td className="px-3 py-2">
                   <span className={cn(
                     'text-xs px-1.5 py-0.5 rounded font-medium',
-                    s.status === 'Dispatched' ? 'bg-emerald-400/15 text-emerald-200' :
-                    s.status === 'In Progress' ? 'bg-sky-400/15 text-sky-200' :
-                    'bg-white/10 text-white/70'
+                    s.status === 'Dispatched' ? 'bg-[#E7F5EE] text-[#0B6B43]' :
+                    s.status === 'In Progress' ? 'bg-[#E8F1FB] text-[#1E6FB8]' :
+                    'bg-brand-surface-2 text-brand-muted'
                   )}>
                     {s.status === 'Dispatched' ? '✓ Dispatched' :
                      s.status === 'In Progress' ? 'In Progress' : '⏳ Pending'}
@@ -523,7 +523,7 @@ function ScheduledReleaseTable({
                         disabled={dispatchingId === s.id}
                         className={cn(
                           'text-xs px-2 py-1 rounded border font-medium transition-colors',
-                          'bg-emerald-400/15 border-emerald-300/30 text-emerald-200 hover:bg-emerald-400/25',
+                          'bg-[#E7F5EE] border-[#BFE3D0] text-[#0B6B43] hover:bg-[#D8EFE3]',
                           'disabled:opacity-40'
                         )}
                       >
@@ -540,10 +540,10 @@ function ScheduledReleaseTable({
         </table>
 
         {/* Totals row */}
-        <div className="bg-white/[0.06] border-t border-white/10 px-3 py-2 flex gap-6 text-xs font-mono">
+        <div className="bg-brand-surface-2 border-t border-brand-border px-3 py-2 flex gap-6 text-xs font-mono">
           <span>Total: <strong>{formatQty(totalQty)}</strong></span>
-          <span className="text-emerald-200">Released: <strong>{formatQty(releasedQty)}</strong></span>
-          <span className="text-amber-200">Remaining: <strong>{formatQty(remainingQty)}</strong></span>
+          <span className="text-[#0B6B43]">Released: <strong>{formatQty(releasedQty)}</strong></span>
+          <span className="text-[#9A6510]">Remaining: <strong>{formatQty(remainingQty)}</strong></span>
         </div>
       </div>
     </div>
