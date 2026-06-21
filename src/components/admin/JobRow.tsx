@@ -52,10 +52,12 @@ export default function JobRow({
     remark?:         string;
     qty_dispatched?: number;
   } | null>(null);
+  const [flash, setFlash] = useState(false);
 
   // ── Row visual class ────────────────────────────────────────
   const rowClass = cn(
-    'border-b border-white/8 transition-colors',
+    'border-b border-brand-border transition-colors',
+    flash && 'row-flash',
     job.status === 'On Hold'
       ? ROW_URGENCY_STYLES.onHold
       : job.status === 'Quality Check'
@@ -134,6 +136,8 @@ export default function JobRow({
 
       onJobUpdated(data.job);
       toast.success(`Status updated to "${payload.new_status}"`);
+      setFlash(true);
+      setTimeout(() => setFlash(false), 650);
       setPendingStage(null);
       setPendingPayload(null);
     } catch {
@@ -197,12 +201,12 @@ export default function JobRow({
             <p className="text-xs text-[var(--glass-muted)] truncate max-w-[220px] mt-0.5">{job.job_name}</p>
           )}
           {job.has_partial_runs && (
-            <span className="inline-block mt-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-purple-400/15 text-purple-200">
+            <span className="inline-block mt-1 text-[11px] font-medium px-1.5 py-0.5 rounded bg-[#F1ECFB] text-[#6B46C1]">
               Partial Runs
             </span>
           )}
           {job.halt_remark && job.status === 'On Hold' && (
-            <p className="text-xs text-amber-200 bg-amber-400/10 rounded px-1.5 py-0.5 mt-1 truncate max-w-[220px]">
+            <p className="text-xs text-[#9A6510] bg-[#FBF1E0] rounded px-1.5 py-0.5 mt-1 truncate max-w-[220px]">
               ⏸ {job.halt_remark}
             </p>
           )}
@@ -221,14 +225,14 @@ export default function JobRow({
                   <span className="text-[var(--glass-muted)]"> dispatched</span>
                 )}
               </p>
-              <div className="h-1.5 bg-white/10 rounded-full mt-1.5 w-20">
+              <div className="h-1.5 bg-brand-surface-2 rounded-full mt-1.5 w-20">
                 <div
-                  className="h-full bg-emerald-400 rounded-full transition-all"
+                  className="h-full bg-brand-live rounded-full transition-all"
                   style={{ width: `${dispatchPct}%` }}
                 />
               </div>
               {job.is_scheduled_release && (
-                <p className="text-xs text-sky-200 mt-1">Scheduled</p>
+                <p className="text-xs text-[#1E6FB8] mt-1">Scheduled</p>
               )}
             </div>
           ) : (
@@ -263,13 +267,12 @@ export default function JobRow({
             disabled={submitting}
             onChange={(e) => handleStageSelect(e.target.value as Stage)}
             className={cn(
-              'w-full px-2 py-1.5 rounded-lg border text-xs font-medium',
-              'focus:outline-none focus:ring-2 focus:ring-brand-accent/20',
-              'transition-colors cursor-pointer',
+              'w-full px-2.5 py-1.5 rounded-full border text-xs font-semibold appearance-none cursor-pointer',
+              'shadow-sm hover:shadow-card-hover hover:-translate-y-px transition-all',
+              'focus:outline-none focus:ring-2 focus:ring-brand-live/30',
               STATUS_COLORS[job.status]?.bg ?? 'bg-gray-100',
               STATUS_COLORS[job.status]?.text ?? 'text-gray-700',
               'border-transparent',
-              '[&>option]:bg-[#0A1F18] [&>option]:text-[var(--glass-ink)]'
             )}
           >
             {availableStages.map((stage) => {
@@ -298,7 +301,7 @@ export default function JobRow({
           <div className="flex items-center gap-2">
             <button
               onClick={onToggleExpand}
-              className="text-[var(--glass-muted)] hover:text-[var(--glass-ink)] text-xs transition-colors px-2 py-1 rounded border border-white/15"
+              className="text-brand-muted hover:text-brand-ink text-xs transition-colors px-2 py-1 rounded border border-brand-border"
             >
               {isExpanded ? '▲ Less' : '▼ More'}
             </button>
@@ -313,7 +316,7 @@ export default function JobRow({
                   onJobDeleted(job.id);
                   toast.success('Job deleted');
                 }}
-                className="text-red-400 hover:text-red-600 text-xs transition-colors px-2 py-1"
+                className="text-[#B23B2E] hover:text-[#8E2C22] text-xs transition-colors px-2 py-1"
               >
                 Del
               </button>
@@ -325,7 +328,7 @@ export default function JobRow({
       {/* Expanded history panel */}
       {isExpanded && (
         <tr>
-          <td colSpan={8} className="px-4 py-0 bg-black/15">
+          <td colSpan={8} className="px-4 py-0 bg-brand-surface-2">
             <HistoryPanel
               jobId={job.id}
               jobType={job.job_type}
