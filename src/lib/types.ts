@@ -58,7 +58,9 @@ export interface AddJobFormData {
   urgent_priority: number | null;
   notes: string;
   is_scheduled_release: boolean;
-  scheduled_releases?: ScheduledReleaseInput[];
+  // Optional first release captured at job creation (qty + delivery date).
+  // Further releases are added later from the job detail screen.
+  first_release?: { planned_qty: number; planned_date: string } | null;
 }
 
 export interface ScheduledReleaseInput {
@@ -162,19 +164,27 @@ export interface JobDetail extends Job {
 // Multi-cycle large orders: each run moves through
 // Printing → QC → Packing → Dispatched independently.
 
-export type PrintRunStage  = 'Printing' | 'QC' | 'Packing' | 'Dispatched';
+export type PrintRunStage =
+  | 'In Printing'
+  | 'Slitting'
+  | 'Quality Check'
+  | 'Packing'
+  | 'Ready to Dispatch'
+  | 'Dispatched';
 export type PrintRunStatus = 'in_progress' | 'dispatched';
 
 export interface PrintRun {
   id:                  string;
   job_id:              string;
   run_number:          number;          // 1, 2, 3… auto-assigned by DB trigger
-  qty_this_run:        number;
+  qty_this_run:        number;          // actual qty for this release
+  planned_qty:         number | null;   // qty the client notified for this release
+  planned_date:        string | null;   // ISO date — this release's delivery date
   qty_remaining_after: number;          // total remaining after this run
   current_stage:       PrintRunStage;
   status:              PrintRunStatus;
   started_at:          string;
-  dispatched_at:       string | null;   // set when this run reaches Dispatched
+  dispatched_at:       string | null;
   notes:               string | null;
   created_at:          string;
 }
@@ -186,6 +196,15 @@ export interface PrintRunStageLog {
   changed_by:   string | null;          // auth.users id
   changed_at:   string;
   notes:        string | null;
+}
+
+// Client-safe stage log (from client_print_run_stage_log_view) —
+// powers per-step timestamps in the client portal release columns.
+export interface ClientPrintRunStageLog {
+  id:           string;
+  print_run_id: string;
+  stage:        string;
+  changed_at:   string;
 }
 
 // ── party_contacts ────────────────────────────────────────────
