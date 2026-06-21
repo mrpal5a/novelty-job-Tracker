@@ -1,7 +1,7 @@
 // src/app/api/jobs/route.ts
 // ============================================================
 // GET  /api/jobs  — list all active jobs (sorted by delivery_date ASC)
-// POST /api/jobs  — create a new job + optional dispatch schedule rows
+// POST /api/jobs  — create a new job + optional first release
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -145,22 +145,37 @@ export async function POST(request: NextRequest) {
       }))
     );
 
-  // ── Insert dispatch schedule rows (if scheduled release) ──
-  if (body.is_scheduled_release && body.scheduled_releases?.length) {
-    const scheduleRows = body.scheduled_releases.map((r) => ({
-      job_id:         job.id,
-      release_number: r.release_number,
-      planned_qty:    r.planned_qty,
-      planned_date:   r.planned_date,
-      status:         'Pending' as const,
-    }));
+  // ── Create the optional first release (scheduled-release jobs) ──
+  // Releases are print_runs. Further releases are added later from the
+  // job detail screen. dispatch_schedules is no longer written for new jobs.
+  if (body.is_scheduled_release && body.first_release && job.label_qty) {
+    const qty = body.first_release.planned_qty;
+    if (qty && qty > 0 && qty <= job.label_qty) {
+      const remainingAfter = job.label_qty - qty;
+      const { data: firstRun, error: runError } = await admin
+        .from('print_runs')
+        .insert({
+          job_id:              job.id,
+          qty_this_run:        qty,
+          planned_qty:         qty,
+          planned_date:        body.first_release.planned_date || null,
+          qty_remaining_after: remainingAfter,
+          current_stage:       'In Printing',
+          status:              'in_progress',
+        })
+        .select()
+        .single();
 
-    const { error: scheduleError } = await admin
-      .from('dispatch_schedules')
-      .insert(scheduleRows);
-
-    if (scheduleError) {
-      console.error('[POST /api/jobs] insert schedules:', scheduleError);
+      if (runError) {
+        console.error('[POST /api/jobs] insert first release:', runError);
+      } else {
+        await admin.from('jobs').update({ has_partial_runs: true }).eq('id', job.id);
+        await admin.from('print_run_stage_logs').insert({
+          print_run_id: firstRun.id,
+          stage:        'In Printing',
+          changed_by:   user.id,
+        });
+      }
     }
   }
 
