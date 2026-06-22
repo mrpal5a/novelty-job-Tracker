@@ -31,6 +31,7 @@ type Props = {
     label_qty?: number | null;
     total_qty_dispatched?: number;
     has_partial_runs?: boolean;
+    is_scheduled_release?: boolean;
   };
   completedStages: Stage[];
   statusLogs:      StatusLog[];
@@ -225,7 +226,7 @@ export default function StagePipeline({
       </div>
 
       {/* Print runs — multi-cycle orders show each run as its own timeline entry */}
-      {job.has_partial_runs && printRuns.length > 0 && (
+      {!job.is_scheduled_release && job.has_partial_runs && printRuns.length > 0 && (
         <div className="mt-5 pt-4 border-t border-brand-border">
           <h4 className="text-sm font-semibold text-[var(--glass-ink)] mb-3">Production Cycles</h4>
 

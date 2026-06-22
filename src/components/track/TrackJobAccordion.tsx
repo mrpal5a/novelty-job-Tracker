@@ -7,9 +7,10 @@ import { registerGsap } from '@/lib/gsap/register';
 import { useRouter } from 'next/navigation';
 import { cn, formatQty, formatShortDate } from '@/lib/utils';
 import { getProgressPercent, getVisibleStages } from '@/lib/constants/stages';
-import type { ClientStatusLog, DispatchSchedule, Job, JobStageTimestamp, PrintRun } from '@/lib/types';
+import type { ClientPrintRunStageLog, ClientStatusLog, DispatchSchedule, Job, JobStageTimestamp, PrintRun } from '@/lib/types';
 import type { Stage } from '@/lib/constants/stages';
 import StagePipeline from './StagePipeline';
+import ReleaseColumns from './ReleaseColumns';
 import ProgressBar from './ProgressBar';
 import DeliveryCountdown from './DeliveryCountdown';
 import StatusBanners from './StatusBanners';
@@ -25,6 +26,7 @@ type TrackJobBundle = {
   stageTimestamps: JobStageTimestamp[];
   schedules: DispatchSchedule[];
   printRuns: PrintRun[];
+  runLogs: ClientPrintRunStageLog[];
 };
 
 type Props = {
@@ -212,11 +214,20 @@ export default function TrackJobAccordion({ poNumber, jobs, initialJobId }: Prop
                     </Reveal>
                   )}
 
-                  {bundle.job.is_scheduled_release && bundle.schedules.length > 0 && (
+                  {bundle.job.is_scheduled_release && bundle.printRuns.length > 0 ? (
+                    <Reveal onScroll>
+                      <ReleaseColumns
+                        runs={bundle.printRuns}
+                        runLogs={bundle.runLogs}
+                        totalQty={bundle.job.label_qty}
+                        totalDispatched={bundle.job.total_qty_dispatched ?? 0}
+                      />
+                    </Reveal>
+                  ) : bundle.job.is_scheduled_release && bundle.schedules.length > 0 ? (
                     <Reveal onScroll>
                       <ScheduledReleaseCard schedules={bundle.schedules} />
                     </Reveal>
-                  )}
+                  ) : null}
 
                   <Reveal onScroll>
                     <div className="grid grid-cols-2 gap-3">
@@ -314,11 +325,20 @@ function SingleJobDetail({ bundle }: { bundle: TrackJobBundle }) {
         </Reveal>
       )}
 
-      {bundle.job.is_scheduled_release && bundle.schedules.length > 0 && (
+      {bundle.job.is_scheduled_release && bundle.printRuns.length > 0 ? (
+        <Reveal onScroll>
+          <ReleaseColumns
+            runs={bundle.printRuns}
+            runLogs={bundle.runLogs}
+            totalQty={bundle.job.label_qty}
+            totalDispatched={bundle.job.total_qty_dispatched ?? 0}
+          />
+        </Reveal>
+      ) : bundle.job.is_scheduled_release && bundle.schedules.length > 0 ? (
         <Reveal onScroll>
           <ScheduledReleaseCard schedules={bundle.schedules} />
         </Reveal>
-      )}
+      ) : null}
 
       <Reveal onScroll>
         <div className="grid grid-cols-2 gap-3">
