@@ -104,6 +104,7 @@ The system explicitly rejects the generic admin template (rows of identical stat
 - Tactile, confident controls: focus lifts, emerald glows, instant hover feedback
 - Trispace with tabular numerals for every number, timestamp, and code
 - Status is always a tinted translucent chip; color means state, never decoration
+- The `/track` footer carries the portal's one signature piece of motion: the Delivery Scene (§5), a line-art truck carrying labels from the press to the client's dock
 
 ## 2. Colors: The Press Green Palette
 
@@ -203,6 +204,14 @@ A 1.5px-radius dot pulsing via `pulse-ring` (scale 1 → 1.4, 1.5s), used exclus
 ### Skeleton (loading)
 Shimmering glass bars (7% → 20% white sweep, 1.4s) shaped to match the final layout. Spinners in content areas are prohibited.
 
+### Delivery Scene (track signature)
+The `/track` portal's footer is a full-width scene: the press (sawtooth-roof silhouette, left — solar panels on every roof slope under a sun whose light streams down onto them, and an EV charger by the loading door), a dashed road along the bottom edge, and the client's receiving dock (right). A line-art electric box truck — Glass Ink strokes, 10–14% white fills, a Press Green band on the cargo side with "NOVELTY LABELS" in Trispace below it and an EV livery above it (charged battery glyph, "100% ELECTRIC", "CHARGED ON OUR SOLAR ROOF"), a driver behind the windscreen and a bolt badge on the cab door — drives left to right and unloads three label rolls onto the dock platform. The solar array glows softly (a slow opacity pulse) as dashed sunlight flows from the sun onto each panel, and the building carries one mint Trispace caption — "SOLAR · EV FLEET" — so the sustainability story is legible even at footer scale. The only accent these cues use is the existing `#7CF0BE` mint. Everything is drawn in the glass vocabulary: no colour beyond the palette, the only spectral tint is the amber hazard lamp that lights when a job is On Hold.
+
+- **Landing page:** an ambient loop (~35s) — the portal's brand statement: the truck pulls up beside the press with its rear to the EV charger; a cable connects and current flows while the battery bars on the livery fill and label rolls come out of the loading door into the cargo box; it unplugs, cruises to the dock, unloads, and drives on. The mono readout above the scene narrates the phase ("Charging · loading at the press", "En route · your dock", "Delivered").
+- **Job page:** the road from the press charger to the dock is the job's progress bar. A fresh PO sits plugged in at the charger; each completed pipeline stage moves the truck further along the road and lights the battery bars on its livery; Dispatched / PO Closed parks it at the dock and unloads; On Hold stops it where it is with hazards on. A Trispace readout above the scene names the stage and percent, so the scene is a status instrument, not decoration.
+- **Reduced motion:** no travel — the truck renders parked at its final position (labels already on the dock for the loop and delivered states).
+- **Scope:** this is the single sanctioned piece of ambient motion in the system. It lives only in the `/track` footer; nothing else inherits the licence.
+
 ## 6. Do's and Don'ts
 
 ### Do:
@@ -214,7 +223,7 @@ Shimmering glass bars (7% → 20% white sweep, 1.4s) shaped to match the final l
 
 ### Don't:
 - **Don't** build "generic admin template" surfaces: no rows of identical stat cards, no default-blue buttons, no off-the-shelf dashboard grammar (PRODUCT.md anti-reference, verbatim).
-- **Don't** be "consumer-app flashy": no gradients for fun, no confetti, no marketing-style motion inside the work tool (PRODUCT.md anti-reference, verbatim).
+- **Don't** be "consumer-app flashy": no gradients for fun, no confetti, no marketing-style motion inside the work tool (PRODUCT.md anti-reference, verbatim). The one sanctioned exception is the `/track` footer Delivery Scene (§5); it is scoped to that footer and does not extend the licence elsewhere.
 - **Don't** use spectral color decoratively; if a tint doesn't encode job state, it doesn't ship.
 - **Don't** add new thick left-stripe urgency borders (`border-l-4`). The existing row stripes are legacy; new urgency treatments use the row's background tint plus its badge. Phase stripes out on touch.
 - **Don't** stack glass on glass on glass. Two translucency levels deep, maximum; a third layer must be solid (e.g. option lists on #0A1F18).

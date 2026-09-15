@@ -29,7 +29,7 @@ References: **Linear** (crisp, fast, restrained color, impeccable detail) and th
 ## Anti-references
 
 - **Generic admin templates.** No Bootstrap/AdminLTE energy: no rows of identical stat cards, no default-blue buttons, no off-the-shelf dashboard grammar.
-- **Consumer-app flashy.** No playful gradients-for-fun, confetti, or marketing-style motion inside a work tool. The glass-mesh theme is premium restraint, not spectacle; every effect must serve legibility or state.
+- **Consumer-app flashy.** No playful gradients-for-fun, confetti, or marketing-style motion inside a work tool. The glass-mesh theme is premium restraint, not spectacle; every effect must serve legibility or state. **One deliberate exception:** the `/track` portal's footer Delivery Scene — a line-art truck carrying labels from the press to the client's dock. It is the portal's single brand signature, drawn in the same glass vocabulary, and on a job page its position is the job's real progress. It is scoped to that footer; it is not a licence for decorative motion anywhere else.
 
 ## Design Principles
 

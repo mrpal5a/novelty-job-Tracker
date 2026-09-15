@@ -57,8 +57,8 @@ export default function TrackPage() {
 
       <p className="mt-8 text-xs text-[var(--glass-muted)] text-center">
         Can&apos;t find your order? Contact us at{' '}
-        <a href="mailto:orders@noveltylabels.com" className="underline">
-          orders@noveltylabels.com
+        <a href="mailto:support@noveltytracker.com" className="underline">
+          support@noveltytracker.com
         </a>
       </p>
     </div>

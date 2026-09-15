@@ -5,6 +5,7 @@ import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { registerGsap } from '@/lib/gsap/register';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft } from 'lucide-react';
 import { cn, formatQty, formatShortDate } from '@/lib/utils';
 import { getProgressPercent, getVisibleStages } from '@/lib/constants/stages';
 import type { ClientStatusLog, DispatchSchedule, Job, JobStageTimestamp, PrintRun, RunStageTimestamp } from '@/lib/types';
@@ -16,8 +17,20 @@ import StatusBanners from './StatusBanners';
 import DispatchSummaryCard from './DispatchSummaryCard';
 import ProductionRunsCard from './ProductionRunsCard';
 import { Reveal } from '@/components/motion/Reveal';
+import { useDriveDeliveryScene, type DeliveryState } from './DeliverySceneContext';
 
 registerGsap();
+
+function toDeliveryState(bundle: TrackJobBundle | undefined): DeliveryState | null {
+  if (!bundle) return null;
+  const { job } = bundle;
+  const total = job.label_qty ?? 0;
+  const percent = job.is_scheduled_release
+    ? total > 0 ? Math.round(((job.dispatched_qty ?? 0) / total) * 100) : 0
+    : getProgressPercent(bundle.stageTimestamps.map((t) => t.stage as Stage), job.job_type);
+  const delivered = job.status === 'Dispatched' || job.status === 'PO Closed';
+  return { percent: delivered ? 100 : percent, delivered, label: job.status, paused: job.status === 'On Hold' };
+}
 
 type TrackJobBundle = {
   job: Job;
@@ -61,6 +74,8 @@ export default function TrackJobAccordion({ poNumber, partyTerm, jobs, initialJo
     }
   }, [hasInitialJob, initialJobId, firstJobId, jobs.length, openJobId]);
 
+  useDriveDeliveryScene(toDeliveryState(jobs.find((b) => b.job.id === openJobId)));
+
   if (!jobs.length) return null;
 
   if (jobs.length === 1) {
@@ -68,13 +83,11 @@ export default function TrackJobAccordion({ poNumber, partyTerm, jobs, initialJo
     return (
       <div className="space-y-5">
         <div className="flex items-center justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-white">Result for &ldquo;{poNumber}&rdquo;</h2>
             <p className="text-sm text-[var(--glass-muted)]">Single product order. Details are shown directly below.</p>
           </div>
-          <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-white shrink-0">
-            ← Search again
-          </a>
+          <SearchAgainLink />
         </div>
 
         <div className="rounded-2xl glass shadow-sm">
@@ -100,13 +113,11 @@ export default function TrackJobAccordion({ poNumber, partyTerm, jobs, initialJo
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Matching Jobs — &ldquo;{poNumber}&rdquo;</h2>
-          <p className="text-sm text-[var(--glass-muted)]">Open one job at a time. Click any row to expand it smoothly.</p>
+        <div className="min-w-0">
+          <h2 className="text-lg font-semibold text-white">Matching Jobs &mdash; &ldquo;{poNumber}&rdquo;</h2>
+          <p className="text-sm text-[var(--glass-muted)]">Open one job at a time. Tap any row to expand it.</p>
         </div>
-        <a href="/track" className="text-sm text-[var(--glass-muted)] hover:text-white shrink-0">
-          ← Search again
-        </a>
+        <SearchAgainLink />
       </div>
 
       <div className="space-y-3">
@@ -374,6 +385,18 @@ function SingleJobDetail({ bundle }: { bundle: TrackJobBundle }) {
         </div>
       </Reveal>
     </div>
+  );
+}
+
+function SearchAgainLink() {
+  return (
+    <a
+      href="/track"
+      className="inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm text-[var(--glass-muted)] transition-colors hover:bg-white/10 hover:text-white"
+    >
+      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+      Search again
+    </a>
   );
 }
 
