@@ -9,17 +9,33 @@
 // BOM access reads. A material with no rate yet is flagged, because it
 // shows in the costing dropdown but can't price a job until the rate is in.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Check, X, Archive, ArchiveRestore, Trash2, AlertTriangle, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { formatInr } from '@/lib/bom';
+import { compareValues, type SortDir } from '@/lib/sort';
 import type { BomMaterial } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
+import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
 const EMPTY: BomMaterial[] = [];
+
+// Click-to-sort, mirroring JobSeparationManager/DiesManager.
+type SortField = 'name' | 'specification' | 'rate_per_sqm' | 'updated_at';
+
+const COLUMN_SORT_FIELDS: Partial<Record<string, SortField>> = {
+  'Material':      'name',
+  'Specification': 'specification',
+  '₹ / m²':        'rate_per_sqm',
+  'Updated':       'updated_at',
+};
+
+const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
+  name: 'text', specification: 'text', rate_per_sqm: 'number', updated_at: 'date',
+};
 
 type Draft = { name: string; specification: string; rate: string };
 
@@ -47,6 +63,18 @@ export default function BomMaterialsManager({ canManage }: Props) {
   const [busyId,    setBusyId]    = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showRetired, setShowRetired] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDir,   setSortDir]   = useState<SortDir>('asc');
+
+  // Click a header to sort by it; click the same one again to flip direction.
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
 
   const materialsQuery = useQuery({
     queryKey: ['bom-materials'],
@@ -65,6 +93,15 @@ export default function BomMaterialsManager({ canManage }: Props) {
   }, [materialsQuery.error]);
 
   const visible = showRetired ? materials : materials.filter((m) => m.is_active);
+  const sortedVisible = useMemo(() => {
+    const kind = SORT_FIELD_KIND[sortField];
+    const sorted = [...visible];
+    sorted.sort((a, b) => {
+      const diff = compareValues(a[sortField], b[sortField], kind);
+      return sortDir === 'asc' ? diff : -diff;
+    });
+    return sorted;
+  }, [visible, sortField, sortDir]);
   const retiredCount = materials.length - materials.filter((m) => m.is_active).length;
   const unrated = materials.filter((m) => m.is_active && !(m.rate_per_sqm > 0)).length;
 
@@ -218,7 +255,16 @@ export default function BomMaterialsManager({ canManage }: Props) {
                     'sticky top-0 z-10 px-3 py-1.5 text-left text-[11px] font-semibold text-[var(--glass-muted)]',
                     'uppercase tracking-[0.06em] whitespace-nowrap bg-[var(--glass-bg-strong)] backdrop-blur-[14px] border-b border-white/12',
                     (col === '₹ / m²' || col === 'Actions') && 'text-right',
-                  )}>{col}</th>
+                  )}>
+                    {COLUMN_SORT_FIELDS[col] ? (
+                      <SortableHeaderLabel
+                        label={col}
+                        active={sortField === COLUMN_SORT_FIELDS[col]}
+                        dir={sortDir}
+                        onClick={() => handleSort(COLUMN_SORT_FIELDS[col]!)}
+                      />
+                    ) : col}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -235,7 +281,7 @@ export default function BomMaterialsManager({ canManage }: Props) {
                     </p>
                   </td>
                 </tr>
-              ) : visible.map((m, i) => {
+              ) : sortedVisible.map((m, i) => {
                 const editing = editingId === m.id;
                 const busy = busyId === m.id;
                 return (

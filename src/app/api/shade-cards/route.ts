@@ -22,7 +22,8 @@ import {
 
 /** Columns the list may be ordered by — same reasoning as SEARCH_FIELDS. */
 const SORTABLE = new Set([
-  'updated_at', 'party', 'prepared_date', 'approval_date', 'status',
+  'updated_at', 'prepared_date', 'approval_date', 'status',
+  'product_name', 'shade_card_number', 'pm_code', 'making_status',
 ]);
 
 /** Strip the characters that carry meaning inside a PostgREST or() filter.

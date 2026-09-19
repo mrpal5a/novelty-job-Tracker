@@ -20,6 +20,7 @@ import toast from 'react-hot-toast';
 import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
+import type { SortDir } from '@/lib/sort';
 import {
   SHADE_CARD_STATUSES,
   MAKING_STATUSES,
@@ -33,12 +34,33 @@ import type { ShadeCard } from '@/lib/types';
 import type { ShadeCardSummary } from '@/app/api/shade-cards/summary/route';
 import AddShadeCardModal, { type ShadeCardModalMode } from './AddShadeCardModal';
 import CsvExportButton from './CsvExportButton';
+import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
 const COLUMNS = [
   'Party', 'Product', 'Shade #', 'PM Code', 'Prepared', 'Approval',
   'Status', 'Made', 'Last updated', 'Actions',
 ] as const;
+
+// Click-to-sort — unlike the other tables here, this list is paged on the
+// server (see the file banner above), so sorting has to happen there too:
+// a client-side sort would only reorder the 25 rows already on screen, not
+// the ~3,000-row register. Every column here now has a matching entry in
+// the API's SORTABLE set (src/app/api/shade-cards/route.ts).
+type SortField =
+  | 'product_name' | 'shade_card_number' | 'pm_code'
+  | 'prepared_date' | 'approval_date' | 'status' | 'making_status' | 'updated_at';
+
+const COLUMN_SORT_FIELDS: Partial<Record<typeof COLUMNS[number], SortField>> = {
+  'Product':      'product_name',
+  'Shade #':      'shade_card_number',
+  'PM Code':      'pm_code',
+  'Prepared':     'prepared_date',
+  'Approval':     'approval_date',
+  'Status':       'status',
+  'Made':         'making_status',
+  'Last updated': 'updated_at',
+};
 
 type ListResponse = {
   cards:    ShadeCard[];
@@ -160,6 +182,8 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
   const [status,  setStatus]  = useState('');
   const [making,  setMaking]  = useState('');
   const [page,    setPage]    = useState(1);
+  const [sort,    setSort]    = useState<SortField>('shade_card_number');
+  const [dir,     setDir]     = useState<SortDir>('asc');
   // Set only by the "Added last 7 days" tile — there is no dropdown for it,
   // because the window it filters on is the one that tile counted rather than
   // anything a user would pick by hand.
@@ -176,9 +200,11 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
   if (making) params.set('making', making);
   if (createdFrom) params.set('created_from', createdFrom);
   params.set('page', String(page));
+  params.set('sort', sort);
+  params.set('dir', dir);
 
   const { data, isLoading } = useQuery<ListResponse>({
-    queryKey: ['shade-cards', search, field, status, making, createdFrom, page],
+    queryKey: ['shade-cards', search, field, status, making, createdFrom, page, sort, dir],
     queryFn: async () => {
       const res = await fetch(`/api/shade-cards?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to load shade cards');
@@ -217,6 +243,16 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
   function changeFilter(fn: () => void) {
     fn();
     setPage(1);
+  }
+
+  // Click a header to sort by it; click the same one again to flip direction.
+  // A re-sort reorders the whole register, not just this page, so it returns
+  // to page 1 the same way a filter change does.
+  function handleSort(field: SortField) {
+    changeFilter(() => {
+      if (field === sort) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      else { setSort(field); setDir('asc'); }
+    });
   }
 
   async function patchCard(card: ShadeCard, body: Record<string, unknown>, okMsg: string) {
@@ -443,7 +479,14 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
                         'px-4 py-1.5 text-left text-[11px] font-semibold text-[var(--glass-muted)]',
                         'uppercase tracking-[0.06em] whitespace-nowrap border-b border-white/12',
                       )}>
-                    {c === 'Actions' && !canManage ? '' : c}
+                    {c === 'Actions' && !canManage ? '' : COLUMN_SORT_FIELDS[c] ? (
+                      <SortableHeaderLabel
+                        label={c}
+                        active={sort === COLUMN_SORT_FIELDS[c]}
+                        dir={dir}
+                        onClick={() => handleSort(COLUMN_SORT_FIELDS[c]!)}
+                      />
+                    ) : c}
                   </th>
                 ))}
               </tr>

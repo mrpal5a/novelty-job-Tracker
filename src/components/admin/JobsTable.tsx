@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn, sortJobs, type JobSortOption } from '@/lib/utils';
+import { compareValues, type SortDir } from '@/lib/sort';
 import { JOBS_CHANGED_EVENT, JOBS_FILTER_EVENT, type JobsFilterDetail } from '@/lib/constants/events';
 import type { Job, AddJobFormData } from '@/lib/types';
 import type { DeptPermissions } from '@/lib/constants/departments';
@@ -11,6 +12,7 @@ import JobRow, { JOB_ROW_COLS } from './JobRow';
 import JobCard from './JobCard';
 import FilterBar from './FilterBar';
 import AddJobForm, { type AddJobFormHandle } from './AddJobForm';
+import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
 type Props = {
@@ -37,6 +39,28 @@ const JOB_COLUMNS = [
   'Dispatch', 'Delivery', 'Status', 'Actions',
 ] as const;
 
+// Click-to-sort, alongside (not replacing) the existing sortBy dropdown —
+// whichever the user touched most recently wins; see colSortField below.
+// Merged headers sort by the more useful of their two fields, same
+// convention as JobSeparationManager: PO date over the job card's own
+// string (which doesn't sort chronologically as text), PM code over the
+// free-text job name, party over the PO number.
+type SortField = 'po_date' | 'pm_code' | 'party' | 'dispatched_qty' | 'delivery_date' | 'status';
+
+const COLUMN_SORT_FIELDS: Partial<Record<typeof JOB_COLUMNS[number], SortField>> = {
+  'Job Card / PO Dt': 'po_date',
+  'PM / Job':         'pm_code',
+  'Party / PO':       'party',
+  'Dispatch':         'dispatched_qty',
+  'Delivery':         'delivery_date',
+  'Status':           'status',
+};
+
+const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
+  po_date: 'date', pm_code: 'text', party: 'text',
+  dispatched_qty: 'number', delivery_date: 'date', status: 'text',
+};
+
 type DuplicatePrefill = Pick<AddJobFormData,
   'party' | 'pm_code' | 'job_name' | 'label_qty' | 'job_type' | 'notes'
 >;
@@ -50,6 +74,11 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
   const [statusFilter, setStatusFilter] = useState('');
   const [urgentOnly,   setUrgentOnly]   = useState(false);
   const [sortBy,       setSortBy]       = useState<JobSortOption>('delivery_asc');
+  // null until a header is clicked — the dropdown drives the order until
+  // then. Set together, so whichever control the user touched last wins:
+  // picking a dropdown option clears this (see the FilterBar handler below).
+  const [colSortField, setColSortField] = useState<SortField | null>(null);
+  const [colSortDir,   setColSortDir]   = useState<SortDir>('asc');
   const [expandedId,   setExpandedId]   = useState<string | null>(null);
   const [prefill,      setPrefill]      = useState<Partial<DuplicatePrefill> | undefined>(undefined);
   const [formKey,      setFormKey]      = useState(0); // increment to reset form
@@ -134,7 +163,27 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
     );
   }
 
-  const sortedJobs = useMemo(() => sortJobs(jobs, sortBy), [jobs, sortBy]);
+  const sortedJobs = useMemo(() => {
+    if (!colSortField) return sortJobs(jobs, sortBy);
+    const kind = SORT_FIELD_KIND[colSortField];
+    const sorted = [...jobs];
+    sorted.sort((a, b) => {
+      const diff = compareValues(a[colSortField], b[colSortField], kind);
+      return colSortDir === 'asc' ? diff : -diff;
+    });
+    return sorted;
+  }, [jobs, sortBy, colSortField, colSortDir]);
+
+  // Click a header to sort by it; click the same one again to flip
+  // direction. Overrides the dropdown until the dropdown is used again.
+  function handleColSort(field: SortField) {
+    if (field === colSortField) {
+      setColSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setColSortField(field);
+      setColSortDir('asc');
+    }
+  }
 
   const hasFilters = Boolean(search || statusFilter || urgentOnly);
 
@@ -198,7 +247,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
         urgentOnly={urgentOnly}
         onUrgentOnlyChange={setUrgentOnly}
         sortBy={sortBy}
-        onSortByChange={setSortBy}
+        onSortByChange={(v) => { setSortBy(v); setColSortField(null); }}
         onClearFilters={clearFilters}
       />
 
@@ -285,7 +334,14 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
                       col === 'Actions' && 'text-right',
                     )}
                   >
-                    {col}
+                    {COLUMN_SORT_FIELDS[col] ? (
+                      <SortableHeaderLabel
+                        label={col}
+                        active={colSortField === COLUMN_SORT_FIELDS[col]}
+                        dir={colSortDir}
+                        onClick={() => handleColSort(COLUMN_SORT_FIELDS[col]!)}
+                      />
+                    ) : col}
                   </th>
                 ))}
               </tr>

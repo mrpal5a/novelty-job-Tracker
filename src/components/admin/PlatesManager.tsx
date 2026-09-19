@@ -7,16 +7,18 @@
 // remove records — this list is typed by hand, so mis-entries and duplicates
 // have to be fixable.
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Layers } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatAdminDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
+import { compareValues, type SortDir } from '@/lib/sort';
 import type { Plate } from '@/lib/types';
 import AddPlateModal from './AddPlateModal';
 import CsvExportButton from './CsvExportButton';
+import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 
 // Header labels for the desk table — must stay in the same order as the
@@ -26,6 +28,34 @@ const PLATE_COLUMNS = [
   'Labels / round', 'Location', 'Added', 'Actions',
 ] as const;
 const PLATE_COLS = PLATE_COLUMNS.length;
+
+// Click-to-sort, mirroring JobSeparationManager/DiesManager. Size (across /
+// around) is a merged header — it sorts by the more commonly filled field.
+type SortField =
+  | 'plate_id' | 'party' | 'pm_code' | 'item_name' | 'across_size' | 'cylinder'
+  | 'label_per_round' | 'location' | 'created_at';
+
+const COLUMN_SORT_FIELDS: Partial<Record<typeof PLATE_COLUMNS[number], SortField>> = {
+  'Plate ID':         'plate_id',
+  'Party':            'party',
+  'PM Code':          'pm_code',
+  'Item':             'item_name',
+  'Size':             'across_size',
+  'Cylinder':         'cylinder',
+  'Labels / round':   'label_per_round',
+  'Location':         'location',
+  'Added':            'created_at',
+};
+
+const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
+  plate_id: 'text', party: 'text', pm_code: 'text', item_name: 'text',
+  across_size: 'text', cylinder: 'number', label_per_round: 'number',
+  location: 'text', created_at: 'date',
+};
+
+// Stable reference — `data ?? []` would otherwise hand back a fresh array
+// every render, defeating the sortedPlates useMemo below.
+const EMPTY_PLATES: Plate[] = [];
 
 // Mirrors PLATE_SEARCH_FIELDS in src/app/api/plates/route.ts — the value
 // sent as ?field=. "All fields" (value 'all') skips the param, falling
@@ -64,6 +94,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
   const [editing,     setEditing]     = useState<Plate | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId,    setBusyId]    = useState<string | null>(null);
+  const [sortField, setSortField] = useState<SortField>('created_at');
+  const [sortDir,   setSortDir]   = useState<SortDir>('desc');
+
+  // Click a header to sort by it; click the same one again to flip direction.
+  const handleSort = (field: SortField) => {
+    if (field === sortField) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
 
   const queryClient = useQueryClient();
 
@@ -88,8 +130,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
     },
     placeholderData: keepPreviousData,
   });
-  const plates  = platesQuery.data ?? [];
+  const plates  = platesQuery.data ?? EMPTY_PLATES;
   const loading = platesQuery.isLoading;
+
+  const sortedPlates = useMemo(() => {
+    const kind = SORT_FIELD_KIND[sortField];
+    const sorted = [...plates];
+    sorted.sort((a, b) => {
+      const diff = compareValues(a[sortField], b[sortField], kind);
+      return sortDir === 'asc' ? diff : -diff;
+    });
+    return sorted;
+  }, [plates, sortField, sortDir]);
 
   useEffect(() => {
     if (platesQuery.error) toast.error((platesQuery.error as Error).message);
@@ -214,7 +266,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         <>
           {/* Phone: card list */}
           <ul className="sm:hidden space-y-3">
-            {plates.map((plate) => (
+            {sortedPlates.map((plate) => (
               <li key={plate.id} className="glass rounded-xl p-4">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                   <div className="min-w-0 flex-1">
@@ -333,13 +385,20 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                         'border-b border-white/12',
                         col === 'Actions' && 'text-right',
                       )}>
-                        {col}
+                        {COLUMN_SORT_FIELDS[col] ? (
+                          <SortableHeaderLabel
+                            label={col}
+                            active={sortField === COLUMN_SORT_FIELDS[col]}
+                            dir={sortDir}
+                            onClick={() => handleSort(COLUMN_SORT_FIELDS[col]!)}
+                          />
+                        ) : col}
                       </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {plates.map((plate, i) => {
+                  {sortedPlates.map((plate, i) => {
                     const size = plate.across_size || plate.around_size
                       ? `${plate.across_size ?? '—'} × ${plate.around_size ?? '—'}`
                       : '—';
