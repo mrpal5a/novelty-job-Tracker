@@ -127,7 +127,7 @@ export default function AddMemberModal({ onClose, onAdded }: Props) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. name@noveltylabels.com"
+              placeholder="e.g. name@yourcompany.com"
               autoComplete="off"
               className={inputCls}
             />

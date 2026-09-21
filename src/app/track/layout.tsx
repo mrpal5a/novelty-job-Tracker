@@ -6,14 +6,19 @@ import { Logo } from '@/components/brand/Logo';
 import { GradientMesh } from '@/components/motion/GradientMesh';
 import { DeliveryScene } from '@/components/track/DeliveryScene';
 import { DeliverySceneProvider } from '@/components/track/DeliverySceneContext';
+import { getBranding } from '@/lib/branding';
 
-export const metadata: Metadata = {
-  title: 'Order Tracking | Novelty Labels',
-  description: 'Track your label printing order status with Novelty Labels & Supplies.',
-  robots: { index: true, follow: false },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBranding();
+  return {
+    title: `Order Tracking | ${branding.shortName}`,
+    description: `Track your label printing order status with ${branding.name}.`,
+    robots: { index: true, follow: false },
+  };
+}
 
-export default function TrackLayout({ children }: { children: React.ReactNode }) {
+export default async function TrackLayout({ children }: { children: React.ReactNode }) {
+  const branding = await getBranding();
   return (
     <DeliverySceneProvider>
       <div className="min-h-screen flex flex-col text-[var(--glass-ink)]">
@@ -21,7 +26,7 @@ export default function TrackLayout({ children }: { children: React.ReactNode })
         {/* Minimal branded header */}
         <header className="bg-brand-header border-b border-white/10">
           <div className="max-w-2xl mx-auto px-4 h-14 flex items-center justify-between">
-            <Link href="/track" className="inline-flex h-8 items-center [&_img]:h-8 [&_img]:w-auto" aria-label="Novelty Labels — order tracking home">
+            <Link href="/track" className="inline-flex h-8 items-center [&_img]:h-8 [&_img]:w-auto" aria-label={`${branding.shortName} — order tracking home`}>
               <Logo onDark width={132} height={34} priority />
             </Link>
             <span className="text-white/40 text-xs">Order Tracking</span>
@@ -35,7 +40,7 @@ export default function TrackLayout({ children }: { children: React.ReactNode })
         <footer className="mt-10">
           <DeliveryScene />
           <p className="text-center text-xs text-[var(--glass-muted)] py-4 bg-black/25">
-            Novelty Labels &amp; Supplies · Ankleshwar GIDC, Gujarat
+            {branding.name} · {branding.address}
           </p>
         </footer>
       </div>

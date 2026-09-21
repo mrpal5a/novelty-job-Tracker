@@ -1,4 +1,4 @@
-# Novelty Labels Tracker — Setup Checklist
+# Label Print Tracker — Setup Checklist
 Complete this in order. Each step is a hard dependency on the previous.
 
 ---
@@ -6,18 +6,24 @@ Complete this in order. Each step is a hard dependency on the previous.
 ## Step 1: Supabase Project
 
 1. Go to https://supabase.com → New Project
-   - Name: `novelty-labels-tracker`
-   - Region: `ap-south-1` (Mumbai — closest to Ankleshwar)
+   - Name: `label-print-tracker` (or your company's name)
+   - Region: pick the one closest to your factory
    - Database password: generate a strong one, save it
 
 2. Once project is ready → **SQL Editor → New Query**
-   Paste and run the entire contents of:
-   `supabase/migrations/001_initial_schema.sql`
+   Run every file in `supabase/migrations/` **in filename order** (001 through
+   016) — paste and run each one's entire contents as its own query, in
+   sequence, since later files reference tables/functions created by earlier
+   ones. (Consolidated from a longer 58-migration history — see
+   [docs/migrations-consolidation.md](docs/migrations-consolidation.md) if
+   you're curious what changed.)
 
 3. Verify tables were created:
-   - Go to Table Editor — you should see:
+   - Go to Table Editor — you should see 30+ tables including
      `jobs`, `job_stage_timestamps`, `job_status_logs`, `stage_comments`,
-     `dispatch_schedules`, `on_time_dispatch_log`
+     `dispatch_schedules`, `on_time_dispatch_log`, `departments`,
+     `job_separations`, `bom_materials`, `shade_cards` (full list in
+     [docs/migrations-consolidation.md](docs/migrations-consolidation.md))
    - Go to Database → Views — you should see:
      `client_job_view`, `client_status_log_view`
 
@@ -34,11 +40,11 @@ Go to **Authentication → Users → Invite user** (or Add user):
 
 | Email                            | Password      | User Metadata (raw JSON)                                     |
 |----------------------------------|---------------|--------------------------------------------------------------|
-| prepress@noveltylabels.com       | [strong pwd]  | `{"department":"Prepress","display_name":"Prepress Team"}`   |
-| qc@noveltylabels.com             | [strong pwd]  | `{"department":"QC","display_name":"QC Team"}`               |
-| production@noveltylabels.com     | [strong pwd]  | `{"department":"Production","display_name":"Production Team"}`|
-| dispatch@noveltylabels.com       | [strong pwd]  | `{"department":"Dispatch","display_name":"Dispatch Team"}`   |
-| admin@noveltylabels.com          | [strong pwd]  | `{"department":"Admin","display_name":"Admin"}`              |
+| prepress@yourcompany.com         | [strong pwd]  | `{"department":"Prepress","display_name":"Prepress Team"}`   |
+| qc@yourcompany.com               | [strong pwd]  | `{"department":"QC","display_name":"QC Team"}`               |
+| production@yourcompany.com       | [strong pwd]  | `{"department":"Production","display_name":"Production Team"}`|
+| dispatch@yourcompany.com         | [strong pwd]  | `{"department":"Dispatch","display_name":"Dispatch Team"}`   |
+| admin@yourcompany.com            | [strong pwd]  | `{"department":"Admin","display_name":"Admin"}`              |
 
 To set metadata after creating a user:
 - Click the user → Edit → Raw User Meta Data → paste the JSON above
@@ -53,10 +59,10 @@ npm install -g pnpm
 
 # 2. Scaffold the Next.js project
 # (if starting fresh — skip if you're using this codebase directly)
-pnpm create next-app@14.2.29 novelty-labels-tracker \
+pnpm create next-app@14.2.29 label-print-tracker \
   --typescript --tailwind --eslint --app --src-dir --import-alias "@/*"
 
-cd novelty-labels-tracker
+cd label-print-tracker
 
 # 3. Install dependencies
 pnpm install
@@ -75,7 +81,7 @@ pnpm dev
 ## Step 4: Test Locally
 
 1. Visit http://localhost:3000/login
-   - Login with admin@noveltylabels.com
+   - Login with admin@yourcompany.com
    - Should redirect to /admin
 
 2. Add a test job via the Add Job form
@@ -122,11 +128,11 @@ vercel --prod
 
 ## Step 6: Custom Domain
 
-1. Buy `noveltylabels.com` (or use existing) from a registrar
+1. Buy your domain (or use existing) from a registrar
 2. In Vercel → Project → Settings → Domains:
-   - Add `track.noveltylabels.com`
+   - Add your production domain (e.g. `track.yourcompany.com`)
    - Follow DNS instructions (add CNAME record at your registrar)
-3. Update `NEXT_PUBLIC_APP_URL=https://track.noveltylabels.com` in Vercel env vars
+3. Update `NEXT_PUBLIC_APP_URL` and `NEXT_PUBLIC_CANONICAL_DOMAIN` in Vercel env vars to match
 
 ---
 
@@ -184,7 +190,7 @@ vercel --prod
 ---
 
 ## File Count Summary
-- SQL migration:         1 file (001_initial_schema.sql)
+- SQL migrations:        16 files (supabase/migrations/001-016)
 - API routes:           10 files
 - Page components:       6 files
 - Admin UI components:  11 files (+ 6 modals in 1 barrel file)

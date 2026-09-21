@@ -1,4 +1,4 @@
-# Novelty Labels — Production Job Tracker
+# Label Print Tracker — Production Job Tracker
 
 Production tracking for a label printing business. One system covers the whole
 journey of an order: from the purchase order landing on a desk, through
@@ -321,8 +321,8 @@ All routes require an authenticated Supabase session unless noted.
 ### 1. Install
 
 ```bash
-git clone https://github.com/mrpal5a/novelty-job-Tracker.git
-cd novelty-job-Tracker
+git clone <your-repo-url>
+cd label-print-tracker
 pnpm install
 ```
 
@@ -472,4 +472,4 @@ admin-template patterns, no consumer-app flashiness.
 
 ## License
 
-Private and proprietary. © Novelty Labels.
+Private and proprietary. © Your Print Company.

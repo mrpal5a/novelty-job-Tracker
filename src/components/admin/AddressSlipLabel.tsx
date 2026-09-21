@@ -58,16 +58,6 @@ export const ADDRESS_SLIP_HEIGHT_MM = 101.6;
  * than intent, so the street line is joined back up here and left to wrap
  * naturally at whatever width it is given.
  */
-export const DEFAULT_FROM_ADDRESS = [
-  'NOVELTY LABELS',
-  'Plot No-307 to 311, Shed No-18,',
-  'My Space (Rajat Pharma), Opp Cosmos Textile Mills,',
-  'Ramdev Chokdi, G.I.D.C.',
-  'Ankleshwar-393002,',
-  'Dist-Bharuch, Gujarat',
-  'MOB NO -91 9558992674',
-].join('\n');
-
 /** Which of the two blocks — the addressee, or the factory. */
 export type AddressBlock = 'to' | 'from';
 

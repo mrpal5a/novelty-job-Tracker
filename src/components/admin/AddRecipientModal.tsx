@@ -85,7 +85,7 @@ export default function AddRecipientModal({ onClose, onAdded }: Props) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="e.g. accounts@noveltylabels.com"
+              placeholder="e.g. accounts@yourcompany.com"
               autoComplete="off"
               className={inputCls}
             />

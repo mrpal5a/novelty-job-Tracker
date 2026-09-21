@@ -387,7 +387,7 @@ export interface JobStatusLog {
   qty_dispatched: number | null;
 }
 
-// Client-safe view (Admin → "Novelty Labels Team")
+// Client-safe view (Admin → its configured client_facing_name)
 export interface ClientStatusLog {
   id: string;
   job_id: string;

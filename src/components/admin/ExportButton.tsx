@@ -25,7 +25,7 @@ export default function ExportButton() {
       }
 
       const blob = await res.blob();
-      const name = res.headers.get('X-Export-Filename') ?? 'novelty-labels-export.zip';
+      const name = res.headers.get('X-Export-Filename') ?? 'export.zip';
 
       // Anchor + object URL — the only way to name a file that arrived
       // over fetch() rather than a direct navigation.

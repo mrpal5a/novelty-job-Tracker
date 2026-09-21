@@ -1,4 +1,4 @@
-novelty-labels-tracker/
+label-print-tracker/
 ├── .env.local.example
 ├── .env.local                    ← gitignored; your real keys
 ├── .gitignore

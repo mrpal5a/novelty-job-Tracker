@@ -23,7 +23,9 @@
 // The printer is 203 dpi = 8 dots/mm. Nothing here is finer than 0.25 mm
 // (2 dots), so every rule and stroke lands on whole dots and prints crisp.
 
+'use client';
 import type { CSSProperties } from 'react';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 /** Physical label dimensions. The die-cut stock loaded in the P210. */
 export const BOX_SLIP_WIDTH_MM = 152.4;
@@ -137,6 +139,7 @@ function Field({
  * make the printed output depend on a preview setting.
  */
 export default function BoxSlipLabel({ data }: { data: BoxSlipLabelData }) {
+  const branding = useBranding();
   const { materialName, pmCode, qtyPerBox, boxCount, mfgDate } = data;
 
   // The two lines the original states differently for the same fact: PACK
@@ -197,7 +200,7 @@ export default function BoxSlipLabel({ data }: { data: BoxSlipLabelData }) {
               whiteSpace: 'nowrap',
             }}
           >
-            NOVELTY CREATIONS
+            {branding.productionName}
           </div>
         </div>
 

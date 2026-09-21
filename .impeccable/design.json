@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
   "generatedAt": "2026-07-10T06:30:00Z",
-  "title": "Design System: Novelty Labels Tracker",
+  "title": "Design System: Label Print Tracker",
   "extensions": {
     "themes": {
       "admin": "Airy Green light theme (scoped under .admin-light): white cards on a pale mint wash, dark ink text. Used by the authenticated admin panel for legibility and speed on the factory floor.",

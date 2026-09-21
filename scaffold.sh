@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# Novelty Labels — Next.js 14 Project Scaffold
+# Label Print Tracker — Next.js 14 Project Scaffold
 # Run this from your dev machine after cloning the repo.
 # Prerequisites: Node 18+, pnpm (preferred) or npm
 # ============================================================
@@ -8,7 +8,7 @@
 set -e
 
 echo "→ Creating Next.js 14 project..."
-pnpm create next-app@latest novelty-labels-tracker \
+pnpm create next-app@latest label-print-tracker \
   --typescript \
   --tailwind \
   --eslint \
@@ -17,7 +17,7 @@ pnpm create next-app@latest novelty-labels-tracker \
   --import-alias "@/*" \
   --no-git
 
-cd novelty-labels-tracker
+cd label-print-tracker
 
 echo "→ Installing core dependencies..."
 pnpm add \

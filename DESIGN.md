@@ -1,5 +1,5 @@
 ---
-name: Novelty Labels Tracker
+name: Label Print Tracker
 description: Deep-green glass control room for a label printing production pipeline
 colors:
   press-green: "#10553F"
@@ -88,7 +88,7 @@ components:
     padding: "20px"
 ---
 
-# Design System: Novelty Labels Tracker
+# Design System: Label Print Tracker
 
 ## 1. Overview
 
@@ -205,7 +205,7 @@ A 1.5px-radius dot pulsing via `pulse-ring` (scale 1 → 1.4, 1.5s), used exclus
 Shimmering glass bars (7% → 20% white sweep, 1.4s) shaped to match the final layout. Spinners in content areas are prohibited.
 
 ### Delivery Scene (track signature)
-The `/track` portal's footer is a full-width scene: the press (sawtooth-roof silhouette, left — solar panels on every roof slope under a sun whose light streams down onto them, and an EV charger by the loading door), a dashed road along the bottom edge, and the client's receiving dock (right). A line-art electric box truck — Glass Ink strokes, 10–14% white fills, a Press Green band on the cargo side with "NOVELTY LABELS" in Trispace below it and an EV livery above it (charged battery glyph, "100% ELECTRIC", "CHARGED ON OUR SOLAR ROOF"), a driver behind the windscreen and a bolt badge on the cab door — drives left to right and unloads three label rolls onto the dock platform. The solar array glows softly (a slow opacity pulse) as dashed sunlight flows from the sun onto each panel, and the building carries one mint Trispace caption — "SOLAR · EV FLEET" — so the sustainability story is legible even at footer scale. The only accent these cues use is the existing `#7CF0BE` mint. Everything is drawn in the glass vocabulary: no colour beyond the palette, the only spectral tint is the amber hazard lamp that lights when a job is On Hold.
+The `/track` portal's footer is a full-width scene: the press (sawtooth-roof silhouette, left — solar panels on every roof slope under a sun whose light streams down onto them, and an EV charger by the loading door), a dashed road along the bottom edge, and the client's receiving dock (right). A line-art electric box truck — Glass Ink strokes, 10–14% white fills, a Press Green band on the cargo side with the company's short name (`BRANDING.shortName`) in Trispace below it and an EV livery above it (charged battery glyph, "100% ELECTRIC", "CHARGED ON OUR SOLAR ROOF"), a driver behind the windscreen and a bolt badge on the cab door — drives left to right and unloads three label rolls onto the dock platform. The solar array glows softly (a slow opacity pulse) as dashed sunlight flows from the sun onto each panel, and the building carries one mint Trispace caption — "SOLAR · EV FLEET" — so the sustainability story is legible even at footer scale. The only accent these cues use is the existing `#7CF0BE` mint. Everything is drawn in the glass vocabulary: no colour beyond the palette, the only spectral tint is the amber hazard lamp that lights when a job is On Hold.
 
 - **Landing page:** an ambient loop (~35s) — the portal's brand statement: the truck pulls up beside the press with its rear to the EV charger; a cable connects and current flows while the battery bars on the livery fill and label rolls come out of the loading door into the cargo box; it unplugs, cruises to the dock, unloads, and drives on. The mono readout above the scene narrates the phase ("Charging · loading at the press", "En route · your dock", "Delivered").
 - **Job page:** the road from the press charger to the dock is the job's progress bar. A fresh PO sits plugged in at the charger; each completed pipeline stage moves the truck further along the road and lights the battery bars on its livery; Dispatched / PO Closed parks it at the dock and unloads; On Hold stops it where it is with hazards on. A Trispace readout above the scene names the stage and percent, so the scene is a status instrument, not decoration.

@@ -11,7 +11,7 @@
  * (which moves the job's dispatched totals). JobsTable and JobDetailClient
  * listen and refetch.
  */
-export const JOBS_CHANGED_EVENT = 'novelty:jobs-changed';
+export const JOBS_CHANGED_EVENT = 'tracker:jobs-changed';
 
 /**
  * A dashboard stat was clicked and wants the jobs table to narrow to the rows
@@ -23,7 +23,7 @@ export const JOBS_CHANGED_EVENT = 'novelty:jobs-changed';
  * jobs that are not in the active table at all, so they stay non-interactive
  * rather than filtering to a guaranteed-empty result.
  */
-export const JOBS_FILTER_EVENT = 'novelty:jobs-filter';
+export const JOBS_FILTER_EVENT = 'tracker:jobs-filter';
 
 export type JobsFilterDetail = {
   /** A pipeline stage, or '' to clear the status filter. */

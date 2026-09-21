@@ -63,13 +63,13 @@ import RollSlipCompactLabel, {
 import AddressSlipLabel, {
   ADDRESS_SLIP_WIDTH_MM,
   ADDRESS_SLIP_HEIGHT_MM,
-  DEFAULT_FROM_ADDRESS,
   NO_OFFSET,
   type AddressBlock,
   type BlockOffset,
   type AddressSlipLabelData,
 } from './AddressSlipLabel';
 import type { Job } from '@/lib/types';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 /**
  * The five artworks this page can put on a sheet.
@@ -341,6 +341,7 @@ function BlockNudge({
 type Props = { canPrintBox: boolean; canPrintRoll: boolean };
 
 export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
+  const branding = useBranding();
   const [kind, setKind] = useState<SlipKind>('box');
 
   // ── Job selection, shared by both slips ─────────────────────
@@ -370,7 +371,7 @@ export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
   // the same on every consignment ever packed, the other is the only thing
   // this slip actually says.
   const [toAddress, setToAddress] = useState('');
-  const [fromAddress, setFromAddress] = useState(DEFAULT_FROM_ADDRESS);
+  const [fromAddress, setFromAddress] = useState(branding.returnAddress);
   const [addressCount, setAddressCount] = useState('1');
 
   // Where each block sits relative to the artwork. Not persisted: how much
@@ -498,7 +499,7 @@ export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
 
   const addressPreview: AddressSlipLabelData = {
     toAddress: toAddress.trim() || 'CONSIGNEE NAME\nStreet, City\nState  PIN',
-    fromAddress: fromAddress.trim() || DEFAULT_FROM_ADDRESS,
+    fromAddress: fromAddress.trim() || branding.returnAddress,
     toOffset,
     fromOffset,
   };

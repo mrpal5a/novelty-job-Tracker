@@ -51,7 +51,9 @@
 // still scan. A client who needs the tracking link gets it from the 6-up
 // slip, the dispatch email or the WhatsApp message.
 
+'use client';
 import type { CSSProperties } from 'react';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 /** Which of the two compact slips to print. */
 export type CompactSlipVariant = 'small' | 'mini';
@@ -166,6 +168,7 @@ export default function RollSlipCompactLabel({
   variant: CompactSlipVariant;
   data: RollSlipCompactLabelData;
 }) {
+  const branding = useBranding();
   const v = VARIANTS[variant];
   const { product, pmCode, qtyPerRoll, direction, operator, slipDate } = data;
 
@@ -219,7 +222,7 @@ export default function RollSlipCompactLabel({
               ...(v.reverseSupplier ? { background: '#000', color: '#fff' } : {}),
             })}
           >
-            <span style={line(v.fs.supplier)}>SUPPLIER - NOVELTY CREATIONS</span>
+            <span style={line(v.fs.supplier)}>SUPPLIER - {branding.productionName}</span>
           </div>
         </div>
 

@@ -6,6 +6,7 @@
 
 import type { Stage } from '@/lib/constants/stages';
 import { LOGO_CID } from './logoDataUri';
+import { getBranding } from '@/lib/branding';
 
 export type NotifyPayload = {
   job_id:    string;
@@ -115,13 +116,14 @@ export function getDispatchThreadKey(
 // masthead with the wordmark + logo, a light-green subject strip, an
 // alternating detail table, and a dark-green total-quantity callout row.
 
-export function getConsolidatedEmailHTML(payload: {
+export async function getConsolidatedEmailHTML(payload: {
   party: string;
   contactName?: string | null;   // party_contacts.contact_name — greet them by name when on file
   items: DispatchItem[];
   audience?: 'party' | 'team';   // 'team' = internal copy (Dear Team, ... for {party}); default 'party'
-}): string {
+}): Promise<string> {
   const { party, contactName, items, audience = 'party' } = payload;
+  const branding = await getBranding();
   const greetingName = audience === 'team' ? 'Team' : (contactName?.trim() || party);
   const introText = audience === 'team'
     ? `These are the dispatch details of today for <strong>${party}</strong>.`
@@ -173,11 +175,11 @@ export function getConsolidatedEmailHTML(payload: {
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#10540f;">
       <tr>
         <td style="padding:18px 16px;">
-          <h3 style="margin:0 0 4px;color:#ffffff;font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:700;">Novelty Labels / Creations</h3>
+          <h3 style="margin:0 0 4px;color:#ffffff;font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:700;">${branding.name}</h3>
           <h2 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.6px;">Dispatch Notification</h2>
         </td>
         <td style="padding:18px 16px 18px 0;text-align:right;vertical-align:middle;width:100px;">
-          <img src="cid:${LOGO_CID}" alt="Novelty Labels" width="80" style="display:block;margin-left:auto;background-color:#ffffff;border-radius:6px;padding:5px 8px;max-width:100%;height:auto;" />
+          <img src="cid:${LOGO_CID}" alt="${branding.shortName}" width="80" style="display:block;margin-left:auto;background-color:#ffffff;border-radius:6px;padding:5px 8px;max-width:100%;height:auto;" />
         </td>
       </tr>
     </table>
@@ -213,7 +215,7 @@ export function getConsolidatedEmailHTML(payload: {
     </div>
 
     <div style="background-color:#f0f7f0;padding:15px 16px;border-top:1px solid #b8d9b7;">
-      <p style="margin:0 0 5px 0;color:#10540f;font-size:12px;font-weight:600;">Novelty Labels · Dispatch Team</p>
+      <p style="margin:0 0 5px 0;color:#10540f;font-size:12px;font-weight:600;">${branding.shortName} · Dispatch Team</p>
       <p style="margin:0;color:#10540f;font-size:11px;">${sentAt}</p>
     </div>
 
@@ -222,10 +224,11 @@ export function getConsolidatedEmailHTML(payload: {
 </html>`;
 }
 
-export function getEmailHTML(
+export async function getEmailHTML(
   payload: Omit<NotifyPayload, 'job_id'> & { party: string; companyName: string }
-): string {
+): Promise<string> {
   const { job_name, po_number, party, companyName, status, remark, qty } = payload;
+  const branding = await getBranding();
   const trackUrl = `${process.env.NEXT_PUBLIC_APP_URL}/track/${encodeURIComponent(po_number)}?party=${encodeURIComponent(companyName)}`;
 
   const messageBody = (() => {
@@ -256,7 +259,7 @@ export function getEmailHTML(
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
           <tr>
             <td style="background:#1a1a18;padding:24px 32px;border-radius:10px 10px 0 0;">
-              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">Novelty Labels &amp; Supplies</p>
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">${branding.name}</p>
               <p style="margin:4px 0 0;color:#a8a8a0;font-size:13px;">Order Status Update</p>
             </td>
           </tr>
@@ -276,7 +279,7 @@ export function getEmailHTML(
           <tr>
             <td style="background:#f7f7f5;padding:16px 32px;border-radius:0 0 10px 10px;border:1px solid #e5e5e2;border-top:none;">
               <p style="margin:0;font-size:12px;color:#a8a8a0;">
-                Novelty Labels &amp; Supplies · Ankleshwar GIDC, Gujarat, India<br>
+                ${branding.name} · ${branding.address}<br>
                 This is an automated notification. Reply to this email to reach our team.
               </p>
             </td>

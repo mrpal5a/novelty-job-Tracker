@@ -12,6 +12,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptExportData } from '@/lib/constants/departments';
 import { buildExportFiles } from '@/lib/export/adminExport';
 import { createZip } from '@/lib/export/zip';
+import { getBranding, slugify } from '@/lib/branding';
 
 // zlib and Buffer — this cannot run on the edge runtime.
 export const runtime = 'nodejs';
@@ -47,9 +48,10 @@ export async function GET() {
     // not be narrowed by the caller's row-level visibility.
     const { files, counts } = await buildExportFiles(createAdminClient());
 
+    const branding = await getBranding();
     const now      = new Date();
     const istDay   = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
-    const filename = `novelty-labels-export-${istDay}.zip`;
+    const filename = `${slugify(branding.shortName)}-export-${istDay}.zip`;
     const zip      = createZip(files, now);
 
     console.log(

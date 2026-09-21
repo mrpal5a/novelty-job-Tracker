@@ -6,8 +6,10 @@ import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Reveal } from '@/components/motion/Reveal';
 import { Field } from '@/components/ui/Field';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 export default function TrackPage() {
+  const branding = useBranding();
   const router = useRouter();
   const [po, setPo] = useState('');
   const [company, setCompany] = useState('');
@@ -57,8 +59,8 @@ export default function TrackPage() {
 
       <p className="mt-8 text-xs text-[var(--glass-muted)] text-center">
         Can&apos;t find your order? Contact us at{' '}
-        <a href="mailto:support@noveltytracker.com" className="underline">
-          support@noveltytracker.com
+        <a href={`mailto:${branding.supportEmail}`} className="underline">
+          {branding.supportEmail}
         </a>
       </p>
     </div>

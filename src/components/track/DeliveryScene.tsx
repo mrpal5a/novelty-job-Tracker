@@ -10,6 +10,7 @@ import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { registerGsap } from '@/lib/gsap/register';
 import { useDeliveryScene } from './DeliverySceneContext';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 registerGsap();
 
@@ -43,6 +44,7 @@ type Layout = {
 };
 
 export function DeliveryScene() {
+  const branding = useBranding();
   const scene = useDeliveryScene();
   const state = scene?.state ?? null;
 
@@ -108,7 +110,7 @@ export function DeliveryScene() {
   const percent = state ? Math.max(0, Math.min(100, state.percent)) : null;
   const delivered = Boolean(state?.delivered);
   const paused = Boolean(state?.paused);
-  const idleReadout = 'Ankleshwar GIDC → your dock';
+  const idleReadout = `${branding.shortName} → your dock`;
 
   useGSAP(
     () => {
@@ -367,6 +369,7 @@ export function DeliveryScene() {
 }
 
 function TruckGlyph() {
+  const branding = useBranding();
   const windowClip = useId();
   return (
     <svg viewBox="0 0 160 68" className="block w-full h-auto overflow-visible">
@@ -405,7 +408,7 @@ function TruckGlyph() {
         x="51" y="45" textAnchor="middle" fontSize="6.5" letterSpacing="1.4" fill="currentColor" opacity=".8"
         style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace' }}
       >
-        NOVELTY LABELS
+        {branding.shortName}
       </text>
       {/* cab */}
       <path d="M100 18 H124 Q132 18 137 27 L146 42 V50 H100 Z" fill="rgba(255,255,255,.14)" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
@@ -453,6 +456,7 @@ const SUN_X = 52;
 const SUN_Y = -16;
 
 function PressSilhouette() {
+  const branding = useBranding();
   const glow = useId();
   return (
     <svg viewBox="0 -34 140 124" className="block w-full h-auto overflow-visible">
@@ -511,7 +515,7 @@ function PressSilhouette() {
         x="41" y="72" textAnchor="middle" fontSize="5.6" fontWeight="600" letterSpacing="1" fill="rgba(234,255,245,.7)"
         style={{ fontFamily: 'var(--font-mono), ui-monospace, monospace' }}
       >
-        NOVELTY LABELS
+        {branding.shortName}
       </text>
       <text
         x="42" y="81" textAnchor="middle" fontSize="4.6" letterSpacing=".8" fill="#7CF0BE" opacity=".9"

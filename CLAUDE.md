@@ -1,4 +1,4 @@
-# novelty-labels-tracker
+# label-print-tracker
 
 Production job tracker for a label printing business: authenticated admin panel (5 departments, 15-stage pipeline, QC, dispatch, machines) plus a public client tracking portal at `/track`. Next.js 14 App Router, Tailwind v3, Supabase, GSAP.
 

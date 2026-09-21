@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 
       if (partyEmails.length > 0) {
         const contactName = contacts?.length === 1 ? contacts[0].contact_name : null;
-        const html = getConsolidatedEmailHTML({ party, contactName, items: dispatchItems });
+        const html = await getConsolidatedEmailHTML({ party, contactName, items: dispatchItems });
         try {
           // Subject carries the PO so repeat dispatches to one party no
           // longer share an identical subject (which had Gmail collapsing
@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
       const internalEmails = (recipients ?? []).map((r) => r.email);
 
       if (internalEmails.length > 0) {
-        const html = getConsolidatedEmailHTML({ party, items: dispatchItems, audience: 'team' });
+        const html = await getConsolidatedEmailHTML({ party, items: dispatchItems, audience: 'team' });
         try {
           // Team copy is date-stamped and threads per-day — a dispatch of
           // the same PO on a later date must not collapse into the earlier

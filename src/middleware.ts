@@ -14,8 +14,9 @@
 //   only gate — because a few routes (e.g. POST /api/jobs) don't check
 //   department at all today and would otherwise let Viewer write there.
 // - / → redirects authenticated users to /admin, unauthenticated to /track
-// - non-api pages on the .vercel.app host → 308 redirect to the canonical
-//   custom domain, so noveltytracker.com is the one URL users ever see.
+// - non-api pages on any *.vercel.app host → 308 redirect to the configured
+//   canonical custom domain (NEXT_PUBLIC_CANONICAL_DOMAIN), so that's the
+//   one URL users ever see. No-op until that env var is set.
 //   /api/* is excluded so Vercel's own cron/internal calls to the
 //   .vercel.app deployment URL aren't redirected and dropped.
 // ============================================================
@@ -27,18 +28,17 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-const CANONICAL_HOST = 'noveltytracker.com';
-const VERCEL_HOST = 'novelty-tracker.vercel.app';
+const CANONICAL_HOST = process.env.NEXT_PUBLIC_CANONICAL_DOMAIN || '';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Canonicalize the domain: send anyone on the .vercel.app host to
-  // noveltytracker.com, preserving path/query. Skip /api/* — Vercel cron and
-  // server-to-server notification calls hit the deployment URL directly and
-  // must not be redirected.
+  // Canonicalize the domain: send anyone on a .vercel.app host to the
+  // configured canonical domain, preserving path/query. Skip /api/* —
+  // Vercel cron and server-to-server notification calls hit the deployment
+  // URL directly and must not be redirected.
   const host = request.headers.get('host');
-  if (host === VERCEL_HOST && !pathname.startsWith('/api/')) {
+  if (CANONICAL_HOST && host?.endsWith('.vercel.app') && host !== CANONICAL_HOST && !pathname.startsWith('/api/')) {
     const canonicalUrl = new URL(
       `${pathname}${request.nextUrl.search}`,
       `https://${CANONICAL_HOST}`

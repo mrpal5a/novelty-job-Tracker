@@ -14,6 +14,7 @@ import { LogoReveal } from '@/components/motion/LogoReveal';
 import { Stagger } from '@/components/motion/Stagger';
 import { Field } from '@/components/ui/Field';
 import { LoadingButton } from '@/components/ui/Loading';
+import { useBranding } from '@/components/brand/BrandingProvider';
 registerGsap();
 
 export default function LoginPage() {
@@ -25,6 +26,7 @@ export default function LoginPage() {
 }
 
 function LoginForm() {
+  const branding = useBranding();
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') ?? '/admin';
@@ -89,7 +91,7 @@ function LoginForm() {
             Staff Portal
           </h1>
           <p className="text-[var(--glass-muted)] text-sm mt-1">
-            Novelty Labels &amp; Supplies
+            {branding.name}
           </p>
         </div>
 

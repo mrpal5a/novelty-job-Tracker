@@ -27,8 +27,11 @@
 // cannot drift, and the fonts are system faces because a webfont that fails
 // to load on an offline packing PC would silently reflow the label.
 
+'use client';
 import type { CSSProperties } from 'react';
 import qrcode from 'qrcode-generator';
+import { productionNameLines } from '@/lib/branding-utils';
+import { useBranding } from '@/components/brand/BrandingProvider';
 
 /**
  * Physical slip dimensions — one sixth of the 6" x 4" sheet, with the height
@@ -50,8 +53,13 @@ export const ROLL_SLIP_ROWS = 3;
  * Deliberately the app host and not the marketing domain: /track has to
  * actually resolve, and a QR is printed onto a physical roll that will
  * outlive any redirect set up later. Point this at whatever serves /track.
+ *
+ * Falls back to localhost rather than any specific deployment's URL — an
+ * unconfigured NEXT_PUBLIC_APP_URL should fail loudly (a QR to localhost is
+ * obviously broken) rather than silently print codes that route to a
+ * different company's site.
  */
-const FALLBACK_SITE = 'https://novelty-tracker.vercel.app';
+const FALLBACK_SITE = 'http://localhost:3000';
 
 export type RollSlipLabelData = {
   product: string;
@@ -91,8 +99,8 @@ export type RollSlipLabelData = {
  * The middle band is now the last comfortable one, so the truncation below
  * matters more than it did at 15mm, not less.
  *
- * "https://novelty-tracker.vercel.app/track/" is already 41 of those
- * characters, and "?party=" another 7, which leaves roughly 36 for the PO
+ * A typical production app URL plus "/track/" is already 30-45 of those
+ * characters, and "?party=" another 7, which leaves roughly 30-40 for the PO
  * number and party combined before the code drops a density band. A typical
  * slip lands at 68. The full party name would still fit today, but a job
  * with a long PO ("PO/2026/000847-REV-A" encodes to 24 characters) plus a
@@ -195,7 +203,7 @@ const FS_LABEL = 3.0;          // SUPPLIER / PRODUCT / PM CODE / QUANTITY
 const FS_VALUE = 3.0;          // PM code, quantity
 const FS_PRODUCT = 3.2;
 const FS_META = 2.7;           // Direction / Operator — the longest strings
-const FS_HOUSE = 4.8;          // NOVELTY CREATIONS, two lines inside ROW1
+const FS_HOUSE = 4.8;          // Production house name, two lines inside ROW1
 
 const RULE = `${BORDER_MM}mm solid #000`;
 
@@ -213,8 +221,10 @@ const cell = (extra: CSSProperties = {}): CSSProperties => ({
 const nowrap: CSSProperties = { whiteSpace: 'nowrap' };
 
 export default function RollSlipLabel({ data }: { data: RollSlipLabelData }) {
+  const branding = useBranding();
   const { product, pmCode, qtyPerRoll, direction, operator, slipDate, poNumber, party } = data;
   const qrUrl = buildRollSlipQrUrl(poNumber, party);
+  const [houseLine1, houseLine2] = productionNameLines(branding.productionName);
 
   return (
     <div
@@ -267,9 +277,8 @@ export default function RollSlipLabel({ data }: { data: RollSlipLabelData }) {
                 letterSpacing: '-0.05mm',
               }}
             >
-              NOVELTY
-              <br />
-              CREATIONS
+              {houseLine1}
+              {houseLine2 && <><br />{houseLine2}</>}
             </span>
           </div>
 

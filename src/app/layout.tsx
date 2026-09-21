@@ -3,6 +3,8 @@ import React from 'react';
 import type { Metadata } from 'next';
 import { DM_Sans, Trispace } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
+import { getBranding } from '@/lib/branding';
+import { BrandingProvider } from '@/components/brand/BrandingProvider';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -18,40 +20,46 @@ const trispace = Trispace({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Novelty Labels — Order Tracking',
-    template: '%s | Novelty Labels',
-  },
-  description: 'Track your label printing orders with Novelty Labels & Supplies.',
-  robots: {
-    index: false,   // admin panel should not be indexed
-    follow: false,
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBranding();
+  return {
+    title: {
+      default: `${branding.shortName} — Order Tracking`,
+      template: `%s | ${branding.shortName}`,
+    },
+    description: `Track your label printing orders with ${branding.name}.`,
+    robots: {
+      index: false,   // admin panel should not be indexed
+      follow: false,
+    },
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const branding = await getBranding();
   return (
     <html lang="en" className={`${dmSans.variable} ${trispace.variable}`}>
       <body className="bg-brand-bg font-sans antialiased">
-        {children}
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              fontFamily: 'var(--font-dm-sans)',
-              fontSize: '0.875rem',
-              background: '#0C2A20',
-              color: '#ffffff',
-              borderRadius: '8px',
-            },
-          }}
-        />
+        <BrandingProvider branding={branding}>
+          {children}
+          <Toaster
+            position="top-right"
+            toastOptions={{
+              duration: 4000,
+              style: {
+                fontFamily: 'var(--font-dm-sans)',
+                fontSize: '0.875rem',
+                background: '#0C2A20',
+                color: '#ffffff',
+                borderRadius: '8px',
+              },
+            }}
+          />
+        </BrandingProvider>
       </body>
     </html>
   );

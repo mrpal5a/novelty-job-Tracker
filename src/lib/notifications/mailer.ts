@@ -10,7 +10,8 @@
 // email) — all send through this one transporter.
 
 import nodemailer from 'nodemailer';
-import { LOGO_DATA_URI, LOGO_CID } from './logoDataUri';
+import { getLogoDataUri, LOGO_CID } from './logoDataUri';
+import { getBranding } from '@/lib/branding';
 
 let transporter: nodemailer.Transporter | null = null;
 
@@ -40,7 +41,7 @@ export async function sendMail(opts: {
   // PO). Every send carrying the same key threads together in the
   // recipient's client; omit it and the email stands on its own.
   threadKey?: string | null;
-  // Attach the Novelty Labels logo as an inline CID image and reference it
+  // Attach the company logo as an inline CID image and reference it
   // in html via <img src="cid:...">. Set this instead of putting the logo
   // in the HTML as a data: URI — Outlook desktop, Outlook.com/Office 365,
   // and Yahoo Mail strip data: URIs from <img src> outright, which showed
@@ -53,11 +54,12 @@ export async function sendMail(opts: {
   // first email we ever sent about that PO. The message's own Message-ID is
   // left to nodemailer so it stays unique per send — reusing an id would let
   // Gmail treat a later dispatch as a duplicate and hide it.
-  const domain = process.env.GMAIL_USER?.split('@')[1] || 'novelty-labels.local';
+  const domain = process.env.GMAIL_USER?.split('@')[1] || 'localhost';
   const threadRoot = opts.threadKey ? `<${opts.threadKey}@${domain}>` : null;
+  const branding = await getBranding();
 
   const info = await getTransporter().sendMail({
-    from:    `"Novelty Labels & Supplies" <${process.env.GMAIL_USER}>`,
+    from:    `"${branding.name}" <${process.env.GMAIL_USER}>`,
     to:      opts.to,
     subject: opts.subject,
     html:    opts.html,
@@ -65,9 +67,9 @@ export async function sendMail(opts: {
     ...(opts.inlineLogo
       ? {
           attachments: [{
-            filename:    'novelty-labels-logo.png',
+            filename:    'company-logo.png',
             cid:         LOGO_CID,
-            content:     Buffer.from(LOGO_DATA_URI.split(',')[1], 'base64'),
+            content:     Buffer.from((await getLogoDataUri(branding.logoUrl)).split(',')[1], 'base64'),
             contentType: 'image/png',
           }],
         }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Package, Scissors, Disc, Users, SplitSquareHorizontal, Contact, ClipboardList, Truck, Menu, X, Building2, LayoutDashboard, Printer, Palette, type LucideIcon } from 'lucide-react';
+import { Package, Scissors, Disc, Users, SplitSquareHorizontal, Contact, ClipboardList, Truck, Menu, X, Building2, LayoutDashboard, Printer, Palette, Settings, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -278,6 +278,11 @@ export default function AdminHeader({ dept, displayName }: Props) {
     // system itself.
     ...(dept.isSuperAdmin
       ? [{ href: '/admin/departments', label: 'Departments', short: 'Depts', icon: Building2 }] : []),
+    // Company name/address/logo/support email — the details that make this
+    // deployment identifiable as one particular printing company. Admin
+    // only, same reasoning as Departments above.
+    ...(dept.isSuperAdmin
+      ? [{ href: '/admin/settings', label: 'Settings', icon: Settings }] : []),
   ];
 
   // ── Which rung of the ladder ────────────────────────────────────────
