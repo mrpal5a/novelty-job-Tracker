@@ -198,10 +198,10 @@ export default function AdminHeader({ dept, displayName, userEmail }: Props) {
   const { data: dispatchPending = 0 } = useQuery({
     queryKey: ['dispatch-notifications', 'pending-count'],
     queryFn: async () => {
-      const res = await fetch('/api/dispatch-notifications');
+      const res = await fetch('/api/dispatch-notifications?count=pending');
       if (!res.ok) throw new Error('Failed to load pending dispatch count');
       const data = await res.json();
-      return data.groups?.length ?? 0;
+      return data.pending ?? 0;
     },
     enabled: canQueue,
     refetchInterval: BOM_BADGE_POLL_MS,

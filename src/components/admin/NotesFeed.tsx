@@ -28,12 +28,15 @@ import { MessageSquare, X, BellRing, Check } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
 import { requestOpen, subscribeActiveWidget } from '@/lib/floatingWidgetCoordinator';
 import { useResizablePanel } from '@/hooks/useResizablePanel';
 import PanelResizeHandles from './PanelResizeHandles';
 import type { NoteFeedItem } from '@/lib/types';
 
-const POLL_MS  = 25_000;
+// Realtime (below) delivers new notes as they're written; this poll is only
+// the safety net for a dropped socket, so it can be slow.
+const POLL_MS  = 60_000;
 const FEED_URL = '/api/notes/feed?limit=50';
 
 type Props = {
@@ -225,6 +228,22 @@ export default function NotesFeed({ dept, userEmail }: Props) {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
+  }, [poll]);
+
+  // Realtime nudge: a new stage comment anywhere re-runs the same poll, so
+  // unread counts and the read-state join stay computed server-side.
+  // stage_comments is readable by every authenticated session, so there is
+  // nothing here this session couldn't already fetch.
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel('stage_comments_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stage_comments' }, () => {
+        poll();
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [poll]);
 
   // Close on Escape — the panel is a transient overlay, not a route.

@@ -24,7 +24,10 @@ import { cn } from '@/lib/utils';
 import { requestOpen, subscribeActiveWidget } from '@/lib/floatingWidgetCoordinator';
 import MessagesDrawer from './MessagesDrawer';
 
-const POLL_MS = 45_000;
+// messages + conversation_participants are in the realtime publication, so
+// the channel below is the primary signal; this poll only covers a dropped
+// socket.
+const POLL_MS = 120_000;
 
 type Props = {
   userEmail:    string;

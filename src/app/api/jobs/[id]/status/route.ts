@@ -20,6 +20,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import { waitUntil } from '@vercel/functions';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -318,7 +319,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     jobUpdate.is_closed = true;
   }
 
-  // ── 8. Execute all DB writes in sequence ──────────────────
+  // ── 8. Execute DB writes ──────────────────────────────────
   // (Supabase JS doesn't support true transactions from the edge —
   //  we write in dependency order; if a later write fails, the job
   //  is still updated but the log/timestamp may be missing.
@@ -337,29 +338,39 @@ export async function POST(request: NextRequest, { params }: Params) {
     ? visibleStages.slice(0, stageIdx + 1)
     : [new_status];
 
-  await admin
-    .from('job_stage_timestamps')
-    .upsert(
-      stagesToStamp.map((stage) => ({ job_id: id, stage, completed_at: now })),
-      { onConflict: 'job_id,stage', ignoreDuplicates: true }
-    );
+  const timestampWrites: PromiseLike<unknown>[] = [
+    admin
+      .from('job_stage_timestamps')
+      .upsert(
+        stagesToStamp.map((stage) => ({ job_id: id, stage, completed_at: now })),
+        { onConflict: 'job_id,stage', ignoreDuplicates: true }
+      ),
+  ];
 
   // An approved revert un-completes the stages it walked back past. Without
   // this the job would read "Plate Status" while Packing and QC stayed stamped
   // — the ✓ marks, the progress bar and the client portal would all keep
   // showing it as nearly done. Only pipeline stages are cleared; an On Hold or
   // PO Closed stamp is history, not progress, and stays.
+  // Runs alongside the upsert above: the two touch disjoint stage sets
+  // (up to and including stageIdx vs. strictly after it).
   if (movingBackward && stageIdx >= 0) {
     const stagesAhead = visibleStages.slice(stageIdx + 1);
     if (stagesAhead.length > 0) {
-      const { error: clearError } = await admin
-        .from('job_stage_timestamps')
-        .delete()
-        .eq('job_id', id)
-        .in('stage', stagesAhead);
-      if (clearError) console.error('[POST status] clear stages ahead:', clearError);
+      timestampWrites.push(
+        admin
+          .from('job_stage_timestamps')
+          .delete()
+          .eq('job_id', id)
+          .in('stage', stagesAhead)
+          .then(({ error }) => {
+            if (error) console.error('[POST status] clear stages ahead:', error);
+          })
+      );
     }
   }
+
+  await Promise.all(timestampWrites);
 
   // Update job
   const { data: updatedJob, error: updateError } = await admin
@@ -386,32 +397,44 @@ export async function POST(request: NextRequest, { params }: Params) {
   //                      Any 'Extra' surplus reported is added, not cleared.
   const stockActor = user.email ?? perms.key;
 
+  // Everything below depends only on updatedJob, not on each other, so the
+  // writes run in parallel instead of one round-trip after another — the
+  // whole block is awaited once, just before the response.
+  const sideEffects: PromiseLike<unknown>[] = [];
+  const logIfError = (label: string) => ({ error }: { error: unknown }) => {
+    if (error) console.error(`[POST status] ${label}:`, error);
+  };
+
   if (new_status === 'Partial Dispatch') {
     const computedRemaining = (updatedJob.label_qty ?? 0) - (updatedJob.dispatched_qty ?? 0);
     const remainingForStock = typeof stock_remaining_qty === 'number'
       ? stock_remaining_qty
       : computedRemaining;
-    const { error } = await upsertRemainingStock(
-      admin, updatedJob as Job, remainingForStock, stockActor,
+    sideEffects.push(
+      upsertRemainingStock(admin, updatedJob as Job, remainingForStock, stockActor)
+        .then(logIfError('remaining stock'))
     );
-    if (error) console.error('[POST status] remaining stock:', error);
   }
 
   if (new_status === 'Dispatched') {
-    const { error } = await clearRemainingStock(admin, id, stockActor);
-    if (error) console.error('[POST status] clear remaining stock:', error);
+    // Clear-then-add stays sequential within its own chain: the surplus row
+    // must not be touched by the clear.
+    sideEffects.push((async () => {
+      const { error } = await clearRemainingStock(admin, id, stockActor);
+      if (error) console.error('[POST status] clear remaining stock:', error);
 
-    if (typeof extra_label_qty === 'number' && extra_label_qty > 0) {
-      const { error: extraErr } = await addExtraStock(
-        admin, updatedJob as Job, extra_label_qty, stockActor,
-        extra_label_location, extra_label_remark,
-      );
-      if (extraErr) console.error('[POST status] extra stock:', extraErr);
-    }
+      if (typeof extra_label_qty === 'number' && extra_label_qty > 0) {
+        const { error: extraErr } = await addExtraStock(
+          admin, updatedJob as Job, extra_label_qty, stockActor,
+          extra_label_location, extra_label_remark,
+        );
+        if (extraErr) console.error('[POST status] extra stock:', extraErr);
+      }
+    })());
   }
 
   // Write status log
-  await admin
+  sideEffects.push(admin
     .from('job_status_logs')
     .insert({
       job_id:          id,
@@ -424,33 +447,36 @@ export async function POST(request: NextRequest, { params }: Params) {
       qty_dispatched:  (new_status === 'Partial Dispatch' || new_status === 'Dispatched')
                          ? (qty_dispatched ?? updatedJob.dispatched_qty)
                          : null,
-    });
+    })
+    .then(logIfError('status log')));
 
   // Record the Admin's skip justification as an internal stage comment.
   // stage_comments are never exposed to the client portal.
   if (override_prerequisite && override_remark?.trim()) {
-    await admin
+    sideEffects.push(admin
       .from('stage_comments')
       .insert({
         job_id:     id,
         stage:      new_status,
         comment:    `[Prerequisite skipped] ${override_remark.trim()}`,
         created_by: perms.key,
-      });
+      })
+      .then(logIfError('skip comment')));
   }
 
   // Same audit trail for a revert, and it records where the job came from —
   // job_status_logs alone would show the new stage with no sign that the job
   // had ever been further along.
   if (movingBackward && override_remark?.trim()) {
-    await admin
+    sideEffects.push(admin
       .from('stage_comments')
       .insert({
         job_id:     id,
         stage:      new_status,
         comment:    `[Reverted from "${job.status}"] ${override_remark.trim()}`,
         created_by: perms.key,
-      });
+      })
+      .then(logIfError('revert comment')));
   }
 
   // Write on-time dispatch log if fully dispatched
@@ -461,7 +487,7 @@ export async function POST(request: NextRequest, { params }: Params) {
       ? dispatchedAt <= deliveryDate
       : null;
 
-    await admin
+    sideEffects.push(admin
       .from('on_time_dispatch_log')
       .insert({
         job_id:        id,
@@ -469,10 +495,14 @@ export async function POST(request: NextRequest, { params }: Params) {
         delivery_date: job.delivery_date ?? null,
         is_on_time:    isOnTime,
         month_key:     toMonthKey(dispatchedAt),
-      });
+      })
+      .then(logIfError('on-time log')));
   }
 
   // ── 9. Fire notifications (non-blocking — don't await, don't fail request) ──
+  // waitUntil keeps the serverless function alive until the sends settle;
+  // a bare un-awaited fetch can be frozen mid-flight once the response
+  // goes out, silently dropping the email/WhatsApp.
   // Dispatch events (Partial Dispatch / Dispatched) don't email instantly —
   // a single truck run often carries several orders for the same party, so
   // each event queues into pending_dispatch_notifications instead, and
@@ -516,14 +546,14 @@ export async function POST(request: NextRequest, { params }: Params) {
       body:    JSON.stringify(notifyPayload),
     }));
 
-    // Fire-and-forget — failures are logged server-side but don't block response
-    Promise.all(sends).catch((err) => {
+    // Failures are logged server-side but don't block the response.
+    waitUntil(Promise.all(sends).catch((err) => {
       console.error('[POST status] notification error (non-fatal):', err);
-    });
+    }));
   }
 
   if (isDispatchEvent) {
-    const { error: queueError } = await admin
+    sideEffects.push(admin
       .from('pending_dispatch_notifications')
       .insert({
         job_id:    id,
@@ -534,9 +564,11 @@ export async function POST(request: NextRequest, { params }: Params) {
         qty:       qty_dispatched ?? updatedJob.dispatched_qty,
         remark:    remark?.trim() ?? null,
         pm_code:   job.pm_code,
-      });
-    if (queueError) console.error('[POST status] queue dispatch notification:', queueError);
+      })
+      .then(logIfError('queue dispatch notification')));
   }
+
+  await Promise.all(sideEffects);
 
   return NextResponse.json({ job: updatedJob });
 }

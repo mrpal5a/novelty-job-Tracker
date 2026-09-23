@@ -84,7 +84,9 @@ export default function MachineBoard({ dept, collapsed }: Props) {
     // dropping to the skeleton between them — same as the old code, which
     // only ever overwrote `data` on a successful fetch, never reset it.
     placeholderData: keepPreviousData,
-    refetchInterval: 60_000,
+    // A past date's board is history — it can't change, so only the live
+    // board polls.
+    refetchInterval: historyDate ? false : 60_000,
     // No point polling a board nobody is looking at — and nothing is fetched
     // until the stored preference has been read (collapsed === null), so a
     // collapsed board costs no request at all. Cached data is kept, so

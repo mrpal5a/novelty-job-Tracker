@@ -13,7 +13,7 @@ import type { PendingDispatchNotification, PendingDispatchGroup } from '@/lib/ty
 
 const MANUAL_STATUSES = ['Partial Dispatch', 'Dispatched'] as const;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
   const user = await getClaimsUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -24,6 +24,21 @@ export async function GET() {
   }
 
   const admin = createAdminClient();
+
+  // ?count=pending — just the number of parties with a batch waiting, for
+  // the header badge. Reads only the party column (served by the partial
+  // idx_pending_dispatch_notifications_pending index) instead of shipping
+  // every pending row to the client to count groups there.
+  if (request.nextUrl.searchParams.get('count') === 'pending') {
+    const { data, error } = await admin
+      .from('pending_dispatch_notifications')
+      .select('party')
+      .is('notified_at', null);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    const parties = new Set((data ?? []).map((r: { party: string }) => r.party));
+    return NextResponse.json({ pending: parties.size });
+  }
+
   const { data, error } = await admin
     .from('pending_dispatch_notifications')
     .select('*')
