@@ -24,6 +24,7 @@ import ExportButton from './ExportButton';
 type Props = {
   dept:        DeptPermissions;
   displayName: string;
+  userEmail:   string;
 };
 
 // How often the header re-checks for material requests nobody has answered.
@@ -149,7 +150,7 @@ function StackedNavLink({ item, pathname }: { item: NavItem; pathname: string })
   );
 }
 
-export default function AdminHeader({ dept, displayName }: Props) {
+export default function AdminHeader({ dept, displayName, userEmail }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();

@@ -853,3 +853,68 @@ export interface ShadeCardStatusHistoryEntry {
   changed_by_name: string | null;
   changed_at:      string;
 }
+
+// ── messages ─────────────────────────────────────────────────
+// Admin-initiated team messaging (migration 059). Admin starts a
+// conversation with one or more tagged members, optionally linked to a
+// job; any participant can reply once it exists. See NoteFeedItem above
+// for the (deliberately separate) job-scoped internal-note feed — this is
+// person-to-person, not tied to a job's stage history.
+
+/** Minimal job reference shown as a chip on a message. */
+export interface MessageJobRef {
+  id:              string;
+  job_card_number: string | null;
+  po_number:       string;
+  party:           string;
+  job_name:        string | null;
+}
+
+export interface Message {
+  id:              string;
+  conversation_id: string;
+  sender_id:       string;
+  sender_email:    string;
+  body:            string;
+  job_id:          string | null;
+  created_at:      string;
+}
+
+/** A message as returned by the thread API, with its job embed resolved. */
+export interface MessageWithJob extends Message {
+  job: MessageJobRef | null;
+}
+
+export interface ConversationParticipant {
+  member_id:    string;
+  member_email: string;
+  last_read_at: string | null;
+}
+
+/** One row of `my_conversations` (see migration 059) — powers both the
+ *  header unread badge and the drawer's conversation list. */
+export interface ConversationSummary {
+  conversation_id:            string;
+  subject:                    string | null;
+  started_by:                 string;
+  created_at:                 string;
+  last_read_at:                string | null;
+  last_message_id:             string | null;
+  last_message_body:           string | null;
+  last_message_sender_email:   string | null;
+  last_message_at:             string | null;
+  unread_count:                 number;
+  /** Filled in by the API from a separate participants query — not part
+   *  of the my_conversations view itself. */
+  participants:                 ConversationParticipant[];
+}
+
+/** Full thread, as returned by GET /api/messages/conversations/[id]. */
+export interface ConversationDetail {
+  id:           string;
+  subject:      string | null;
+  started_by:   string;
+  created_at:   string;
+  participants: ConversationParticipant[];
+  messages:     MessageWithJob[];
+}

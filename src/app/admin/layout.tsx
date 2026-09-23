@@ -6,6 +6,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { getDeptPermissions } from '@/lib/constants/departments';
 import AdminHeader from '@/components/admin/AdminHeader';
 import NotesFeed from '@/components/admin/NotesFeed';
+import MessagesWidget from '@/components/admin/MessagesWidget';
 import QueryProvider from '@/components/providers/QueryProvider';
 
 export const metadata = {
@@ -34,13 +35,17 @@ export default async function AdminLayout({
   return (
     <QueryProvider>
       <div className="admin-light min-h-screen">
-        <AdminHeader dept={perms} displayName={perms.displayName} />
+        <AdminHeader dept={perms} displayName={perms.displayName} userEmail={user.email ?? ''} />
         <main className="max-w-screen-2xl 3xl:max-w-[1800px] 4xl:max-w-[2200px] mx-auto px-4 py-6">
           {children}
         </main>
-        {/* Global internal-note feed. Mounted in the layout so the unread
-            badge survives navigation between admin pages. */}
+        {/* Global internal-note feed + team messaging. Both mounted in the
+            layout (not AdminHeader) so their unread badges survive
+            navigation and their floating launchers stay thumb-reachable
+            on every admin page — see the FAB stack rhythm documented in
+            NotesFeed/PrepressTodoPanel/MeterCalculatorPanel. */}
         <NotesFeed dept={perms.key} userEmail={user.email ?? ''} />
+        <MessagesWidget userEmail={user.email ?? ''} isSuperAdmin={perms.isSuperAdmin} />
       </div>
     </QueryProvider>
   );

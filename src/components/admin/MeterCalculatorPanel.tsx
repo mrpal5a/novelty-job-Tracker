@@ -2,9 +2,10 @@
 // src/components/admin/MeterCalculatorPanel.tsx
 // Floating launcher + panel for the Job Separation Meter Calculator — same
 // interaction shape as PrepressTodoPanel.tsx (itself modeled on NotesFeed's
-// chat widget), stacked above both so none of the three floating widgets
-// collide: NotesFeed at bottom-5, PrepressTodoPanel at bottom-24, this one
-// at bottom-[172px] (same 76px rhythm as the 5→24 step).
+// chat widget), stacked above all three so none of the floating widgets
+// collide: NotesFeed at bottom-5, MessagesWidget at bottom-24,
+// PrepressTodoPanel at bottom-[172px], this one at bottom-[248px] (same
+// 76px rhythm throughout).
 //
 // Three inputs, one answer. The operator enters the cylinder (teeth) rather
 // than a repeat length in mm — the shop's cylinders are specced by tooth
@@ -193,15 +194,15 @@ export default function MeterCalculatorPanel() {
     setUps('1');
   }
 
-  // ── Launcher — stacked above PrepressTodoPanel's FAB (bottom-24) so
-  // none of the three floating widgets overlap. ──────────────────────
+  // ── Launcher — stacked above PrepressTodoPanel's FAB (bottom-[172px])
+  // so none of the floating widgets overlap. ─────────────────────────
   if (!open) {
     return (
       <button
         onClick={handleOpen}
         aria-label="Meter Calculator"
         className={cn(
-          'fixed bottom-[172px] right-5 z-40 h-14 w-14 rounded-full',
+          'fixed bottom-[248px] right-5 z-40 h-14 w-14 rounded-full',
           'bg-brand-primary hover:bg-brand-primary-hover text-white',
           'shadow-lg shadow-black/20 flex items-center justify-center',
           'transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/40',
@@ -220,7 +221,7 @@ export default function MeterCalculatorPanel() {
       style={resizeStyle}
       className={cn(
         'fixed z-50 grid grid-rows-[auto_minmax(0,1fr)]',
-        !resizable && 'bottom-[172px] right-5 w-[min(92vw,360px)] max-h-[80vh]',
+        !resizable && 'bottom-[248px] right-5 w-[min(92vw,360px)] max-h-[80vh]',
         'bg-brand-surface border border-brand-border rounded-2xl',
         'shadow-2xl shadow-black/20 overflow-hidden',
       )}

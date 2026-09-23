@@ -402,15 +402,15 @@ export default function PrepressTodoPanel() {
     }
   }
 
-  // ── Launcher — stacked above NotesFeed's chat FAB (bottom-5) so the
-  // two floating widgets never overlap. ─────────────────────────────
+  // ── Launcher — stacked above NotesFeed (bottom-5) and MessagesWidget
+  // (bottom-24) so none of the floating widgets overlap. ─────────────
   if (!open) {
     return (
       <button
         onClick={handleOpen}
         aria-label={todos.length > 0 ? `Prepress To-Do, ${todos.length} pending` : 'Prepress To-Do'}
         className={cn(
-          'fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full',
+          'fixed bottom-[172px] right-5 z-40 h-14 w-14 rounded-full',
           'bg-brand-primary hover:bg-brand-primary-hover text-white',
           'shadow-lg shadow-black/20 flex items-center justify-center',
           'transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/40',
@@ -440,7 +440,7 @@ export default function PrepressTodoPanel() {
       style={resizeStyle}
       className={cn(
         'fixed z-50 grid grid-rows-[auto_minmax(0,1fr)_auto]',
-        !resizable && 'bottom-24 right-5 w-[min(90vw,320px)] max-h-[min(70vh,460px)]',
+        !resizable && 'bottom-[172px] right-5 w-[min(90vw,320px)] max-h-[min(70vh,460px)]',
         'bg-brand-surface border border-brand-border rounded-2xl',
         'shadow-2xl shadow-black/20 overflow-hidden',
       )}
