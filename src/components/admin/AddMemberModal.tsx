@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useDepartments } from '@/hooks/useReferenceData';
 
 type DepartmentOption = { key: string; display_name: string };
 
@@ -42,16 +43,13 @@ export default function AddMemberModal({ onClose, onAdded }: Props) {
 
   const [email,       setEmail]       = useState('');
   const [department,  setDepartment]  = useState('');
-  const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [password,    setPassword]    = useState('');
   const [saving,      setSaving]      = useState(false);
 
+  const { data: departments = [], isError: departmentsFailed } = useDepartments<DepartmentOption>();
   useEffect(() => {
-    fetch('/api/departments')
-      .then((res) => res.json())
-      .then((data) => setDepartments(data.departments ?? []))
-      .catch(() => toast.error('Failed to load the departments list'));
-  }, []);
+    if (departmentsFailed) toast.error('Failed to load the departments list');
+  }, [departmentsFailed]);
 
   function fillGeneratedPassword() {
     setPassword(generatePassword());

@@ -17,6 +17,9 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import type { PrintingMethod, PrintingUnit } from '@/lib/types';
 import { canDeptSetPrinting, type DeptPermissions } from '@/lib/constants/departments';
+import { usePrintingUnits } from '@/hooks/useReferenceData';
+
+const NO_UNITS: PrintingUnit[] = [];
 
 interface Props {
   jobId: string;
@@ -44,7 +47,6 @@ export default function PrintingUnitEdit({
   disabled = false,
 }: Props) {
   const canEdit = canDeptSetPrinting(dept);
-  const [units,  setUnits]  = useState<PrintingUnit[]>([]);
   const [method, setMethod] = useState<PrintingMethod>(printingMethod);
   const [unitId, setUnitId] = useState<string | null>(printingUnitId);
   const [saving, setSaving] = useState(false);
@@ -56,20 +58,10 @@ export default function PrintingUnitEdit({
 
   // Only active units are offered — a retired unit must not be assignable,
   // though a job already sitting on one keeps it until reassigned.
+  const { data: units = NO_UNITS, isError: unitsFailed } = usePrintingUnits<PrintingUnit>();
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/printing-units');
-        if (!res.ok) throw new Error('Could not load printing units');
-        const json = await res.json();
-        if (!cancelled) setUnits(json.units ?? []);
-      } catch {
-        if (!cancelled) setError('Could not load printing units');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    if (unitsFailed) setError('Could not load printing units');
+  }, [unitsFailed]);
 
   async function save(patch: Record<string, unknown>) {
     setSaving(true);

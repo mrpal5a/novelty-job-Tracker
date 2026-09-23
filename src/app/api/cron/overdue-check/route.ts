@@ -53,7 +53,7 @@ export async function GET() {
   });
 
   const message =
-    `🔴 *Overdue Orders — ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}*\n\n` +
+    `🔴 *Overdue Orders — ${new Date().toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })}*\n\n` +
     `${overdueJobs.length} order(s) past delivery date:\n\n` +
     lines.join('\n');
 

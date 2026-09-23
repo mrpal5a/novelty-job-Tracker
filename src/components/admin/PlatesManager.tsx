@@ -7,6 +7,7 @@
 // remove records — this list is typed by hand, so mis-entries and duplicates
 // have to be fixable.
 
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Layers } from 'lucide-react';
@@ -16,10 +17,12 @@ import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
 import { compareValues, type SortDir } from '@/lib/sort';
 import type { Plate } from '@/lib/types';
-import AddPlateModal from './AddPlateModal';
 import CsvExportButton from './CsvExportButton';
 import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+
+// Loaded on first open, not with the page — it only renders when open.
+const AddPlateModal = dynamic(() => import('./AddPlateModal'), { ssr: false });
 
 // Header labels for the desk table — must stay in the same order as the
 // <td>s rendered below.

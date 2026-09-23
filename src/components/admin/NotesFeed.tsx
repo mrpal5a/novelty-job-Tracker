@@ -33,9 +33,11 @@ import { requestOpen, subscribeActiveWidget } from '@/lib/floatingWidgetCoordina
 import { useResizablePanel } from '@/hooks/useResizablePanel';
 import PanelResizeHandles from './PanelResizeHandles';
 import type { NoteFeedItem } from '@/lib/types';
+import { useDepartments } from '@/hooks/useReferenceData';
 
 // Realtime (below) delivers new notes as they're written; this poll is only
 // the safety net for a dropped socket, so it can be slow.
+const NO_DEPARTMENTS: { key: string }[] = [];
 const POLL_MS  = 60_000;
 const FEED_URL = '/api/notes/feed?limit=50';
 
@@ -89,7 +91,6 @@ export default function NotesFeed({ dept, userEmail }: Props) {
   const [notes,          setNotes]          = useState<NoteFeedItem[]>([]);
   const [unread,         setUnread]         = useState(0);
   const [filter,         setFilter]         = useState<string>('All');
-  const [departments,    setDepartments]    = useState<{ key: string }[]>([]);
   const [error,          setError]          = useState(false);
   const [canPush,        setCanPush]        = useState<NotificationPermission | 'unsupported'>('unsupported');
   // Ids marked read locally but not yet confirmed by the next poll —
@@ -111,12 +112,8 @@ export default function NotesFeed({ dept, userEmail }: Props) {
     if ('Notification' in window) setCanPush(Notification.permission);
   }, []);
 
-  useEffect(() => {
-    fetch('/api/departments')
-      .then((res) => res.json())
-      .then((data) => setDepartments(data.departments ?? []))
-      .catch(() => {});
-  }, []);
+  // Shared cached list — same query every other component uses.
+  const { data: departments = NO_DEPARTMENTS } = useDepartments<{ key: string }>();
 
   const poll = useCallback(async () => {
     try {

@@ -108,16 +108,30 @@ export function sortJobs(jobs: Job[], sortBy: JobSortOption): Job[] {
 
 // ── Date formatting ───────────────────────────────────────────
 
+// date-fns formats in the runtime's own zone. That is IST in a browser at
+// the plant, but UTC on Vercel — so every server-rendered timestamp (the
+// whole /track portal, server-rendered admin cells) read 5h30m early, e.g.
+// "5:29 AM" for a 10:59 AM stage change. All display formatters below go
+// through toIST() so they print Indian time wherever they run. IST has no
+// DST, so the fixed +05:30 offset is exact year-round.
+const IST_OFFSET_MIN = 330;
+
+/** A Date whose *local* fields read as the IST wall-clock time of `iso`. */
+function toIST(iso: string | Date): Date {
+  const d = new Date(iso);
+  return new Date(d.getTime() + (IST_OFFSET_MIN + d.getTimezoneOffset()) * 60_000);
+}
+
 /** Admin panel format: "09-06-2026, 02:45 PM" */
 export function formatAdminDate(iso: string | null): string {
   if (!iso) return '—';
-  return format(new Date(iso), 'dd-MM-yyyy, hh:mm aa');
+  return format(toIST(iso), 'dd-MM-yyyy, hh:mm aa');
 }
 
 /** Numeric date only: "09-06-2026" — the dense desk table's mono date form. */
 export function formatNumericDate(iso: string | null): string {
   if (!iso) return '—';
-  return format(new Date(iso), 'dd-MM-yyyy');
+  return format(toIST(iso), 'dd-MM-yyyy');
 }
 
 /**
@@ -126,20 +140,20 @@ export function formatNumericDate(iso: string | null): string {
  */
 export function formatAdminDateParts(iso: string | null): { date: string; time: string } | null {
   if (!iso) return null;
-  const d = new Date(iso);
+  const d = toIST(iso);
   return { date: format(d, 'dd-MM-yyyy'), time: format(d, 'hh:mm aa') };
 }
 
 /** Client portal format: "09 June, 2:45 PM" */
 export function formatClientDate(iso: string | null): string {
   if (!iso) return '—';
-  return format(new Date(iso), 'dd MMMM, h:mm aa');
+  return format(toIST(iso), 'dd MMMM, h:mm aa');
 }
 
 /** Short date only: "09 Jun 2026" */
 export function formatShortDate(iso: string | null): string {
   if (!iso) return '—';
-  return format(new Date(iso), 'dd MMM yyyy');
+  return format(toIST(iso), 'dd MMM yyyy');
 }
 
 /** Month key for analytics: "2026-06" */

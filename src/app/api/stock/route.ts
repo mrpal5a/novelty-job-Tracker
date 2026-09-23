@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageStock } from '@/lib/constants/departments';
+import { orContains } from '@/lib/search';
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -33,11 +34,9 @@ export async function GET(request: NextRequest) {
   // Someone at the shelf has a label in hand: they search by whatever is
   // printed on it — card number, PO, PM code, party or job name.
   if (search) {
-    query = query.or(
-      `job_card_number.ilike.%${search}%,po_number.ilike.%${search}%,` +
-      `pm_code.ilike.%${search}%,party.ilike.%${search}%,job_name.ilike.%${search}%,` +
-      `location.ilike.%${search}%`
-    );
+    query = query.or(orContains(
+      ['job_card_number', 'po_number', 'pm_code', 'party', 'job_name', 'location'], search,
+    ));
   }
 
   const { data, error } = await query;

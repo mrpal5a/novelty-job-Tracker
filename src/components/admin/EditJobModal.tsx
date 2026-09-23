@@ -22,6 +22,9 @@ import { ModalShell } from './modals';
 import type { Job, PrintingUnit, JobType, PrintingMethod } from '@/lib/types';
 import { canDeptEditDeliveryDate } from '@/lib/constants/departments';
 import type { DeptPermissions } from '@/lib/constants/departments';
+import { usePrintingUnits } from '@/hooks/useReferenceData';
+
+const NO_UNITS: PrintingUnit[] = [];
 
 const JOB_TYPES: JobType[] = ['New', 'Repeat', 'Artwork Changed'];
 
@@ -74,7 +77,6 @@ type Props = {
 export default function EditJobModal({ job, dept, onClose, onSaved }: Props) {
   const titleId = useId();
   const [form,   setForm]   = useState<EditForm>(() => toForm(job));
-  const [units,  setUnits]  = useState<PrintingUnit[]>([]);
   const [saving, setSaving] = useState(false);
 
   // Dispatch and Admin own the delivery date (see the PATCH guard). Showing
@@ -83,20 +85,8 @@ export default function EditJobModal({ job, dept, onClose, onSaved }: Props) {
   const canEditDelivery = canDeptEditDeliveryDate(dept);
 
   // Active units only — a retired unit must never become assignable again.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/printing-units');
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) setUnits(json.units ?? []);
-      } catch {
-        // Non-fatal: the unit select falls back to "no units configured".
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // Non-fatal on failure: the unit select falls back to "no units configured".
+  const { data: units = NO_UNITS } = usePrintingUnits<PrintingUnit>();
 
   function set<K extends keyof EditForm>(key: K, value: EditForm[K]) {
     setForm((f) => ({ ...f, [key]: value }));

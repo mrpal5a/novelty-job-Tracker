@@ -8,6 +8,7 @@
 // someone else just added shows up without a manual refresh — the same
 // visibility-aware pattern the room displays use, not Supabase Realtime.
 
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -18,7 +19,6 @@ import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
 import type { JobSeparation, AddJobFormData, Job } from '@/lib/types';
 import type { Department } from '@/lib/constants/departments';
-import AddJobSeparationModal from './AddJobSeparationModal';
 import AddJobForm from './AddJobForm';
 import { PromptModal } from './modals';
 import ManagePartiesModal from './ManagePartiesModal';
@@ -26,6 +26,9 @@ import PrepressTodoPanel from './PrepressTodoPanel';
 import MeterCalculatorPanel from './MeterCalculatorPanel';
 import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+
+// Loaded on first open, not with the page — it only renders when open.
+const AddJobSeparationModal = dynamic(() => import('./AddJobSeparationModal'), { ssr: false });
 
 // party/po_no/po_date/pm_code/quantity map cleanly onto Job fields;
 // material_name maps to job_name (confirmed with the team — the two are

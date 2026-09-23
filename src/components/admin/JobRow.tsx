@@ -16,7 +16,8 @@
 // small fact about the job's identity, not a separate dimension worth a
 // whole column.
 
-import { useState } from 'react';
+import dynamic from 'next/dynamic';
+import { memo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, PauseCircle, Pencil, Trash2, CheckCircle2 } from 'lucide-react';
 import { cn, formatJobCardNumber, formatNumericDate, formatQty } from '@/lib/utils';
@@ -28,10 +29,12 @@ import type { DeptPermissions } from '@/lib/constants/departments';
 import type { Stage } from '@/lib/constants/stages';
 import HistoryPanel from './HistoryPanel';
 import DeliveryDateEdit from './DeliveryDateEdit';
-import EditJobModal from './EditJobModal';
 import JobDuplicateButton from './JobDuplicateButton';
 import { Button } from '@/components/ui/Button';
 import JobActionModals from './JobActionModals';
+
+// Loaded on first open, not with the page — it only renders when open.
+const EditJobModal = dynamic(() => import('./EditJobModal'), { ssr: false });
 
 /** Number of <td>s in a row — the expanded history panel has to span them all. */
 export const JOB_ROW_COLS = 7;
@@ -41,13 +44,13 @@ type Props = {
   dept:           DeptPermissions;
   index:          number;
   isExpanded:     boolean;
-  onToggleExpand: () => void;
+  onToggleExpand: (jobId: string) => void;
   onJobUpdated:   (job: Job) => void;
   onJobDeleted:   (id: string) => void;
   onDuplicate:    (data: { party: string; pm_code: string; job_name: string; label_qty: number | null; job_type: 'New' | 'Repeat' | 'Artwork Changed'; notes: string }) => void;
 };
 
-export default function JobRow({
+function JobRow({
   job, dept, index, isExpanded, onToggleExpand, onJobUpdated, onJobDeleted, onDuplicate,
 }: Props) {
   const actions = useJobActions({ job, dept, onJobUpdated, onJobDeleted });
@@ -290,7 +293,7 @@ export default function JobRow({
             <Button
               size="sm"
               icon={isExpanded ? ChevronUp : ChevronDown}
-              onClick={onToggleExpand}
+              onClick={() => onToggleExpand(job.id)}
               aria-expanded={isExpanded}
               aria-label={isExpanded ? 'Hide job history' : 'Show job history'}
               title={isExpanded ? 'Hide job history' : 'Show job history'}
@@ -354,3 +357,7 @@ export default function JobRow({
     </>
   );
 }
+
+// Memoised: JobsTable passes stable callbacks, so typing in the search box
+// or expanding one row no longer re-renders every other row.
+export default memo(JobRow);

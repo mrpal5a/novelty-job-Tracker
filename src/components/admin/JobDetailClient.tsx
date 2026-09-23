@@ -58,24 +58,24 @@ export default function JobDetailClient({ initialJob, dept }: Props) {
     qty_dispatched?: number;
   } | null>(null);
 
-  // A release dispatched down in the Releases panel changes this job's
-  // quantities without touching our copy of it — refetch when it says so.
+  // router.refresh() re-runs the page's server query and hands down a fresh
+  // initialJob — fold it into local state, or every refresh (a release
+  // dispatch, a printing-unit change) would be fetched and then ignored.
+  // Merged, not replaced, so fields only this component set stay put.
   useEffect(() => {
-    async function refreshJob() {
-      try {
-        const res  = await fetch(`/api/jobs/${initialJob.id}`);
-        const data = await res.json();
-        if (res.ok) setJob((prev) => ({ ...prev, ...data.job }));
-        // Drop the client router cache too, so going back to /admin shows the
-        // new totals instead of the list as it looked before the dispatch.
-        router.refresh();
-      } catch {
-        // Leave the current view in place — the panel already showed the error.
-      }
-    }
+    setJob((prev) => ({ ...prev, ...initialJob }));
+  }, [initialJob]);
+
+  // A release dispatched down in the Releases panel changes this job's
+  // quantities without touching our copy of it. One router.refresh() both
+  // re-reads the job (via the effect above) and drops the client router
+  // cache, so going back to /admin shows the new totals too — no separate
+  // /api/jobs/[id] fetch needed.
+  useEffect(() => {
+    const refreshJob = () => router.refresh();
     window.addEventListener(JOBS_CHANGED_EVENT, refreshJob);
     return () => window.removeEventListener(JOBS_CHANGED_EVENT, refreshJob);
-  }, [initialJob.id, router]);
+  }, [router]);
 
   const availableStages: Stage[] = [...PIPELINE_STAGES, 'On Hold'];
   if (canDeptOverridePOClosed(dept)) availableStages.push('PO Closed');

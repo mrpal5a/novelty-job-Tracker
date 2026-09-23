@@ -10,6 +10,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageJobSeparation } from '@/lib/constants/departments';
 import { parseDateRange, rangeOrClause, parseLimit, type DateRange } from '@/lib/jobSeparationQuery';
+import { containsPattern, orContains } from '@/lib/search';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -82,15 +83,14 @@ export async function GET(request: NextRequest) {
       query = query.eq(config.column, Math.trunc(n));
     } else if (config) {
       // Picked a specific text field — search just that column.
-      query = query.ilike(config.column, `%${search}%`);
+      query = query.ilike(config.column, containsPattern(search));
     } else {
       // "All fields" — the shop looks this up by whatever they can read
       // off a PO: the sr. no, the party, the PO no, the PM code, or the
       // material name.
-      query = query.or(
-        `sr_no.ilike.%${search}%,party.ilike.%${search}%,po_no.ilike.%${search}%,` +
-        `pm_code.ilike.%${search}%,material_name.ilike.%${search}%`
-      );
+      query = query.or(orContains(
+        ['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search,
+      ));
     }
   }
 

@@ -8,7 +8,8 @@
 // identity first, then the one decision that matters (what stage is it in),
 // then delivery pressure, then everything else.
 
-import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
+import React, { memo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp, PauseCircle, Pencil, Trash2, CheckCircle2 } from 'lucide-react';
 import { cn, formatAdminDate, formatJobCardNumber, formatQty, getDeliveryCountdown } from '@/lib/utils';
@@ -20,16 +21,18 @@ import type { DeptPermissions } from '@/lib/constants/departments';
 import type { Stage } from '@/lib/constants/stages';
 import HistoryPanel from './HistoryPanel';
 import DeliveryDateEdit from './DeliveryDateEdit';
-import EditJobModal from './EditJobModal';
 import JobDuplicateButton from './JobDuplicateButton';
 import { Button } from '@/components/ui/Button';
 import JobActionModals from './JobActionModals';
+
+// Loaded on first open, not with the page — it only renders when open.
+const EditJobModal = dynamic(() => import('./EditJobModal'), { ssr: false });
 
 type Props = {
   job:            Job;
   dept:           DeptPermissions;
   isExpanded:     boolean;
-  onToggleExpand: () => void;
+  onToggleExpand: (jobId: string) => void;
   onJobUpdated:   (job: Job) => void;
   onJobDeleted:   (id: string) => void;
   onDuplicate:    (data: { party: string; pm_code: string; job_name: string; label_qty: number | null; job_type: 'New' | 'Repeat' | 'Artwork Changed'; notes: string }) => void;
@@ -43,7 +46,7 @@ const COUNTDOWN_TEXT: Record<'green' | 'amber' | 'red' | 'muted', string> = {
   muted: 'text-[var(--glass-muted)]',
 };
 
-export default function JobCard({
+function JobCard({
   job, dept, isExpanded, onToggleExpand, onJobUpdated, onJobDeleted, onDuplicate,
 }: Props) {
   const actions   = useJobActions({ job, dept, onJobUpdated, onJobDeleted });
@@ -259,7 +262,7 @@ export default function JobCard({
       <div className="flex items-stretch gap-2 px-4 pb-3.5">
         <Button
           icon={isExpanded ? ChevronUp : ChevronDown}
-          onClick={onToggleExpand}
+          onClick={() => onToggleExpand(job.id)}
           aria-expanded={isExpanded}
           aria-controls={`history-${job.id}`}
           className="flex-1"
@@ -319,3 +322,6 @@ export default function JobCard({
     </article>
   );
 }
+
+// Memoised for the same reason as JobRow.
+export default memo(JobCard);

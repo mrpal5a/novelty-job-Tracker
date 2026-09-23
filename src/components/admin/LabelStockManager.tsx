@@ -6,6 +6,7 @@
 // Read-only for most departments; Dispatch and Admin get the two verbs that
 // change the shelf — add a manual entry, and mark a row dispatched out.
 
+import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, PackageCheck, History, Package } from 'lucide-react';
@@ -14,8 +15,10 @@ import { cn, formatQty, formatAdminDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvTimestamp, type CsvColumn } from '@/lib/export/csv';
 import type { LabelStock, StockKind } from '@/lib/types';
-import ManualStockModal from './ManualStockModal';
 import CsvExportButton from './CsvExportButton';
+
+// Loaded on first open, not with the page — it only renders when open.
+const ManualStockModal = dynamic(() => import('./ManualStockModal'), { ssr: false });
 
 const STOCK_EXPORT_COLUMNS: CsvColumn<LabelStock>[] = [
   { header: 'Kind',            value: (s) => s.kind },

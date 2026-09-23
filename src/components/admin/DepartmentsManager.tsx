@@ -14,12 +14,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, ChevronDown, ShieldCheck, Eye, Lock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { STAGES } from '@/lib/constants/stages';
 import { RUN_STAGES, RUN_STAGE_LABELS } from '@/lib/constants/runStages';
 import type { DepartmentRecord } from '@/lib/types';
 import { ConfirmModal } from './modals';
 import AddDepartmentModal from './AddDepartmentModal';
+import { DEPARTMENTS_KEY } from '@/hooks/useReferenceData';
 
 const FEATURES: { key: string; label: string }[] = [
   { key: 'printing_edit',                 label: 'Set printing method' },
@@ -52,20 +54,27 @@ export default function DepartmentsManager() {
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch('/api/departments');
       const data = await res.json();
-      if (res.ok) setDepartments(data.departments ?? []);
-      else toast.error(data.error ?? 'Failed to load departments');
+      if (res.ok) {
+        setDepartments(data.departments ?? []);
+        // Same endpoint the shared useDepartments() cache reads — hand it the
+        // fresh list so every other component sees this page's edits at once.
+        queryClient.setQueryData(DEPARTMENTS_KEY, data.departments ?? []);
+      } else {
+        toast.error(data.error ?? 'Failed to load departments');
+      }
     } catch {
       toast.error('Network error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => { load(); }, [load]);
 

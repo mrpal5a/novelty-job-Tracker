@@ -10,6 +10,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { DIE_STATUSES, type DieStatus } from '@/lib/types';
+import { containsPattern, orContains } from '@/lib/search';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -92,15 +93,14 @@ export async function GET(request: NextRequest) {
       query = query.eq(config.column, Math.trunc(n));
     } else if (config) {
       // Picked a specific text field — search just that column.
-      query = query.ilike(config.column, `%${search}%`);
+      query = query.ilike(config.column, containsPattern(search));
     } else {
       // "All fields" — someone holding a die searches by whatever they can
       // read off it: the job it was cut for, its material, its corner
       // style, or its serial — or where it should be sitting.
-      query = query.or(
-        `job_name.ilike.%${search}%,material.ilike.%${search}%,` +
-        `corner.ilike.%${search}%,serial_no.ilike.%${search}%,location.ilike.%${search}%`
-      );
+      query = query.or(orContains(
+        ['job_name', 'material', 'corner', 'serial_no', 'location'], search,
+      ));
     }
   }
 

@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/JobsTable.tsx
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn, sortJobs, type JobSortOption } from '@/lib/utils';
 import { compareValues, type SortDir } from '@/lib/sort';
@@ -149,19 +149,25 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
   // the updated row in — no need to re-sort `jobs` itself. Applied across
   // every cached filter/search variant, not just the one on screen, so
   // flipping back to a previously-viewed filter still shows the edit.
-  function onJobUpdated(updatedJob: Job) {
+  // All row callbacks are stable (useCallback) so the memoised JobRow /
+  // JobCard only re-render when their own job or expanded state changes.
+  const onJobUpdated = useCallback((updatedJob: Job) => {
     queryClient.setQueriesData<Job[]>(
       { queryKey: ['jobs'] },
       (old) => old?.map((j) => (j.id === updatedJob.id ? updatedJob : j))
     );
-  }
+  }, [queryClient]);
 
-  function onJobDeleted(jobId: string) {
+  const onJobDeleted = useCallback((jobId: string) => {
     queryClient.setQueriesData<Job[]>(
       { queryKey: ['jobs'] },
       (old) => old?.filter((j) => j.id !== jobId)
     );
-  }
+  }, [queryClient]);
+
+  const toggleExpand = useCallback((jobId: string) => {
+    setExpandedId((prev) => (prev === jobId ? null : jobId));
+  }, []);
 
   const sortedJobs = useMemo(() => {
     if (!colSortField) return sortJobs(jobs, sortBy);
@@ -194,11 +200,11 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
   }
 
   // Called by JobDuplicateButton — sets prefill and triggers new form key to open fresh
-  function handleDuplicate(data: DuplicatePrefill) {
+  const handleDuplicate = useCallback((data: DuplicatePrefill) => {
     setPrefill(data);
     setFormKey((k) => k + 1); // forces AddJobForm to remount with new prefill
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  }, []);
 
   return (
     <div>
@@ -286,9 +292,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
                     job={job}
                     dept={dept}
                     isExpanded={expandedId === job.id}
-                    onToggleExpand={() =>
-                      setExpandedId((prev) => (prev === job.id ? null : job.id))
-                    }
+                    onToggleExpand={toggleExpand}
                     onJobUpdated={onJobUpdated}
                     onJobDeleted={onJobDeleted}
                     onDuplicate={handleDuplicate}
@@ -363,9 +367,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
                     dept={dept}
                     index={i}
                     isExpanded={expandedId === job.id}
-                    onToggleExpand={() =>
-                      setExpandedId((prev) => (prev === job.id ? null : job.id))
-                    }
+                    onToggleExpand={toggleExpand}
                     onJobUpdated={onJobUpdated}
                     onJobDeleted={onJobDeleted}
                     onDuplicate={handleDuplicate}

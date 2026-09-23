@@ -11,6 +11,7 @@
 // cards, and shipping them all to sort a table would be the single largest
 // response in the admin panel.
 
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -32,10 +33,13 @@ import {
 } from '@/lib/constants/shadeCards';
 import type { ShadeCard } from '@/lib/types';
 import type { ShadeCardSummary } from '@/app/api/shade-cards/summary/route';
-import AddShadeCardModal, { type ShadeCardModalMode } from './AddShadeCardModal';
+import type { ShadeCardModalMode } from './AddShadeCardModal';
 import CsvExportButton from './CsvExportButton';
 import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+
+// Loaded on first open, not with the page — it only renders when open.
+const AddShadeCardModal = dynamic(() => import('./AddShadeCardModal'), { ssr: false });
 
 const COLUMNS = [
   'Party', 'Product', 'Shade #', 'PM Code', 'Prepared', 'Approval',

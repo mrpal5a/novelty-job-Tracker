@@ -9,6 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
+import { containsPattern, orContains } from '@/lib/search';
 
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() || null : null;
@@ -66,15 +67,12 @@ export async function GET(request: NextRequest) {
       query = query.eq(config.column, Math.trunc(n));
     } else if (config) {
       // Picked a specific text field — search just that column.
-      query = query.ilike(config.column, `%${search}%`);
+      query = query.ilike(config.column, containsPattern(search));
     } else {
       // "All fields" — someone standing at the rack searches by whatever
       // they have: the party that ordered it, the PM code, the item, or
       // the serial on the plate.
-      query = query.or(
-        `party.ilike.%${search}%,pm_code.ilike.%${search}%,` +
-        `item_name.ilike.%${search}%,plate_id.ilike.%${search}%`
-      );
+      query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
     }
   }
 

@@ -13,12 +13,12 @@ import { cn, formatAdminDate } from '@/lib/utils';
 import type { Member } from '@/lib/types';
 import AddMemberModal from './AddMemberModal';
 import RemoveAdminModal from './RemoveAdminModal';
+import { useDepartments } from '@/hooks/useReferenceData';
 
 type DepartmentOption = { key: string; display_name: string; is_super_admin: boolean };
 
 export default function TeamManager({ currentUserId }: { currentUserId: string }) {
   const [members,       setMembers]       = useState<Member[]>([]);
-  const [departments,   setDepartments]   = useState<DepartmentOption[]>([]);
   const [loading,       setLoading]       = useState(true);
   const [adding,        setAdding]        = useState(false);
   const [confirming,    setConfirming]    = useState<string | null>(null);
@@ -43,12 +43,10 @@ export default function TeamManager({ currentUserId }: { currentUserId: string }
 
   useEffect(() => { load(); }, [load]);
 
+  const { data: departments = [], isError: departmentsFailed } = useDepartments<DepartmentOption>();
   useEffect(() => {
-    fetch('/api/departments')
-      .then((res) => res.json())
-      .then((data) => setDepartments(data.departments ?? []))
-      .catch(() => toast.error('Failed to load the departments list'));
-  }, []);
+    if (departmentsFailed) toast.error('Failed to load the departments list');
+  }, [departmentsFailed]);
 
   const deptNames = Object.fromEntries(departments.map((d) => [d.key, d.display_name]));
   const superAdminKeys = new Set(departments.filter((d) => d.is_super_admin).map((d) => d.key));

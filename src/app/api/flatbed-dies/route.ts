@@ -14,6 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
+import { containsPattern, orContains } from '@/lib/search';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -67,13 +68,11 @@ export async function GET(request: NextRequest) {
       if (!Number.isFinite(n)) return NextResponse.json({ flatbed_dies: [] });
       query = query.eq(config.column, Math.trunc(n));
     } else if (config) {
-      query = query.ilike(config.column, `%${search}%`);
+      query = query.ilike(config.column, containsPattern(search));
     } else {
       // "All fields" — shape, corner, location are the only free-text
       // columns worth matching a loose search against.
-      query = query.or(
-        `shape.ilike.%${search}%,corner.ilike.%${search}%,location.ilike.%${search}%`
-      );
+      query = query.or(orContains(['shape', 'corner', 'location'], search));
     }
   }
 

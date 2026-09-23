@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/HistoryPanel.tsx
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { CheckCircle2, RefreshCw, Clock, Lock } from 'lucide-react';
 import { cn, formatAdminDate, formatShortDate, formatQty } from '@/lib/utils';
 import { PIPELINE_STAGES, REPEAT_SKIPPED_STAGES } from '@/lib/constants/stages';
@@ -15,6 +15,7 @@ import StageComments from './StageComments';
 import { PrintRunModal, PromptModal } from './modals';
 import { SkeletonText } from '@/components/ui/Skeleton';
 import toast from 'react-hot-toast';
+import { useDepartments } from '@/hooks/useReferenceData';
 
 type Props = {
   jobId:               string;
@@ -32,18 +33,12 @@ export default function HistoryPanel({ jobId, jobType, isScheduledRelease, dept,
   const [tick,     setTick]     = useState(0);
   // key -> display_name, for showing which department made a past status change —
   // that log's department may not be the viewer's own, so it can't come from `dept`.
-  const [deptNames, setDeptNames] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    fetch('/api/departments')
-      .then((res) => res.json())
-      .then((data) => {
-        const map: Record<string, string> = {};
-        for (const d of data.departments ?? []) map[d.key] = d.display_name;
-        setDeptNames(map);
-      })
-      .catch(() => {});
-  }, []);
+  const { data: departments } = useDepartments();
+  const deptNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const d of departments ?? []) map[d.key] = d.display_name;
+    return map;
+  }, [departments]);
 
   useEffect(() => {
     async function load() {

@@ -13,9 +13,11 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { Loader2, Plus, Trash2, Check, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { PRINTING_METHODS, type PrintingMethod, type PrintingUnit } from '@/lib/types';
 import { ConfirmModal } from './modals';
+import { PRINTING_UNITS_KEY } from '@/hooks/useReferenceData';
 
 const inputCls =
   'rounded-lg border border-black/[0.12] bg-white px-3 py-2 text-sm ' +
@@ -43,6 +45,8 @@ export default function PrintingUnitsManager() {
   const [editName,   setEditName]   = useState('');
   const [editMethod, setEditMethod] = useState<PrintingMethod>('Flexo');
 
+  const queryClient = useQueryClient();
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -51,12 +55,16 @@ export default function PrintingUnitsManager() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Could not load units');
       setUnits(json.units ?? []);
+      // This page reads ?all=true (retired units included), so it can't seed
+      // the shared active-only cache directly — mark it stale instead, so the
+      // next job form picks up an added, renamed or retired unit.
+      queryClient.invalidateQueries({ queryKey: PRINTING_UNITS_KEY });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load units');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => { load(); }, [load]);
 

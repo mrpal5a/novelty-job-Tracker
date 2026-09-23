@@ -8,6 +8,9 @@ import type { DeptPermissions } from '@/lib/constants/departments';
 import type { AddJobFormData, ScheduledReleaseInput, JobType, PrintingUnit, LabelStock, Job } from '@/lib/types';
 import { LoadingButton } from '@/components/ui/Loading';
 import toast from 'react-hot-toast';
+import { usePrintingUnits } from '@/hooks/useReferenceData';
+
+const NO_UNITS: PrintingUnit[] = [];
 
 // Shape returned by /api/jobs/pm-lookup
 type PmSuggestion = {
@@ -86,7 +89,6 @@ const AddJobForm = React.forwardRef<AddJobFormHandle, Props>(function AddJobForm
 ) {
   const [form,       setForm]       = useState<AddJobFormData>({ ...EMPTY_FORM, ...prefillData });
   // Active units only — a retired unit must never be assignable to a new job.
-  const [units,      setUnits]      = useState<PrintingUnit[]>([]);
   const [loading,    setLoading]    = useState(false);
   // Open straight away when duplicating — JobsTable remounts us with a fresh
   // key and the prefill, and a collapsed form would hide it (which made the
@@ -111,23 +113,10 @@ const AddJobForm = React.forwardRef<AddJobFormHandle, Props>(function AddJobForm
   // ── Stock already on the shelf for this PM code ────────────
   const [stockMatch, setStockMatch] = useState<StockMatch | null>(null);
 
-  // Load assignable units once the form opens.
-  useEffect(() => {
-    if (!isOpen) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('/api/printing-units');
-        if (!res.ok) return;
-        const json = await res.json();
-        if (!cancelled) setUnits(json.units ?? []);
-      } catch {
-        // Non-fatal: the unit select falls back to "no units configured"
-        // and the DB trigger still assigns the method's default on insert.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [isOpen]);
+  // Load assignable units once the form opens (shared cache). A failure is
+  // non-fatal: the unit select falls back to "no units configured" and the
+  // DB trigger still assigns the method's default on insert.
+  const { data: units = NO_UNITS } = usePrintingUnits<PrintingUnit>({ enabled: isOpen });
 
   useEffect(() => {
     if (!isOpen) return;

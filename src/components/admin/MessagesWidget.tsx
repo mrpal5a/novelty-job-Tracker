@@ -16,13 +16,20 @@
 // where that would matter.
 // ============================================================
 
+import dynamic from 'next/dynamic';
 import { useEffect, useState } from 'react';
 import { MessageCircle } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { requestOpen, subscribeActiveWidget } from '@/lib/floatingWidgetCoordinator';
-import MessagesDrawer from './MessagesDrawer';
+
+// Loaded on first open, not with every admin page — the drawer only renders
+// once the launcher is used. preloadDrawer warms the chunk on hover/focus so
+// the first open doesn't wait on the network.
+const loadDrawer = () => import('./MessagesDrawer');
+const MessagesDrawer = dynamic(loadDrawer, { ssr: false });
+const preloadDrawer = () => { void loadDrawer(); };
 
 // messages + conversation_participants are in the realtime publication, so
 // the channel below is the primary signal; this poll only covers a dropped
@@ -89,6 +96,8 @@ export default function MessagesWidget({ userEmail, isSuperAdmin }: Props) {
     return (
       <button
         onClick={handleOpen}
+        onPointerEnter={preloadDrawer}
+        onFocus={preloadDrawer}
         aria-label={unread > 0 ? `Messages, ${unread} unread` : 'Messages'}
         className={cn(
           'fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full',

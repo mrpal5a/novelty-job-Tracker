@@ -9,6 +9,7 @@
 // Read-only for most departments — Prepress and Admin own the entries.
 // Structure mirrors DiesManager.tsx, minus the columns that don't apply.
 
+import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Scissors, ArrowUp, ArrowDown } from 'lucide-react';
@@ -17,9 +18,11 @@ import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
 import type { FlatbedDie } from '@/lib/types';
-import AddFlatbedDieModal from './AddFlatbedDieModal';
 import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
+
+// Loaded on first open, not with the page — it only renders when open.
+const AddFlatbedDieModal = dynamic(() => import('./AddFlatbedDieModal'), { ssr: false });
 
 // Header labels for the desk table — must stay in the same order as the
 // <td>s rendered below.

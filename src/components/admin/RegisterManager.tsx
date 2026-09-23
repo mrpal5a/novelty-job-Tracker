@@ -14,6 +14,7 @@ import {
   Pencil, Trash2, PhoneCall, Copy,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { ModalShell, ConfirmModal, PromptModal } from './modals';
 import CsvExportButton from './CsvExportButton';
@@ -34,6 +35,12 @@ const STAGES: { id: RegisterStage; name: string; dot: string }[] = [
 const ACTIVITY_TYPES = ['Call', 'WhatsApp', 'Email', 'Visit', 'Sample sent', 'Quote sent', 'Note'];
 const SEGMENTS = ['Agrochem', 'FMCG / Personal care', 'Pharma', 'Food', 'Industrial', 'Other'];
 const POLL_MS = 30_000;
+const REGISTER_KEY = ['register'] as const;
+// Stable empties so the useMemos below don't recompute on every render
+// before the first load lands.
+const NO_ACCOUNTS:   RegisterAccount[]  = [];
+const NO_DEALS:      RegisterDeal[]     = [];
+const NO_ACTIVITIES: RegisterActivity[] = [];
 type View = 'today' | 'pipeline' | 'accounts' | 'log';
 
 const stageMeta = (id: string) => STAGES.find((s) => s.id === id) ?? STAGES[0];
@@ -82,10 +89,6 @@ const btnDanger = 'inline-flex items-center justify-center gap-1.5 min-h-9 px-3 
 
 // ── main component ───────────────────────────────────────────
 export default function RegisterManager() {
-  const [accounts,   setAccounts]   = useState<RegisterAccount[]>([]);
-  const [deals,      setDeals]      = useState<RegisterDeal[]>([]);
-  const [activities, setActivities] = useState<RegisterActivity[]>([]);
-  const [loading,    setLoading]    = useState(true);
   const [view,       setView]       = useState<View>('today');
   const [search,     setSearch]     = useState('');
 
@@ -95,28 +98,40 @@ export default function RegisterManager() {
   const [dealModal, setDealModal] = useState<{ deal: RegisterDeal | null; accountId?: string } | null>(null);
   const [logDeal, setLogDeal] = useState<RegisterDeal | null>(null);
 
-  const load = useCallback(async () => {
-    try {
+  // React Query owns the poll: refetchInterval already pauses while the tab
+  // is hidden (the old manual visibilityState check), a failed poll keeps the
+  // last good data on screen, and revisiting the page renders from cache.
+  const queryClient = useQueryClient();
+  const registerQuery = useQuery({
+    queryKey: REGISTER_KEY,
+    queryFn: async () => {
       const [a, d, act] = await Promise.all([
         fetch('/api/register/accounts').then((r) => r.json()),
         fetch('/api/register/deals').then((r) => r.json()),
         fetch('/api/register/activities').then((r) => r.json()),
       ]);
-      if (a.accounts) setAccounts(a.accounts);
-      if (d.deals) setDeals(d.deals);
-      if (act.activities) setActivities(act.activities);
-    } catch {
-      toast.error('Network error loading Register');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (!a.accounts || !d.deals || !act.activities) throw new Error('Register load failed');
+      return {
+        accounts:   a.accounts as RegisterAccount[],
+        deals:      d.deals as RegisterDeal[],
+        activities: act.activities as RegisterActivity[],
+      };
+    },
+    refetchInterval: POLL_MS,
+  });
+  const accounts   = registerQuery.data?.accounts   ?? NO_ACCOUNTS;
+  const deals      = registerQuery.data?.deals      ?? NO_DEALS;
+  const activities = registerQuery.data?.activities ?? NO_ACTIVITIES;
+  const loading    = registerQuery.isPending;
 
-  useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const interval = setInterval(() => { if (document.visibilityState === 'visible') load(); }, POLL_MS);
-    return () => clearInterval(interval);
-  }, [load]);
+    if (registerQuery.isError) toast.error('Network error loading Register');
+  }, [registerQuery.isError]);
+
+  const load = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: REGISTER_KEY }),
+    [queryClient],
+  );
 
   const accountOf = useCallback((id: string) => accounts.find((a) => a.id === id), [accounts]);
   const openDeals = useMemo(() => deals.filter((d) => d.status === 'open'), [deals]);

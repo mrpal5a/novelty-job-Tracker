@@ -11,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions } from '@/lib/constants/departments';
 import { createJobRecord } from '@/lib/jobs/createJob';
 import type { AddJobFormData } from '@/lib/types';
+import { orContains } from '@/lib/search';
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -39,9 +40,7 @@ export async function GET(request: NextRequest) {
   if (search) {
     // job_card_number first: prepress reads a number off a printed card
     // and searches for it, so it is the most common lookup on the floor.
-    query = query.or(
-      `job_card_number.ilike.%${search}%,po_number.ilike.%${search}%,party.ilike.%${search}%,job_name.ilike.%${search}%`
-    );
+    query = query.or(orContains(['job_card_number', 'po_number', 'party', 'job_name'], search));
   }
 
   const { data, error } = await query;
