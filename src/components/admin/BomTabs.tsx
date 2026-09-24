@@ -1,9 +1,9 @@
 'use client';
 // src/components/admin/BomTabs.tsx
-// Bill of Material's three sheets behind one tab switcher, the way Dies
+// Bill of Material's four sheets behind one tab switcher, the way Dies
 // holds roto and flatbed: Costing (the order-vs-material comparison, where
-// the floor works), Requests (the owner's inbox), Materials (the master
-// list with rates). Same pattern as DiesTabs so the team keeps thinking of
+// the floor works), Requests (the owner's inbox), Inventory (paper rolls on
+// the rack), Materials (the master list with rates). Same pattern as DiesTabs so the team keeps thinking of
 // it as one section.
 //
 // The Requests tab carries the pending count — the same number the nav
@@ -16,16 +16,18 @@ import { cn } from '@/lib/utils';
 import BomCostingTable from './BomCostingTable';
 import BomRequestsList from './BomRequestsList';
 import BomMaterialsManager from './BomMaterialsManager';
+import PaperStockManager from './PaperStockManager';
 
-type Tab = 'costing' | 'requests' | 'materials';
+type Tab = 'costing' | 'requests' | 'inventory' | 'materials';
 
 const TABS: { value: Tab; label: string }[] = [
   { value: 'costing',   label: 'Costing' },
   { value: 'requests',  label: 'Requests' },
+  { value: 'inventory', label: 'Inventory' },
   { value: 'materials', label: 'Materials' },
 ];
 
-export default function BomTabs({ canDecide }: { canDecide: boolean }) {
+export default function BomTabs({ canDecide, canManageStock }: { canDecide: boolean; canManageStock: boolean }) {
   // Costing first for everyone — "is this order worth taking" is the
   // question the section exists to answer; the Requests badge flags the
   // rest.
@@ -77,7 +79,8 @@ export default function BomTabs({ canDecide }: { canDecide: boolean }) {
       </div>
 
       {tab === 'costing'   && <BomCostingTable canDecide={canDecide} />}
-      {tab === 'requests'  && <BomRequestsList canDecide={canDecide} />}
+      {tab === 'requests'  && <BomRequestsList canDecide={canDecide} canManageStock={canManageStock} />}
+      {tab === 'inventory' && <PaperStockManager canManage={canManageStock} />}
       {tab === 'materials' && <BomMaterialsManager canManage={canDecide} />}
     </div>
   );

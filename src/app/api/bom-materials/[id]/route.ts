@@ -125,11 +125,11 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
 
   const { error } = await admin.from('bom_materials').delete().eq('id', id);
   if (error) {
-    // 23503 = foreign key: something else (a request snapshot) still points
-    // here. Same answer as above.
+    // 23503 = foreign key: something else (a request snapshot, or paper
+    // rolls in stock) still points here. Same answer as above.
     if (error.code === '23503') {
       return NextResponse.json(
-        { error: 'This material is referenced by a request — retire it instead of deleting' },
+        { error: 'This material has requests or paper stock against it — retire it instead of deleting' },
         { status: 409 }
       );
     }

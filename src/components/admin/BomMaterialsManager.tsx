@@ -12,6 +12,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Check, X, Archive, ArchiveRestore, Trash2, AlertTriangle, Layers } from 'lucide-react';
+import { useFitToViewport } from '@/hooks/useFitToViewport';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { formatInr } from '@/lib/bom';
@@ -54,6 +55,8 @@ function draftFrom(material: BomMaterial): Draft {
 type Props = { canManage: boolean };
 
 export default function BomMaterialsManager({ canManage }: Props) {
+  // The table scrolls, not the page — see useFitToViewport.
+  const fitRef = useFitToViewport<HTMLDivElement>();
   const queryClient = useQueryClient();
 
   const [adding,    setAdding]    = useState(false);
@@ -246,7 +249,7 @@ export default function BomMaterialsManager({ canManage }: Props) {
       )}
 
       <div className="rounded-xl glass overflow-hidden">
-        <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
+        <div ref={fitRef} className="table-scroll-wrapper relative max-h-[70vh] overflow-y-auto">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
               <tr>

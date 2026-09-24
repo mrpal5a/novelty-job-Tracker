@@ -166,6 +166,11 @@ export function canDeptDecideBOM(perms: DeptPermissions | null): boolean {
   return hasFeature(perms, 'bom_decide');
 }
 
+/** Who may receive, adjust and remove paper rolls in BOM → Inventory. Issuing stock to a job only needs bom_use. */
+export function canDeptManagePaperStock(perms: DeptPermissions | null): boolean {
+  return hasFeature(perms, 'paper_stock_manage');
+}
+
 /** Who may manage the internal dispatch-notification recipient list ("Dispatch Alerts"). */
 export function canDeptManageNotificationRecipients(perms: DeptPermissions | null): boolean {
   return hasFeature(perms, 'notification_recipients_manage');

@@ -773,6 +773,7 @@ export interface BomMaterialRequest {
   decided_by:              string | null;
   requested_by_department: string;
   requested_by:            string | null;
+  received_at:             string | null;   // paper arrived and entered as rolls
   created_at:              string;
   updated_at:              string;
 }
@@ -798,6 +799,45 @@ export interface BomCostingRow {
   job:            BomJobSummary;
   costing:        BomCosting | null;
   latest_request: BomMaterialRequest | null;
+  stock_issued_m:   number;   // net metres out on this job (issued − returned)
+  stock_out_m:      number;   // gross metres issued from stock
+  stock_returned_m: number;   // leftover metres brought back
+}
+
+// ── Paper stock (BOM → Inventory) ───────────────────────────────
+// Mirrors supabase/migrations/062_paper_stock.sql.
+
+/** One physical roll on the rack (paper_rolls), with its material name joined. */
+export interface PaperRoll {
+  id:                string;
+  ref:               string;          // 'R-0042'
+  material_id:       string;
+  material_name:     string;          // joined from bom_materials
+  width_mm:          number;
+  initial_meter:     number;
+  remaining_meter:   number;
+  location:          string | null;
+  supplier:          string | null;
+  note:              string | null;
+  source_request_id: string | null;
+  received_at:       string;
+  created_by:        string | null;
+}
+
+export type PaperStockMovementKind = 'receive' | 'issue' | 'return' | 'adjust';
+
+/** One ledger line (paper_stock_movements), with roll + job context joined. */
+export interface PaperStockMovement {
+  id:                string;
+  roll_id:           string;
+  roll_ref:          string | null;
+  kind:              PaperStockMovementKind;
+  meters:            number;          // signed: + into stock, − out
+  job_separation_id: string | null;
+  job_label:         string | null;   // sr no / party of the job it went to
+  note:              string | null;
+  created_by:        string | null;
+  created_at:        string;
 }
 
 // ── shade cards ─────────────────────────────────────────────

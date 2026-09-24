@@ -53,6 +53,7 @@ type RawRow = {
   created_at:    string;
   costing:       RawCosting | RawCosting[] | null;
   requests:      BomMaterialRequest[] | null;
+  stock:         { meters: number; kind: string }[] | null;
 };
 
 function one<T>(value: T | T[] | null | undefined): T | null {
@@ -79,6 +80,18 @@ function shapeCosting(raw: RawCosting | null): BomCosting | null {
   };
 }
 
+// Gross out, gross back, and the net the job actually used — the chip shows
+// "6,000 out · 500 back" so the floor can see where the paper went.
+function stockTotals(moves: RawRow['stock']) {
+  let out = 0, back = 0;
+  for (const m of moves ?? []) {
+    if (m.kind === 'issue')  out  += -Number(m.meters);
+    if (m.kind === 'return') back += Number(m.meters);
+  }
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return { stock_issued_m: round(out - back), stock_out_m: round(out), stock_returned_m: round(back) };
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
 
@@ -101,7 +114,10 @@ export async function GET(request: NextRequest) {
       'id, sr_no, party, po_no, po_date, pm_code, material_name, quantity, order_value, created_at, ' +
       'costing:bom_costings(job_separation_id, material_id, material_width_mm, running_meter, updated_by, updated_at, ' +
         'material:bom_materials(name, rate_per_sqm)), ' +
-      'requests:bom_material_requests(*)'
+      'requests:bom_material_requests(*), ' +
+      // Issue (−) and return (+) movements against this job; their negated
+      // sum is what's currently out of stock for it.
+      'stock:paper_stock_movements(meters, kind)'
     )
     .is('cancelled_at', null)
     .order('created_at', { ascending: false })
@@ -137,6 +153,7 @@ export async function GET(request: NextRequest) {
     },
     costing:        shapeCosting(one(r.costing)),
     latest_request: one(r.requests),
+    ...stockTotals(r.stock),
   }));
 
   return NextResponse.json({ rows, hasMore });
