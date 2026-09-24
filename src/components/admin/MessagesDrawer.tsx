@@ -3,7 +3,7 @@
 // ============================================================
 // Slide-out panel from the header (AdminHeader → MessagesWidget). Two
 // views: the conversation list, and a selected thread. Admin-initiated
-// only — the "New message" action (compose) is hidden for anyone who
+// only — the "New chat" button (compose view) is hidden for anyone who
 // isn't Admin, but every participant can reply once a thread exists.
 //
 // Realtime nudges live at the widget level (one shared subscription,
@@ -14,7 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Send, X, Tag } from 'lucide-react';
+import { ArrowLeft, Send, X, Tag, SquarePen, Check } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -49,16 +49,19 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
   const panelRef = useRef<HTMLElement>(null);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
-  // ── New-chat composer: type "@" to tag someone, pick from the dropdown,
-  // then just type the message — no modal, no subject field. Reuses an
+  // ── New-chat view: opened from the header's "New chat" button. Pick
+  // people from the list (or type to filter), then type the message in the
+  // bottom composer — same place the reply box sits in a thread. Reuses an
   // existing thread with that exact recipient set if one exists, otherwise
-  // starts a new one (same two endpoints the old modal used).
+  // starts a new one.
+  const [composing,    setComposing]    = useState(false);
   const [recipients,   setRecipients]   = useState<Member[]>([]);
   const [toValue,      setToValue]      = useState('');
   const [activeIndex,  setActiveIndex]  = useState(0);
   const [messageText,  setMessageText]  = useState('');
   const [sendingNew,   setSendingNew]   = useState(false);
   const messageRef = useRef<HTMLTextAreaElement>(null);
+  const toRef = useRef<HTMLInputElement>(null);
 
   const { data: members = [] } = useQuery({
     queryKey: ['team', 'members'],
@@ -113,10 +116,14 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
   // Close on Escape / outside click — same transient-overlay behaviour as
   // NotesFeed and PrepressTodoPanel.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    // Escape backs out of the new-chat view first, then closes the drawer.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (composing) closeCompose(); else onClose();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, composing]);
 
   useEffect(() => {
     const onPointerDown = (e: PointerEvent) => {
@@ -152,35 +159,38 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
     }
   }
 
-  // null = not in the middle of an @mention; a string (possibly empty) =
-  // everything typed after the "@" so far, used to filter the dropdown.
-  const mentionQuery = toValue.startsWith('@') ? toValue.slice(1).trim().toLowerCase() : null;
+  // Filter text for the people list — a leading "@" is tolerated so the
+  // old muscle memory still works.
+  const memberQuery = toValue.replace(/^@/, '').trim().toLowerCase();
 
   const filteredMembers = useMemo(() => {
-    if (mentionQuery === null) return [];
-    const taken = new Set(recipients.map((r) => r.id));
+    if (!composing) return [];
     return members
-      .filter((m) => m.email !== userEmail && !taken.has(m.id))
-      .filter((m) => mentionQuery === '' || m.email.toLowerCase().includes(mentionQuery) || (m.department ?? '').toLowerCase().includes(mentionQuery))
-      .slice(0, 6);
-  }, [members, recipients, mentionQuery, userEmail]);
+      .filter((m) => m.email !== userEmail)
+      .filter((m) => memberQuery === '' || m.email.toLowerCase().includes(memberQuery) || (m.department ?? '').toLowerCase().includes(memberQuery));
+  }, [composing, members, memberQuery, userEmail]);
 
-  useEffect(() => { setActiveIndex(0); }, [mentionQuery]);
+  useEffect(() => { setActiveIndex(0); }, [memberQuery]);
 
-  // Focus the message box the moment the first recipient lands — tied to
-  // React's own commit of the textarea (which only mounts once
-  // recipients.length > 0), not a requestAnimationFrame guess racing the
-  // next keystroke.
-  const hadRecipientsRef = useRef(false);
   useEffect(() => {
-    if (recipients.length > 0 && !hadRecipientsRef.current) {
-      messageRef.current?.focus();
-    }
-    hadRecipientsRef.current = recipients.length > 0;
-  }, [recipients.length]);
+    if (composing) toRef.current?.focus();
+  }, [composing]);
 
+  function openCompose() {
+    setSelectedId(null);
+    setComposing(true);
+  }
+
+  function closeCompose() {
+    setComposing(false);
+    setRecipients([]);
+    setToValue('');
+    setMessageText('');
+  }
+
+  // Tapping a person toggles them in/out of the recipient set.
   function selectMember(m: Member) {
-    setRecipients((prev) => [...prev, m]);
+    setRecipients((prev) => (prev.some((r) => r.id === m.id) ? prev.filter((r) => r.id !== m.id) : [...prev, m]));
     setToValue('');
   }
 
@@ -189,16 +199,14 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
   }
 
   function onToKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (mentionQuery === null || filteredMembers.length === 0) {
-      if (e.key === 'Backspace' && toValue === '' && recipients.length > 0) {
-        setRecipients((prev) => prev.slice(0, -1));
-      }
+    if (e.key === 'Backspace' && toValue === '' && recipients.length > 0) {
+      setRecipients((prev) => prev.slice(0, -1));
       return;
     }
+    if (filteredMembers.length === 0) return;
     if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex((i) => (i + 1) % filteredMembers.length); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex((i) => (i - 1 + filteredMembers.length) % filteredMembers.length); }
     else if (e.key === 'Enter') { e.preventDefault(); selectMember(filteredMembers[activeIndex] ?? filteredMembers[0]); }
-    else if (e.key === 'Escape') { setToValue(''); }
   }
 
   function onMessageKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -240,9 +248,7 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
 
       const targetId = existing ? existing.conversation_id : data.conversation.id;
       queryClient.invalidateQueries({ queryKey: ['messages'] });
-      setRecipients([]);
-      setMessageText('');
-      setToValue('');
+      closeCompose();
       setSelectedId(targetId);
     } catch {
       toast.error('Network error');
@@ -266,9 +272,9 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
       {/* Header */}
       <header className="flex items-center justify-between gap-2 px-4 h-12 bg-brand-header text-white shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          {selectedId && (
+          {(selectedId || composing) && (
             <button
-              onClick={() => setSelectedId(null)}
+              onClick={() => (composing ? closeCompose() : setSelectedId(null))}
               aria-label="Back to conversations"
               className="p-1.5 -ml-1.5 rounded-lg text-white/75 hover:text-white hover:bg-white/10 transition-colors"
             >
@@ -276,12 +282,23 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
             </button>
           )}
           <h2 className="text-sm font-semibold truncate">
-            {selectedId
-              ? (selectedSummary ? otherParticipants(selectedSummary, userEmail).join(', ') || 'Conversation' : 'Conversation')
-              : 'Messages'}
+            {composing
+              ? 'New chat'
+              : selectedId
+                ? (selectedSummary ? otherParticipants(selectedSummary, userEmail).join(', ') || 'Conversation' : 'Conversation')
+                : 'Messages'}
           </h2>
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {isSuperAdmin && !selectedId && !composing && (
+            <button
+              onClick={openCompose}
+              className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <SquarePen className="h-4 w-4" aria-hidden="true" />
+              New chat
+            </button>
+          )}
           <button
             onClick={onClose}
             aria-label="Close messages"
@@ -292,14 +309,15 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
         </div>
       </header>
 
-      {/* ── New-chat composer ───────────────────────────────────
-          Type "@" to tag someone, pick from the dropdown, then just type
-          the message. No modal, no extra clicks — replaces the old
-          "+ → New message" flow. Admin-only, same as before. */}
-      {isSuperAdmin && !selectedId && (
-        <div className="border-b border-brand-border shrink-0">
-          <div className="px-4 pt-3 pb-2">
+      {/* ── New-chat view ───────────────────────────────────────
+          Opened from the header button. "To" field with chips on top,
+          the people list in the middle (tap to add/remove), and the
+          message box pinned to the bottom like a thread's reply box. */}
+      {composing && (
+        <>
+          <div className="px-4 pt-3 pb-2 border-b border-brand-border shrink-0">
             <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-brand-border bg-brand-bg px-2 py-1.5 focus-within:ring-2 focus-within:ring-brand-primary/40 transition-shadow">
+              <span className="text-xs font-medium text-brand-muted pl-1">To:</span>
               {recipients.map((r) => (
                 <span
                   key={r.id}
@@ -316,66 +334,86 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
                   </button>
                 </span>
               ))}
-              <div className="relative flex-1 min-w-[120px]">
-                <input
-                  type="text"
-                  value={toValue}
-                  onChange={(e) => setToValue(e.target.value)}
-                  onKeyDown={onToKeyDown}
-                  placeholder={recipients.length === 0 ? 'Type @ to start a new chat…' : 'Add another…'}
-                  className="w-full bg-transparent text-sm text-brand-ink placeholder:text-brand-muted focus:outline-none py-1 min-h-[28px]"
-                />
-                {mentionQuery !== null && filteredMembers.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-64 max-h-48 overflow-y-auto rounded-lg border border-brand-border bg-white shadow-xl">
-                    {filteredMembers.map((m, i) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectMember(m)}
-                        className={cn(
-                          'w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors',
-                          i === activeIndex ? 'bg-brand-bg' : 'hover:bg-brand-bg',
-                        )}
-                      >
-                        <span className="text-brand-ink truncate">{m.email}</span>
-                        {m.department && (
-                          <span className="text-[10px] font-mono text-brand-muted shrink-0">{m.department}</span>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <input
+                ref={toRef}
+                type="text"
+                value={toValue}
+                onChange={(e) => setToValue(e.target.value)}
+                onKeyDown={onToKeyDown}
+                placeholder={recipients.length === 0 ? 'Search name or department…' : 'Add another…'}
+                aria-label="Search people"
+                className="flex-1 min-w-[120px] bg-transparent text-sm text-brand-ink placeholder:text-brand-muted focus:outline-none py-1 min-h-[28px]"
+              />
             </div>
           </div>
 
-          {recipients.length > 0 && (
-            <div className="px-4 pb-3 flex items-end gap-2">
+          <ul className="flex-1 overflow-y-auto divide-y divide-brand-border" aria-label="People">
+            {filteredMembers.length === 0 && (
+              <li className="px-4 py-8 text-center text-xs text-brand-muted">
+                {members.length === 0 ? 'Loading…' : 'No one matches that search.'}
+              </li>
+            )}
+            {filteredMembers.map((m, i) => {
+              const picked = recipients.some((r) => r.id === m.id);
+              return (
+                <li key={m.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectMember(m)}
+                    aria-pressed={picked}
+                    className={cn(
+                      'w-full min-h-11 text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors focus:outline-none focus-visible:bg-brand-bg',
+                      i === activeIndex && toValue !== '' ? 'bg-brand-bg' : 'hover:bg-brand-bg',
+                    )}
+                  >
+                    <span className="min-w-0">
+                      <span className="block text-xs font-semibold text-brand-ink truncate">{m.email}</span>
+                      {m.department && (
+                        <span className="block text-[10px] font-mono text-brand-muted">{m.department}</span>
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        'h-5 w-5 shrink-0 rounded-full border flex items-center justify-center transition-colors',
+                        picked ? 'bg-brand-primary border-brand-primary text-white' : 'border-brand-border',
+                      )}
+                      aria-hidden="true"
+                    >
+                      {picked && <Check className="h-3 w-3" />}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+
+          <div className="border-t border-brand-border p-3 shrink-0">
+            <div className="flex items-end gap-2">
               <textarea
                 ref={messageRef}
                 value={messageText}
                 onChange={(e) => setMessageText(e.target.value)}
                 onKeyDown={onMessageKeyDown}
-                placeholder="Type your message…"
+                disabled={recipients.length === 0}
+                placeholder={recipients.length === 0 ? 'Pick someone first…' : 'Type your message…'}
                 rows={1}
-                className="flex-1 resize-none max-h-28 rounded-lg border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-ink placeholder:text-brand-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40"
+                className="flex-1 resize-none max-h-28 rounded-lg border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-ink placeholder:text-brand-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40 disabled:opacity-60"
               />
               <button
                 onClick={sendNew}
-                disabled={!messageText.trim() || sendingNew}
+                disabled={!messageText.trim() || recipients.length === 0 || sendingNew}
                 aria-label="Send message"
                 className="min-h-11 min-w-11 rounded-lg bg-brand-primary text-white flex items-center justify-center hover:bg-brand-primary-hover disabled:opacity-40 transition-colors"
               >
                 <Send className="h-4 w-4" aria-hidden="true" />
               </button>
             </div>
-          )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* ── Conversation list ────────────────────────────────── */}
-      {!selectedId && (
+      {!selectedId && !composing && (
         <ul className="flex-1 overflow-y-auto divide-y divide-brand-border">
           {listLoading && (
             <li className="px-4 py-8 text-center text-xs text-brand-muted">Loading…</li>
@@ -384,7 +422,7 @@ export default function MessagesDrawer({ userEmail, isSuperAdmin, onClose }: Pro
           {!listLoading && conversations.length === 0 && (
             <li className="px-4 py-8 text-center text-xs text-brand-muted">
               {isSuperAdmin
-                ? 'No conversations yet — type @ above to message someone.'
+                ? 'No conversations yet — tap New chat to message someone.'
                 : 'No conversations yet. Messages Admin sends you will show up here.'}
             </li>
           )}
