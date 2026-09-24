@@ -774,8 +774,32 @@ export interface BomMaterialRequest {
   requested_by_department: string;
   requested_by:            string | null;
   received_at:             string | null;   // paper arrived and entered as rolls
+  order_id:                string | null;   // the purchase that answers it (bom_material_orders)
   created_at:              string;
   updated_at:              string;
+}
+
+export type BomOrderStatus = 'ordered' | 'received' | 'cancelled';
+
+/**
+ * What Admin actually bought (bom_material_orders) — one material at one
+ * width, usually more than was requested; the surplus goes to stock.
+ */
+export interface BomMaterialOrder {
+  id:             string;
+  ref:            string;          // 'ORD-0001'
+  material_id:    string | null;
+  material_name:  string;
+  width_mm:       number;
+  ordered_meter:  number;
+  status:         BomOrderStatus;
+  received_meter: number | null;
+  received_at:    string | null;
+  received_by:    string | null;
+  ordered_by:     string | null;
+  created_at:     string;
+  updated_at:     string;
+  requests:       BomMaterialRequestWithJob[];
 }
 
 /** The Job Separation fields the BOM shows beside a request or a costing. */

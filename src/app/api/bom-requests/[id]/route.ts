@@ -77,7 +77,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const { data: existing, error: findError } = await admin
     .from('bom_material_requests')
-    .select('id, status')
+    .select('id, status, order_id')
     .eq('id', id)
     .maybeSingle();
 
@@ -92,6 +92,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
   if (action === 'reopen' && existing.status === 'pending') {
     return NextResponse.json({ error: 'That request is already open' }, { status: 409 });
+  }
+  // A request inside a placed order moves with the order: cancelling the
+  // order is what puts it back. Ordering is done via /api/bom-orders so the
+  // metres actually bought are recorded.
+  if (existing.order_id && (action === 'reopen' || action === 'order')) {
+    return NextResponse.json(
+      { error: 'This request is part of an order — cancel the order to change it' },
+      { status: 409 }
+    );
   }
 
   const actor = gate.user.email ?? gate.perms.key;

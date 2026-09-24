@@ -2,8 +2,10 @@
 // src/components/admin/PaperStockModals.tsx
 // The two paper-stock forms, shared by BOM → Inventory and BOM → Requests:
 //   ReceiveRollsModal — "5 rolls × 2000 m of BMB1450 at 110 mm" into stock.
-//                       Opened blank from Inventory, or pre-filled from an
-//                       ordered request ("Receive into stock").
+//                       Opened blank from Inventory, pre-filled from an
+//                       ordered request, or — for a placed order — locked
+//                       to the order's material + width and pre-filled with
+//                       the metres ordered (all of it goes to stock).
 //   AdjustRollModal   — set one roll's remaining metres to what's actually
 //                       on it (recount, damage, write-off), with a reason.
 
@@ -23,7 +25,9 @@ export type ReceivePrefill = {
   meters_per_roll?:   number;
   source_request_id?:  string;
   source_request_ids?: string[];  // one delivery answering several requests
-  source_label?:       string;    // "BOM-0042" / "3 requests" — shown in the title
+  source_label?:       string;    // "BOM-0042" / "3 requests" / "ORD-0001" — shown in the title
+  order_id?:           string;    // receiving a placed order (bom_material_orders)
+  ordered_meter?:      number;    // what that order was for — compared against what arrived
 };
 
 function num(v: string): number | null {
@@ -39,6 +43,7 @@ export function useRefreshStock() {
     queryClient.invalidateQueries({ queryKey: ['paper-stock'] });
     queryClient.invalidateQueries({ queryKey: ['bom-costings'] });
     queryClient.invalidateQueries({ queryKey: ['bom-requests'] });
+    queryClient.invalidateQueries({ queryKey: ['bom-orders'] });
   };
 }
 
@@ -60,6 +65,11 @@ export function ReceiveRollsModal({
   const [note,       setNote]       = useState('');
   const [busy,       setBusy]       = useState(false);
 
+  // Receiving a placed order: material and width are the order's, not
+  // editable — the rolls must be what was bought.
+  const orderMode = !!prefill?.order_id;
+  const ordered = prefill?.ordered_meter ?? null;
+
   const options = materials.filter((m) => m.is_active || m.id === materialId);
   const w = num(width), c = num(count), p = num(perRoll);
   const total = c !== null && p !== null && c > 0 && p > 0 ? c * p : null;
@@ -69,16 +79,22 @@ export function ReceiveRollsModal({
     if (!valid || busy) return;
     setBusy(true);
     try {
-      const res = await fetch('/api/paper-stock', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          material_id: materialId, width_mm: w, roll_count: c, meters_per_roll: p,
-          location, supplier, note,
-          source_request_id:  prefill?.source_request_id ?? null,
-          source_request_ids: prefill?.source_request_ids ?? null,
-        }),
-      });
+      const res = orderMode
+        ? await fetch(`/api/bom-orders/${prefill!.order_id}/receive`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roll_count: c, meters_per_roll: p, location, note }),
+          })
+        : await fetch('/api/paper-stock', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              material_id: materialId, width_mm: w, roll_count: c, meters_per_roll: p,
+              location, supplier, note,
+              source_request_id:  prefill?.source_request_id ?? null,
+              source_request_ids: prefill?.source_request_ids ?? null,
+            }),
+          });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? 'Failed to add rolls'); return; }
       const name = materials.find((m) => m.id === materialId)?.name ?? 'material';
@@ -103,12 +119,14 @@ export function ReceiveRollsModal({
             {prefill?.source_label ? `Receive ${prefill.source_label} into stock` : 'Add rolls to stock'}
           </h3>
           <p className="text-sm text-[var(--glass-muted)] mt-1">
-            Each roll gets its own number (R-0001…) so part-used rolls can be tracked.
+            {orderMode
+              ? 'Enter what actually arrived — split it into rolls. All of it goes to stock.'
+              : 'Each roll gets its own number (R-0001…) so part-used rolls can be tracked.'}
           </p>
         </div>
 
         <Field label="Material">
-          <select value={materialId} onChange={(e) => setMaterialId(e.target.value)} className={fieldCls} required>
+          <select value={materialId} onChange={(e) => setMaterialId(e.target.value)} className={cn(fieldCls, orderMode && 'opacity-70')} required disabled={orderMode}>
             <option value="">— pick material —</option>
             {options.map((m) => (
               <option key={m.id} value={m.id}>{m.name}{m.specification ? ` · ${m.specification}` : ''}</option>
@@ -118,7 +136,7 @@ export function ReceiveRollsModal({
 
         <div className="grid grid-cols-3 gap-3">
           <Field label="Width (mm)">
-            <input type="number" min="0" step="any" inputMode="decimal" value={width} onChange={(e) => setWidth(e.target.value)} className={cn(fieldCls, 'font-mono')} />
+            <input type="number" min="0" step="any" inputMode="decimal" value={width} onChange={(e) => setWidth(e.target.value)} readOnly={orderMode} className={cn(fieldCls, 'font-mono', orderMode && 'opacity-70')} />
           </Field>
           <Field label="No. of rolls">
             <input type="number" min="1" max="500" step="1" inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value)} className={cn(fieldCls, 'font-mono')} />
@@ -132,15 +150,22 @@ export function ReceiveRollsModal({
           {total !== null
             ? <>Total <strong className="font-mono text-[var(--glass-ink)]">{formatMeters(total)} m</strong> across {c} roll{c === 1 ? '' : 's'}</>
             : 'Enter width, number of rolls and metres per roll.'}
+          {orderMode && ordered !== null && total !== null && Math.abs(total - ordered) > 0.005 && (
+            <span className="block mt-1 text-amber-800">
+              {formatMeters(ordered)} m was ordered — this receives {formatMeters(Math.abs(Math.round((total - ordered) * 100) / 100))} m {total < ordered ? 'less' : 'more'}.
+            </span>
+          )}
         </p>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className={cn('grid gap-3', orderMode ? 'grid-cols-1' : 'grid-cols-2')}>
           <Field label="Location (optional)">
             <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Rack B2" className={fieldCls} />
           </Field>
-          <Field label="Supplier (optional)">
-            <input value={supplier} onChange={(e) => setSupplier(e.target.value)} className={fieldCls} />
-          </Field>
+          {!orderMode && (
+            <Field label="Supplier (optional)">
+              <input value={supplier} onChange={(e) => setSupplier(e.target.value)} className={fieldCls} />
+            </Field>
+          )}
         </div>
         <Field label="Note (optional)">
           <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. invoice no., batch" className={fieldCls} />

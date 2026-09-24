@@ -18,9 +18,12 @@
 // material header above them) and its own Receive button.
 //
 // Group actions act on every line they apply to:
-//   Order all      — the awaiting ones, when there are 2+ (bom_decide)
-//   Receive · W mm — ordered, not-yet-received ones at that width
-//                    (paper_stock_manage); rolls are width-specific.
+//   Order N together — awaiting ones at one width, when there are 2+
+//                    (bom_decide); opens the order form, which asks how
+//                    many metres are actually being bought
+//   Receive · W mm — requests ordered before order tracking existed
+//                    (paper_stock_manage); newer ones are received from
+//                    their order on the Ordered tab.
 
 import { useEffect, useRef, useState } from 'react';
 import {
@@ -37,16 +40,20 @@ export type RequestGroup = {
   materialId:   string | null;
   materialName: string;
   requests:     BomMaterialRequestWithJob[];
-  meters:       number;   // open (awaiting + ordered) only
+  meters:       number;   // open only (awaiting, or ordered and not yet received)
   sqm:          number;
   expense:      number;
   widths:       { width: number; meters: number }[];
   pending:      BomMaterialRequestWithJob[];
-  receivable:   Map<number, BomMaterialRequestWithJob[]>;   // width → ordered, not yet received
+  pendingByWidth: Map<number, BomMaterialRequestWithJob[]>; // width → awaiting — one order per width
+  receivable:   Map<number, BomMaterialRequestWithJob[]>;   // width → ordered before order tracking, not yet received
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
-const isOpen = (r: BomMaterialRequestWithJob) => r.status === 'pending' || r.status === 'ordered';
+// Still needs something done: awaiting a decision, or ordered and not yet
+// arrived. Received paper is history — it no longer counts toward "needed".
+const isOpen = (r: BomMaterialRequestWithJob) =>
+  r.status === 'pending' || (r.status === 'ordered' && !r.received_at);
 
 /** Requests folded by material, biggest open need first. */
 export function groupRequests(requests: BomMaterialRequestWithJob[]): RequestGroup[] {
@@ -57,7 +64,7 @@ export function groupRequests(requests: BomMaterialRequestWithJob[]): RequestGro
     if (!g) {
       g = {
         key, materialId: r.material_id, materialName: r.material_name, requests: [],
-        meters: 0, sqm: 0, expense: 0, widths: [], pending: [], receivable: new Map(),
+        meters: 0, sqm: 0, expense: 0, widths: [], pending: [], pendingByWidth: new Map(), receivable: new Map(),
       };
       byKey.set(key, g);
     }
@@ -71,8 +78,13 @@ export function groupRequests(requests: BomMaterialRequestWithJob[]): RequestGro
       const w = g.widths.find((x) => x.width === width);
       if (w) w.meters = round2(w.meters + metres); else g.widths.push({ width, meters: metres });
     }
-    if (r.status === 'pending') g.pending.push(r);
-    if (r.status === 'ordered' && !r.received_at) {
+    if (r.status === 'pending') {
+      g.pending.push(r);
+      g.pendingByWidth.set(width, [...(g.pendingByWidth.get(width) ?? []), r]);
+    }
+    // Requests inside a placed order are received through the order (the
+    // Ordered tab); only ones ordered before order tracking are received here.
+    if (r.status === 'ordered' && !r.received_at && !r.order_id) {
       g.receivable.set(width, [...(g.receivable.get(width) ?? []), r]);
     }
   }
@@ -104,7 +116,7 @@ type Props = {
   onWithdraw:     (r: BomMaterialRequestWithJob) => void;
   onReopen:       (r: BomMaterialRequestWithJob) => void;
   onDelete:       (r: BomMaterialRequestWithJob) => void;
-  onOrderAll:     (group: RequestGroup) => void;
+  onOrderAll:     (group: RequestGroup, width: number, requests: BomMaterialRequestWithJob[]) => void;
   onReceive:      (group: RequestGroup, width: number, requests: BomMaterialRequestWithJob[]) => void;
 };
 
@@ -148,10 +160,13 @@ function GroupCard({
 }: Omit<Props, 'requests'> & { group: RequestGroup }) {
   const groupBusy = g.requests.some((r) => busyIds.has(r.id));
   const jobs = g.requests.length;
-  const pendingMetres = round2(g.pending.reduce((s, r) => s + Number(r.running_meter), 0));
-  // One awaiting line already has its own Order button — the header action
-  // earns its place only when it saves clicks.
-  const showOrderAll = canDecide && g.pending.length > 1;
+  // One order per width (rolls are width-specific). A width with a single
+  // awaiting line already has that line's Order button — the header action
+  // earns its place only when it gathers several requests into one order.
+  const orderAll = canDecide
+    ? Array.from(g.pendingByWidth.entries()).filter(([, rs]) => rs.length > 1)
+    : [];
+  const showOrderAll = orderAll.length > 0;
   const receivable = canManageStock ? Array.from(g.receivable.entries()) : [];
 
   return (
@@ -195,11 +210,11 @@ function GroupCard({
 
       {(showOrderAll || receivable.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 px-5 pb-4 -mt-1">
-          {showOrderAll && (
-            <Button intent="primary" icon={PackageCheck} busy={groupBusy} onClick={() => onOrderAll(g)}>
-              Order all {g.pending.length} · {formatMeters(pendingMetres)} m
+          {orderAll.map(([width, rs]) => (
+            <Button key={width} intent="primary" icon={PackageCheck} busy={groupBusy} onClick={() => onOrderAll(g, width, rs)}>
+              Order {rs.length} together · {formatMeters(width)} mm · {formatMeters(round2(rs.reduce((s, r) => s + Number(r.running_meter), 0)))} m
             </Button>
-          )}
+          ))}
           {receivable.map(([width, rs]) => (
             <Button key={width} intent="tinted" icon={PackagePlus} disabled={groupBusy} onClick={() => onReceive(g, width, rs)}>
               Receive {formatMeters(width)} mm · {formatMeters(round2(rs.reduce((s, r) => s + Number(r.running_meter), 0)))} m
@@ -229,14 +244,17 @@ function RequestLine({
   onDelete: (r: BomMaterialRequestWithJob) => void;
 }) {
   const job = r.job;
-  const closed = !isOpen(r);
+  const closed = !isOpen(r);                                              // done with: received, declined, withdrawn
+  const dropped = r.status === 'declined' || r.status === 'cancelled';   // never happened — struck through
   const chip = STATUS_CHIP[r.received_at ? 'received' : r.status];
   const difference = orderDifference(r.order_value, r.expense);
   const marginPct = difference !== null && r.order_value ? Math.round((difference / r.order_value) * 100) : null;
 
   const menu: MenuItem[] = [
     ...(r.status === 'pending' && canDecide ? [{ label: 'Withdraw', icon: Undo2, onClick: () => onWithdraw(r) }] : []),
-    ...(canDecide && (r.status === 'ordered' || r.status === 'declined') && !r.received_at
+    // Inside a placed order the request moves with the order (Ordered tab →
+    // Cancel order), so there's no per-request undo for it.
+    ...(canDecide && (r.status === 'ordered' || r.status === 'declined') && !r.received_at && !r.order_id
       ? [{ label: 'Undo decision', icon: Undo2, onClick: () => onReopen(r) }] : []),
     ...(canDecide ? [{ label: 'Delete request', icon: Trash2, onClick: () => onDelete(r), danger: true }] : []),
   ];
@@ -254,12 +272,12 @@ function RequestLine({
       className={cn(
         'grid items-center gap-x-5 gap-y-2 px-5 py-3',
         'grid-cols-[auto_minmax(0,1fr)_auto] md:grid-cols-[168px_minmax(0,1fr)_120px_auto]',
-        closed && 'bg-slate-50/50',
+        dropped && 'bg-slate-50/50',
       )}
     >
       {/* What to order — the first thing the eye lands on */}
       <div className={cn('rounded-lg px-3 py-2 ring-1 ring-inset', specTone)}>
-        <p className={cn('font-mono text-xl font-bold tabular-nums leading-none', closed && 'line-through decoration-1')}>
+        <p className={cn('font-mono text-xl font-bold tabular-nums leading-none', dropped && 'line-through decoration-1')}>
           {formatQty(Number(r.running_meter))}<span className="text-xs font-semibold opacity-70"> m</span>
         </p>
         <p className="mt-1 font-mono text-xs font-semibold opacity-80 whitespace-nowrap">
