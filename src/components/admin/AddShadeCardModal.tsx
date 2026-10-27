@@ -20,8 +20,9 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import { MAKING_STATUSES, SHADE_CARD_STATUSES, type ShadeCardStatus, SHADE_CARD_STATUS_DOT } from '@/lib/constants/shadeCards';
 import { StateChip } from '@/components/ui/StateChip';
-import type { Party, ShadeCard } from '@/lib/types';
+import type { JobSeparation, Party, ShadeCard } from '@/lib/types';
 import { useListKeys } from '@/hooks/useListKeys';
+import { istToday } from '@/lib/jobViews';
 
 // Matches the shared field style used by every other modal and form in the
 // admin panel (see modals/index.tsx and AddJobForm.tsx) — this form used to
@@ -83,7 +84,7 @@ type Props = {
 const COPY: Record<ShadeCardModalMode, { title: string; blurb: string; save: string; done: string }> = {
   create: {
     title: 'Add shade card',
-    blurb: 'A new card normally starts as Pending Approval — change the status here if the party has already responded.',
+    blurb: 'Start with the PM code: party and product fill in from Job Separation. A new card normally starts as Pending Approval.',
     save:  'Add card',
     done:  'Shade card added',
   },
@@ -112,7 +113,8 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
   const [docketNumber,     setDocketNumber]     = useState(card?.docket_number ?? '');
   const [status,           setStatus]           = useState<ShadeCardStatus>(card?.status ?? 'Pending Approval');
   const [makingStatus,     setMakingStatus]     = useState(card?.making_status ?? 'Pending');
-  const [preparedDate,     setPreparedDate]     = useState(card?.prepared_date ?? '');
+  // A new card is normally entered the day it is made.
+  const [preparedDate,     setPreparedDate]     = useState(card?.prepared_date ?? (mode === 'create' ? istToday() : ''));
   const [approvalDate,     setApprovalDate]     = useState(card?.approval_date ?? '');
   const [sentToPartyDate,  setSentToPartyDate]  = useState(card?.sent_to_party_date ?? '');
   const [receivedBackDate, setReceivedBackDate] = useState(card?.received_back_date ?? '');
@@ -191,6 +193,55 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
   const partyOnList = partySuggestions.some(
     (p) => p.name.toLowerCase() === party.trim().toLowerCase(),
   );
+
+  // ── PM code → Job Separation ────────────────────────────────
+  // A new card is entered by PM code first: the worksheet already holds the
+  // party and material for it, so those fill in rather than being retyped.
+  // Create only, and only into a field that is empty or still holds the last
+  // fill: a hand-typed party or product is never overwritten.
+  const [jobMatch, setJobMatch] = useState<JobSeparation | 'none' | null>(null);
+  const lastFill = useRef({ party: '', product: '' });
+
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const code = pmCode.trim();
+    if (code.length < 3) {
+      setJobMatch(null);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ field: 'pm_code', search: code, range: 'all', limit: '20' });
+        const res = await fetch(`/api/job-separations?${params.toString()}`);
+        if (!res.ok) return;
+        const rows: JobSeparation[] = (await res.json()).job_separations ?? [];
+        if (cancelled) return;
+
+        // The search is a substring match, newest first: take the newest row
+        // whose code is exactly this one ("PM-45" must not fill from
+        // "PM-450"), preferring one that wasn't cancelled.
+        const exact = rows.filter((r) => r.pm_code?.trim().toLowerCase() === code.toLowerCase());
+        const row = exact.find((r) => !r.cancelled_at) ?? exact[0];
+        if (!row) {
+          setJobMatch('none');
+          return;
+        }
+        setJobMatch(row);
+
+        // Captured first: the updaters below run later, after lastFill moves on.
+        const prev    = lastFill.current;
+        const product = row.material_name ?? '';
+        lastFill.current = { party: row.party, product };
+        chosenParty.current = row.party; // a filled party mustn't pop the suggestion list
+        setParty((p) => (!p.trim() || p === prev.party ? row.party : p));
+        setProductName((p) => (!p.trim() || p === prev.product ? product : p));
+      } catch {
+        // Best-effort — party and product can still be typed by hand.
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pmCode, mode]);
 
   // ── Duplicate check ─────────────────────────────────────────
   // 3,000+ cards came across in the import and the same product gets re-carded
@@ -303,13 +354,30 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {/* Identity — the two required fields, kept full-width and first */}
+          {/* Identity — PM code first: on a new card it fills party and product
+              from Job Separation. Then the two required fields, full-width. */}
           <div className="space-y-4">
+            <div>
+              <label htmlFor="sc-pm" className={labelCls}>PM code</label>
+              <input
+                id="sc-pm" className={cn(inputCls, 'font-mono')} value={pmCode} autoFocus={mode === 'create'}
+                autoComplete="off"
+                onChange={(e) => setPmCode(e.target.value)}
+              />
+              <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                {jobMatch === 'none'
+                  ? 'Not in Job Separation: enter party and product by hand.'
+                  : jobMatch
+                    ? `Party and product filled from Job Separation${jobMatch.sr_no ? ` ${jobMatch.sr_no}` : ''}.`
+                    : 'Matches this card to its job.'}
+              </p>
+            </div>
+
             <div>
               <label htmlFor="sc-party" className={labelCls}>Party <span aria-hidden="true">*</span></label>
               <div className="relative">
                 <input
-                  id="sc-party" className={inputCls} value={party} required autoFocus
+                  id="sc-party" className={inputCls} value={party} required autoFocus={mode !== 'create'}
                   autoComplete="off"
                   {...partyKeys.inputProps}
                   onChange={(e) => setParty(e.target.value)}
@@ -358,18 +426,7 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
           </div>
 
           {/* Identifiers — how this card is looked up and matched to a job */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label htmlFor="sc-pm" className={labelCls}>PM code</label>
-              <input
-                id="sc-pm" className={inputCls} value={pmCode}
-                onChange={(e) => setPmCode(e.target.value)}
-              />
-              <p className="text-[11px] text-[var(--glass-muted)] mt-1">
-                Matches this card to its job.
-              </p>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label htmlFor="sc-number" className={labelCls}>Shade card #</label>
               <input
