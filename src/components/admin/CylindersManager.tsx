@@ -8,7 +8,7 @@
 
 import React, { useState, useMemo, useId } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Pencil, Trash2, Check, X, Cylinder as CylinderIcon } from 'lucide-react';
+import { Search, Plus, Pencil, Copy, Trash2, Check, X, Cylinder as CylinderIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -61,7 +61,8 @@ export default function CylindersManager({ canManage }: { canManage: boolean }) 
   const queryClient = useQueryClient();
   const [search,    setSearch]    = useState('');
   const [type,      setType]      = useState<'all' | Cylinder['type']>('all');
-  const [editing,   setEditing]   = useState<Cylinder | 'new' | null>(null);
+  // { copyOf } opens the add form pre-filled from another cylinder, serial included.
+  const [editing,   setEditing]   = useState<Cylinder | 'new' | { copyOf: Cylinder } | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [busyId,    setBusyId]    = useState<string | null>(null);
   const [sortField, setSortField] = useState<SortField>('teeth');
@@ -135,6 +136,14 @@ export default function CylindersManager({ canManage }: { canManage: boolean }) 
         className="inline-flex items-center justify-center min-h-11 min-w-11 rounded-lg border border-black/[0.12] text-[var(--glass-muted)] hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors"
       >
         <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+      </button>
+      <button
+        onClick={() => setEditing({ copyOf: c })}
+        aria-label={`Duplicate cylinder ${c.serial_no}`}
+        title="Duplicate"
+        className="inline-flex items-center justify-center min-h-11 min-w-11 rounded-lg border border-black/[0.12] text-[var(--glass-muted)] hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors"
+      >
+        <Copy className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
       {confirmId === c.id ? (
         <>
@@ -298,7 +307,8 @@ export default function CylindersManager({ canManage }: { canManage: boolean }) 
 
       {editing && (
         <CylinderModal
-          editing={editing === 'new' ? undefined : editing}
+          editing={editing === 'new' || 'copyOf' in editing ? undefined : editing}
+          copyOf={editing !== 'new' && 'copyOf' in editing ? editing.copyOf : undefined}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); queryClient.invalidateQueries({ queryKey: ['cylinders'] }); }}
         />
@@ -323,13 +333,14 @@ const inputCls = cn(
   'focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
 );
 
-function CylinderModal({ editing, onClose, onSaved }: { editing?: Cylinder; onClose: () => void; onSaved: () => void }) {
+function CylinderModal({ editing, copyOf, onClose, onSaved }: { editing?: Cylinder; copyOf?: Cylinder; onClose: () => void; onSaved: () => void }) {
   const titleId = useId();
-  const [serial,       setSerial]       = useState(editing?.serial_no ?? '');
-  const [teeth,        setTeeth]        = useState(editing?.teeth.toString() ?? '');
-  const [type,         setType]         = useState<Cylinder['type']>(editing?.type ?? 'Print');
-  const [manufacturer, setManufacturer] = useState(editing?.manufacturer ?? '');
-  const [purchaseDate, setPurchaseDate] = useState(editing?.purchase_date ?? '');
+  const src = editing ?? copyOf;
+  const [serial,       setSerial]       = useState(src?.serial_no ?? '');
+  const [teeth,        setTeeth]        = useState(src?.teeth.toString() ?? '');
+  const [type,         setType]         = useState<Cylinder['type']>(src?.type ?? 'Print');
+  const [manufacturer, setManufacturer] = useState(src?.manufacturer ?? '');
+  const [purchaseDate, setPurchaseDate] = useState(src?.purchase_date ?? '');
   const [saving,       setSaving]       = useState(false);
 
   const n = Number(teeth);
@@ -361,9 +372,11 @@ function CylinderModal({ editing, onClose, onSaved }: { editing?: Cylinder; onCl
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/12 shrink-0">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-[var(--glass-ink)]">
-              {editing ? 'Edit cylinder' : 'Add cylinder'}
+              {editing ? 'Edit cylinder' : copyOf ? 'Duplicate cylinder' : 'Add cylinder'}
             </h2>
-            <p className="text-xs text-[var(--glass-muted)] mt-0.5">One entry per cylinder: each serial number is used once</p>
+            <p className="text-xs text-[var(--glass-muted)] mt-0.5">
+              {copyOf ? `Copied from ${copyOf.serial_no}: change the serial number` : 'One entry per cylinder: each serial number is used once'}
+            </p>
           </div>
           <button
             type="button"
@@ -379,7 +392,7 @@ function CylinderModal({ editing, onClose, onSaved }: { editing?: Cylinder; onCl
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
               <FieldLabel required>Serial number</FieldLabel>
-              <input value={serial} onChange={(e) => setSerial(e.target.value)} required className={cn(inputCls, 'font-mono')} />
+              <input value={serial} onChange={(e) => setSerial(e.target.value)} required autoFocus={!!copyOf} className={cn(inputCls, 'font-mono')} />
             </label>
             <label className="block">
               <FieldLabel required>Type</FieldLabel>
