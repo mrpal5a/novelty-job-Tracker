@@ -13,7 +13,8 @@
 // Saving is checked against the order (lib/dispatchChecks.ts): the same PO
 // and PM code entered in the last 3 days, more labels than ordered, or no
 // order line at all. The warnings show here and Save becomes "Save anyway";
-// changing a field clears them so the next save checks again.
+// changing a field clears them so the next save checks again. When the PO and
+// PM code fit several lines, it also asks which one and links the entry to it.
 
 import React, { useState, useEffect, useId, useMemo } from 'react';
 import { Check, X } from 'lucide-react';
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import PartyPicker from './PartyPicker';
 import type { Party, PendingDispatchNotification } from '@/lib/types';
+import type { LineChoice } from '@/lib/dispatchChecks';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { useListKeys } from '@/hooks/useListKeys';
 import { searchSources, type SlipSource, type SourceMatches } from '@/lib/slipSource';
@@ -58,7 +60,11 @@ export default function AddCustomDispatchModal({ existing, onClose, onSaved }: P
   const [saving,     setSaving]     = useState(false);
   const [warnings,   setWarnings]   = useState<string[]>([]);
 
+  const [choices,    setChoices]    = useState<LineChoice[]>([]);
+  const [lineId,     setLineId]     = useState<string | null>(null);
+
   useEffect(() => { setWarnings([]); }, [poNumber, pmCode, qty]);
+  useEffect(() => { setChoices([]); setLineId(null); }, [poNumber, pmCode]);
 
   // Only what's typed into the PM code box searches — not the value an
   // entry being edited opens with, nor the code a pick fills in.
@@ -129,12 +135,14 @@ export default function AddCustomDispatchModal({ existing, onClose, onSaved }: P
             remark:    remark.trim() || undefined,
             pm_code:   pmCode.trim() || undefined,
             confirm:   warnings.length > 0,
+            line_id:   lineId ?? undefined,
           }),
         },
       );
       const data = await res.json();
       if (res.status === 409 && Array.isArray(data.warnings)) {
         setWarnings(data.warnings);
+        if (!lineId) setChoices(data.choices ?? []);
         return;
       }
       if (!res.ok) {
@@ -306,6 +314,28 @@ export default function AddCustomDispatchModal({ existing, onClose, onSaved }: P
               {warnings.map((w) => <li key={w}>{w}</li>)}
             </ul>
           </div>
+        )}
+
+        {choices.length > 1 && (
+          <fieldset className="mx-5 mb-1 mt-1 min-w-0 shrink-0">
+            <legend className="mb-1.5 text-xs font-medium text-[var(--glass-muted)]">Which line is this dispatch for?</legend>
+            <div className="flex max-h-44 flex-col gap-1.5 overflow-y-auto">
+              {choices.map((c) => (
+                <label key={c.id} className={cn(
+                  'flex min-h-11 shrink-0 cursor-pointer items-start gap-3 rounded-[10px] border px-3 py-2 transition-colors',
+                  lineId === c.id ? 'border-brand-primary bg-brand-surface-hover' : 'border-brand-border bg-white hover:bg-brand-surface-hover',
+                )}>
+                  <input type="radio" name="dispatch-line" checked={lineId === c.id} onChange={() => { setLineId(c.id); setWarnings([]); }}
+                    className="mt-0.5 h-4 w-4 shrink-0 accent-[#10553F]" />
+                  <span className="min-w-0 flex-1 text-[13px] text-[var(--glass-ink)]">
+                    <span className="font-mono font-medium">{c.sr_no ?? 'No Sr. No.'}</span>
+                    {c.quantity != null && <span className="font-mono text-[var(--glass-muted)]"> · {c.quantity.toLocaleString('en-IN')} ordered</span>}
+                    {c.material_name && <span className="block truncate text-xs text-[var(--glass-muted)]">{c.material_name}</span>}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
         )}
 
         <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-white/12 shrink-0">

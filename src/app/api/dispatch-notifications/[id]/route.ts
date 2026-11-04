@@ -1,7 +1,9 @@
 // src/app/api/dispatch-notifications/[id]/route.ts
 // PATCH  /api/dispatch-notifications/[id] — correct a queued (unsent) entry.
 //        A changed PO, PM code or qty is checked like a new entry (409
-//        { warnings } until sent again with confirm: true).
+//        { warnings, choices } until sent again with confirm: true). line_id
+//        ties it to one of the choices; changing the PO or PM code drops an
+//        earlier link, which was for the old codes.
 // DELETE /api/dispatch-notifications/[id] — remove an entry. One that never
 //        counted (still queued, never team-emailed) is deleted outright; one
 //        that counts is struck out with who, when and { reason }, and stays
@@ -18,7 +20,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDispatchNotifications } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
-import { dispatchWarnings } from '@/lib/dispatchChecks';
+import { dispatchCheck } from '@/lib/dispatchChecks';
 import { poKey } from '@/lib/dispatchLedger';
 import { pmKey } from '@/lib/reports';
 
@@ -59,7 +61,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const admin = createAdminClient();
   const { data: before, error: readError } = await admin
     .from('pending_dispatch_notifications')
-    .select('po_number, pm_code, qty')
+    .select('po_number, pm_code, qty, line_id')
     .eq('id', id)
     .is('notified_at', null)
     .is('removed_at', null)
@@ -69,11 +71,16 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   // Only a change to what counts is checked: saving the vehicle number on a
   // flagged entry shouldn't ask again.
-  const changed = poKey(before.po_number) !== poKey(poNumber) || pmKey(before.pm_code) !== pmKey(pmCode) || before.qty !== qty;
-  if (changed && body.confirm !== true) {
+  const newCodes = poKey(before.po_number) !== poKey(poNumber) || pmKey(before.pm_code) !== pmKey(pmCode);
+  const changed = newCodes || before.qty !== qty;
+  const picked = typeof body.line_id === 'string' && body.line_id ? body.line_id : null;
+  if (picked || (changed && body.confirm !== true)) {
     try {
-      const warnings = await dispatchWarnings(admin, { po: poNumber, pm: pmCode || null, qty, excludeId: id });
-      if (warnings.length) return NextResponse.json({ warnings }, { status: 409 });
+      const { warnings, choices, line } = await dispatchCheck(admin, {
+        po: poNumber, pm: pmCode || null, qty, excludeId: id, lineId: picked ?? (newCodes ? null : before.line_id),
+      });
+      if (picked && !line) return NextResponse.json({ error: 'That order line is cancelled or no longer exists' }, { status: 409 });
+      if (body.confirm !== true && warnings.length) return NextResponse.json({ warnings, choices }, { status: 409 });
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });
     }
@@ -89,6 +96,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       qty,
       remark:    remark || null,
       pm_code:   pmCode || null,
+      ...(picked
+        ? { line_id: picked, linked_by: auth.who, linked_at: new Date().toISOString() }
+        : newCodes ? { line_id: null, linked_by: null, linked_at: null } : {}),
     })
     .eq('id', id)
     .is('notified_at', null)

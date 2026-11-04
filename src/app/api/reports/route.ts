@@ -104,14 +104,14 @@ export async function GET(req: Request) {
   // a few thousand a year, and they change without touching Job Separation.
   let dispatches: DispatchEntry[];
   try {
-    const entries = await allPages<{ id: string; party: string; po_number: string; pm_code: string | null; qty: number | null; confirmed_at: string }>((from, to) => admin
+    const entries = await allPages<{ id: string; party: string; po_number: string; pm_code: string | null; qty: number | null; confirmed_at: string; line_id: string | null }>((from, to) => admin
       .from('pending_dispatch_notifications')
-      .select('id, party, po_number, pm_code, qty, confirmed_at')
+      .select('id, party, po_number, pm_code, qty, confirmed_at, line_id')
       .not('confirmed_at', 'is', null)
       .is('removed_at', null)
       .order('id', { ascending: true })
       .range(from, to));
-    dispatches = entries.map((d) => ({ id: d.id, party: d.party, po: d.po_number, pm: d.pm_code, qty: d.qty ?? 0, day: istToday(new Date(d.confirmed_at)) }));
+    dispatches = entries.map((d) => ({ id: d.id, party: d.party, po: d.po_number, pm: d.pm_code, qty: d.qty ?? 0, day: istToday(new Date(d.confirmed_at)), lineId: d.line_id }));
   } catch (err) {
     console.error('[GET /api/reports] dispatches', err);
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

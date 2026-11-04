@@ -8,8 +8,8 @@
 // and can be removed from History with a reason. Same checks as the dispatch
 // form (lib/dispatchChecks.ts): 409 { warnings } until sent with confirm.
 //
-// Only a line its PO + PM code picks out on its own can take one — otherwise
-// the entry would count against whichever line matching lands on.
+// The entry is linked to this line (migration 088), so a line sharing its PO
+// and PM code with another still gets the labels.
 // Needs dispatch_qty_edit, granted by Admin per department.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,8 +19,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptRecordDispatchedQty } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
 import { containsPattern } from '@/lib/search';
-import { dispatchWarnings } from '@/lib/dispatchChecks';
-import { dispatchedByLine, lineFor } from '@/lib/dispatchLedger';
+import { dispatchCheck } from '@/lib/dispatchChecks';
+import { dispatchedByLine } from '@/lib/dispatchLedger';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -58,28 +58,25 @@ export async function POST(request: NextRequest, { params }: Params) {
     .is('cancelled_at', null)
     .ilike('po_no', pattern);
   if (poError) return NextResponse.json({ error: poError.message }, { status: 500 });
-  if (lineFor(row.po_no, row.pm_code, samePo)?.id !== row.id) {
-    return NextResponse.json({
-      error: 'Another line has the same PO and PM code, so a dispatch can\'t be tied to this one. Correct the PM code first.',
-    }, { status: 409 });
-  }
 
   if (body.confirm !== true) {
     try {
-      const warnings = await dispatchWarnings(admin, { po: row.po_no, pm: row.pm_code, qty });
+      const { warnings } = await dispatchCheck(admin, { po: row.po_no, pm: row.pm_code, qty, lineId: row.id });
       if (warnings.length) return NextResponse.json({ warnings }, { status: 409 });
     } catch (err) {
       return NextResponse.json({ error: (err as Error).message }, { status: 500 });
     }
   }
 
-  const { data: counted, error: countedError } = await admin
+  // A linked entry's PO can differ from this line's, so read those too.
+  const counting = () => admin
     .from('pending_dispatch_notifications')
-    .select('po_number, pm_code, qty')
+    .select('id, po_number, pm_code, qty, line_id')
     .not('confirmed_at', 'is', null)
-    .is('removed_at', null)
-    .ilike('po_number', pattern);
-  if (countedError) return NextResponse.json({ error: countedError.message }, { status: 500 });
+    .is('removed_at', null);
+  const [byPo, byLink] = await Promise.all([counting().ilike('po_number', pattern), counting().eq('line_id', row.id)]);
+  if (byPo.error || byLink.error) return NextResponse.json({ error: (byPo.error ?? byLink.error)!.message }, { status: 500 });
+  const counted = Array.from(new Map([...byPo.data, ...byLink.data].map((e) => [e.id, e])).values());
   const before = dispatchedByLine(samePo, counted).get(row.id) ?? 0;
 
   const now = new Date().toISOString();
@@ -95,6 +92,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     created_by:   user.email ?? deptKeyOf(user) ?? null,
     confirmed_at: now,
     notified_at:  now,
+    line_id:      row.id,
+    linked_by:    user.email ?? deptKeyOf(user) ?? null,
+    linked_at:    now,
   });
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

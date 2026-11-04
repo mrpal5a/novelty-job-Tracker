@@ -323,12 +323,12 @@ export function PromptModal({
 // what will happen. White body, soft footer, 44px controls.
 
 const dBtn = 'inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-[10px] border px-4 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50';
-const dPrimary = cn(dBtn, 'border-transparent bg-brand-primary text-white hover:bg-brand-primary-hover');
-const dQuiet   = cn(dBtn, 'border-transparent bg-transparent font-medium text-brand-muted hover:bg-brand-surface-hover hover:text-brand-ink');
+export const dPrimary = cn(dBtn, 'border-transparent bg-brand-primary text-white hover:bg-brand-primary-hover');
+export const dQuiet   = cn(dBtn, 'border-transparent bg-transparent font-medium text-brand-muted hover:bg-brand-surface-hover hover:text-brand-ink');
 const dHold    = cn(dBtn, 'border-[#D97706] bg-[#FFFBEB] text-[#92400E] hover:bg-[#FEF3C7]');
 const dDanger  = cn(dBtn, 'border-transparent bg-[#B91C1C] text-white hover:bg-[#991B1B]');
 
-const dField = cn(
+export const dField = cn(
   'w-full min-h-11 rounded-[10px] border border-brand-border bg-white px-3 text-[15px] text-brand-ink',
   'placeholder:text-brand-faint focus:border-brand-primary focus:outline-none focus:shadow-[0_0_0_4px_rgba(16,85,63,0.18)]',
 );
@@ -345,7 +345,7 @@ function Ref({ job }: { job?: Job | null }) {
   return ref ? <span className="font-mono">{ref}</span> : <>this job</>;
 }
 
-function StageDialog({
+export function StageDialog({
   titleId, cap, title, sub, onClose, children, footer,
 }: {
   titleId: string;
@@ -384,7 +384,7 @@ function Facts({ items }: { items: [string, React.ReactNode, ('bad' | undefined)
   );
 }
 
-function Note({ tone, children }: { tone: 'ok' | 'warn' | 'bad'; children: React.ReactNode }) {
+export function Note({ tone, children }: { tone: 'ok' | 'warn' | 'bad'; children: React.ReactNode }) {
   return (
     <p
       role={tone === 'ok' ? undefined : 'note'}

@@ -7,16 +7,17 @@
 // Each row says whether it counts and what it matched: the order line
 // (Sr. No.) and how much is now entered against it out of the order. The
 // lists that need a look are one tap away: entries cleared without a team
-// email (Confirm them, or remove them), entries with no order line, and
-// lines with more entered than ordered. Removing asks why; the row stays
-// here struck out, with who and when, and stops counting.
+// email (Confirm them, or remove them), entries with no order line (Link
+// them, LinkLineModal), and lines with more entered than ordered. Removing
+// asks why; the row stays here struck out, with who and when, and stops counting.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Trash2, Search } from 'lucide-react';
+import { Check, Link2, Trash2, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import type { DispatchHistoryRow } from '@/lib/types';
 import { PromptModal } from './modals';
+import LinkLineModal from './LinkLineModal';
 
 type View = 'all' | 'unconfirmed' | 'noline' | 'over' | 'removed';
 
@@ -45,6 +46,7 @@ export default function DispatchHistory() {
   const [shown, setShown]     = useState(PAGE);
   const [busyId, setBusyId]   = useState<string | null>(null);
   const [removing, setRemoving] = useState<DispatchHistoryRow | null>(null);
+  const [linking, setLinking]   = useState<DispatchHistoryRow | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -102,6 +104,14 @@ export default function DispatchHistory() {
         />
       )}
 
+      {linking && (
+        <LinkLineModal
+          entry={linking}
+          onClose={() => setLinking(null)}
+          onDone={(message) => { setLinking(null); toast.success(message); load(); }}
+        />
+      )}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="group" aria-label="Show" className="flex flex-wrap gap-1.5">
           {VIEWS.map((v) => (
@@ -149,7 +159,7 @@ export default function DispatchHistory() {
                 </tr>
               </thead>
               <tbody>
-                {list.slice(0, shown).map((r) => <Row key={r.id} r={r} busy={busyId === r.id} onConfirm={confirm} onRemove={setRemoving} />)}
+                {list.slice(0, shown).map((r) => <Row key={r.id} r={r} busy={busyId === r.id} onConfirm={confirm} onRemove={setRemoving} onLink={setLinking} />)}
               </tbody>
             </table>
           </div>
@@ -166,9 +176,9 @@ export default function DispatchHistory() {
   );
 }
 
-function Row({ r, busy, onConfirm, onRemove }: {
+function Row({ r, busy, onConfirm, onRemove, onLink }: {
   r: DispatchHistoryRow; busy: boolean;
-  onConfirm: (r: DispatchHistoryRow) => void; onRemove: (r: DispatchHistoryRow) => void;
+  onConfirm: (r: DispatchHistoryRow) => void; onRemove: (r: DispatchHistoryRow) => void; onLink: (r: DispatchHistoryRow) => void;
 }) {
   const gone = !!r.removed_at;
   const state = gone ? { dot: 'bg-brand-muted', name: 'Removed' }
@@ -201,7 +211,12 @@ function Row({ r, busy, onConfirm, onRemove }: {
               </span>
             )}
           </>
-        ) : <span className="text-brand-muted">none matched</span>}
+        ) : <span className="text-brand-muted">{r.line_id ? 'linked line cancelled' : 'none matched'}</span>}
+        {r.line && r.linked_at && (
+          <span className="block max-w-[200px] truncate font-sans text-[11px] text-brand-muted" title={`Linked by ${r.linked_by ?? 'someone'} on ${formatNumericDate(r.linked_at)}`}>
+            Linked by {r.linked_by ?? 'someone'}
+          </span>
+        )}
       </td>
       <td className="px-3 py-3 text-xs">
         <span className="inline-flex items-center gap-2 whitespace-nowrap font-medium text-brand-ink">
@@ -222,6 +237,17 @@ function Row({ r, busy, onConfirm, onRemove }: {
             <Check className="h-4 w-4" aria-hidden="true" /> Confirm
           </button>
         )}
+        {!gone && (r.line ? (
+          <button type="button" onClick={() => onLink(r)} disabled={busy} aria-label={`Change the order line for ${r.po_number}`} title="Change the order line"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-brand-surface-hover hover:text-brand-ink disabled:opacity-40">
+            <Link2 className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : (
+          <button type="button" onClick={() => onLink(r)} disabled={busy}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2.5 text-sm font-medium text-brand-primary transition-colors hover:bg-brand-surface-hover disabled:opacity-40">
+            <Link2 className="h-4 w-4" aria-hidden="true" /> Link to line
+          </button>
+        ))}
         {!gone && (
           <button type="button" onClick={() => onRemove(r)} disabled={busy} aria-label={`Remove entry for ${r.po_number}`}
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg text-brand-muted transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40">

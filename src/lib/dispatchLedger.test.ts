@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lineFor, entryWarnings, dispatchOf, dispatchedByLine, type DispatchEntry } from './dispatchLedger';
+import { lineFor, lineMatcher, suggestLines, linkWarnings, entryWarnings, dispatchOf, dispatchedByLine, type DispatchEntry } from './dispatchLedger';
 import type { SepRow } from './reports';
 
 const row = (p: Partial<SepRow>): SepRow => ({
@@ -39,6 +39,74 @@ describe('dispatchedByLine', () => {
   });
 });
 
+describe('linked entries', () => {
+  const a = row({ id: 'a', po_no: 'PO1', pm_code: 'PM1' });
+  const twin = row({ id: 'twin', po_no: 'PO1', pm_code: 'PM1' });
+  const other = row({ id: 'other', po_no: 'PO-99', pm_code: null });
+
+  it('settles two lines with the same PO and PM code', () => {
+    const m = dispatchedByLine([a, twin], [
+      { po_number: 'PO1', pm_code: 'PM1', qty: 30, line_id: 'twin' },
+      { po_number: 'PO1', pm_code: 'PM1', qty: 43, line_id: 'a' },
+      { po_number: 'PO1', pm_code: 'PM1', qty: 99 },   // unlinked: still no guess
+    ]);
+    expect(m.get('twin')).toBe(30);
+    expect(m.get('a')).toBe(43);
+  });
+  it('wins over PO + PM code, even across POs', () => {
+    const m = dispatchedByLine([a, other], [{ po_number: 'PO1', pm_code: 'PM1', qty: 5, line_id: 'other' }]);
+    expect(m.get('other')).toBe(5);
+    expect(m.has('a')).toBe(false);
+  });
+  it('matches nothing when the linked line is gone, rather than falling back to another line', () => {
+    expect(lineMatcher([a])('PO1', 'PM1', 'cancelled-line')).toBeNull();
+  });
+  it('counts in Reports against the linked line', () => {
+    const period = { from: '2026-10-01', to: '2026-10-31' }, previous = { from: '2026-09-01', to: '2026-09-30' };
+    const v = dispatchOf([{ ...a, quantity: 100 }, { ...twin, quantity: 50 }],
+      [entry({ qty: 30, day: '2026-10-22', lineId: 'twin' })], period, previous, { unit: null, group: null, party: null }, '2026-10-25', '2026-10-01')!;
+    expect(v.shipped.qty).toBe(30);
+    expect(v.unmatched.entries).toBe(0);
+  });
+});
+
+describe('suggestLines', () => {
+  const line = (id: string, po: string, pm: string | null, item: string, party = 'SUPERFORM - 81') =>
+    ({ id, po_no: po, pm_code: pm, material_name: item, party });
+  const lines = [
+    line('haz', '5000465206', '2303393', 'HAZ CLASS 9'),
+    line('marine', '5000465206', '2303392', 'MARRINE POLLUTANT'),
+    line('elsewhere', '777', '1', 'UNRELATED'),
+  ];
+  it('puts the line whose PM code is in the job name first', () => {
+    const got = suggestLines({ party: 'SUPERFORM - 81', po_number: '5000465206', pm_code: null, job_name: '2303392--MARRINE POLLUTANT' }, lines);
+    expect(got.map((l) => l.id)).toEqual(['marine', 'haz']);
+  });
+  it('sticks to the entry\'s own PO when it has lines, and looks wider by PM code when it has none', () => {
+    const many = [line('own', 'PO1', 'PM9', 'X'), line('other-po', 'PO2', 'PM9', 'X')];
+    expect(suggestLines({ party: 'SUPERFORM - 81', po_number: 'PO1', pm_code: 'PM9', job_name: null }, many).map((l) => l.id)).toEqual(['own']);
+    expect(suggestLines({ party: 'SUPERFORM - 81', po_number: 'PO7', pm_code: 'PM9', job_name: null }, many).map((l) => l.id)).toEqual(['own', 'other-po']);
+  });
+  it('finds a PO typed differently, within the same party only', () => {
+    const nl = [line('mine', 'NL149/2026-27', '32', 'X', 'SIMK'), line('theirs', 'NL149/2026-27', '32', 'X', 'OTHER')];
+    expect(suggestLines({ party: 'SIMK', po_number: 'NL149', pm_code: null, job_name: null }, nl).map((l) => l.id)).toEqual(['mine']);
+  });
+  it('suggests nothing on the party alone', () => {
+    expect(suggestLines({ party: 'SUPERFORM - 81', po_number: 'WITHOUT PO', pm_code: null, job_name: null }, lines)).toEqual([]);
+  });
+});
+
+describe('linkWarnings', () => {
+  it('says nothing when it fits', () => {
+    expect(linkWarnings({ entry: { party: 'ARYSTA', qty: 30 }, line: { party: 'arysta ', quantity: 35 }, entered: 0 })).toEqual([]);
+  });
+  it('flags another party and going over the order', () => {
+    const w = linkWarnings({ entry: { party: 'ARYSTA', qty: 43000 }, line: { party: 'UPL', quantity: 65000 }, entered: 30000 });
+    expect(w[0]).toContain('UPL');
+    expect(w[1]).toContain('8,000 more than ordered');
+  });
+});
+
 describe('entryWarnings', () => {
   const now = new Date('2026-10-21T10:00:00+05:30');
   it('says nothing for a first entry inside the order', () => {
@@ -56,6 +124,7 @@ describe('entryWarnings', () => {
   });
   it('flags an entry with no order line', () => {
     expect(entryWarnings({ line: null, others: [], qty: 10, now })[0]).toContain('No order line');
+    expect(entryWarnings({ line: null, others: [], qty: 10, now, choices: 2 })[0]).toContain('2 order lines');
   });
 });
 

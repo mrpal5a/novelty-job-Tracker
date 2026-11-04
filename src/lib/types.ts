@@ -722,12 +722,29 @@ export interface PendingDispatchNotification {
   removed_at:    string | null;          // struck out — left out of every figure
   removed_by:    string | null;
   remove_reason: string | null;
+  // Migration 088: the exact Job Separation line, when someone picked it.
+  // Wins over matching by PO + PM code.
+  line_id:   string | null;
+  linked_by: string | null;
+  linked_at: string | null;
 }
 
 // One entry in the Dispatch history tab: the entry plus the order line it
-// matched (lib/dispatchLedger.ts lineFor) and that line's running total.
+// matched (lib/dispatchLedger.ts lineMatcher) and that line's running total.
 export interface DispatchHistoryRow extends PendingDispatchNotification {
-  line: { sr_no: string | null; quantity: number | null; entered: number } | null;
+  line: { id: string; sr_no: string | null; quantity: number | null; entered: number } | null;
+}
+
+// A live order line as the "Link to line" dialog lists it.
+export interface DispatchLineOption {
+  id:            string;
+  sr_no:         string | null;
+  party:         string;
+  po_no:         string | null;
+  pm_code:       string | null;
+  material_name: string | null;
+  quantity:      number | null;
+  entered:       number;
 }
 
 // One party's group of pending dispatch notifications, as returned by

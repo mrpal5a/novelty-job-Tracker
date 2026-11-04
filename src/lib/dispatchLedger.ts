@@ -9,6 +9,10 @@
 // PO has exactly one live line. Two live lines with the same PO and PM code
 // match neither; guessing would put the labels against the wrong one.
 //
+// Someone can settle that by hand: an entry's line_id (migration 088) wins
+// over PO + PM code. A link to a line that's gone or cancelled matches
+// nothing, so the labels never move to another line by themselves.
+//
 // An entry counts once it's confirmed (its first team email, or confirmed
 // by hand) and not removed (migration 085). Entry status can't close a
 // line: the form defaults to "Dispatched", so most part dispatches carry
@@ -42,21 +46,69 @@ export function lineFor<L extends LineLike>(po: string | null, pm: string | null
   return hits.length === 1 ? hits[0] : null;
 }
 
-/**
- * Labels entered against each line: line id → total. `lines`: every live
- * line that shares a PO with the ones asked about (so an ambiguous PO + PM
- * code stays unmatched); `entries`: the entries that count.
- */
-export function dispatchedByLine<L extends LineLike>(lines: L[], entries: { po_number: string; pm_code: string | null; qty: number | null }[]): Map<string, number> {
+/** Matches many entries against `lines`: the entry's link if it has one, otherwise PO + PM code. */
+export function lineMatcher<L extends LineLike>(lines: L[]) {
+  const byId = new Map(lines.map((l) => [l.id, l]));
   const byPo = new Map<string, L[]>();
   for (const l of lines) {
     const k = poKey(l.po_no);
     if (k) byPo.set(k, [...(byPo.get(k) ?? []), l]);
   }
+  return (po: string | null, pm: string | null, lineId?: string | null): L | null =>
+    lineId ? byId.get(lineId) ?? null : lineFor(po, pm, byPo.get(poKey(po)) ?? []);
+}
+
+/**
+ * Labels entered against each line: line id → total. `lines`: every live
+ * line that shares a PO with the ones asked about (so an ambiguous PO + PM
+ * code stays unmatched); `entries`: the entries that count.
+ */
+export function dispatchedByLine<L extends LineLike>(lines: L[], entries: { po_number: string; pm_code: string | null; qty: number | null; line_id?: string | null }[]): Map<string, number> {
+  const match = lineMatcher(lines);
   const out = new Map<string, number>();
   for (const e of entries) {
-    const l = lineFor(e.po_number, e.pm_code, byPo.get(poKey(e.po_number)) ?? []);
+    const l = match(e.po_number, e.pm_code, e.line_id);
     if (l) out.set(l.id, (out.get(l.id) ?? 0) + (e.qty ?? 0));
+  }
+  return out;
+}
+
+/** The lines most likely to be the one an unmatched entry ships, best first. */
+export function suggestLines<L extends LineLike & { party: string; material_name: string | null }>(
+  e: { party: string; po_number: string; pm_code: string | null; job_name: string | null },
+  lines: L[],
+  max = 8,
+): L[] {
+  const squash = (s: string | null) => (s ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const po = squash(e.po_number), pm = pmKey(e.pm_code), job = squash(e.job_name), party = partyKey(e.party);
+  const score = (l: L) => {
+    const linePo = squash(l.po_no), linePm = pmKey(l.pm_code), item = squash(l.material_name), sameParty = partyKey(l.party) === party;
+    let s = sameParty ? 1 : 0;
+    if (poKey(l.po_no) === poKey(e.po_number)) s += 8;
+    // "NL149" for "NL149/2026-27". Only within the party: short numbers turn up inside other parties' POs.
+    else if (sameParty && Math.min(po.length, linePo.length) >= 4 && (linePo.includes(po) || po.includes(linePo))) s += 6;
+    if (pm && pm === linePm) s += 4;
+    if (linePm && linePm.length >= 4 && job.includes(squash(linePm))) s += 3;   // the code typed into the job name
+    if (item && job.includes(item)) s += 3;
+    return s;
+  };
+  const likely = lines.map((l) => ({ l, s: score(l) })).filter((x) => x.s >= 4).sort((a, b) => b.s - a.s).map((x) => x.l);
+  // The PO itself is in the order book: its lines are the question, not the same PM code on other POs.
+  const samePo = likely.filter((l) => poKey(l.po_no) === poKey(e.po_number));
+  return (samePo.length ? samePo : likely).slice(0, max);
+}
+
+/** What to tell whoever links an entry to `line` before saving. `entered`: labels already on the line, not counting this entry. */
+export function linkWarnings({ entry, line, entered }: {
+  entry:   { party: string; qty: number | null };
+  line:    { party: string; quantity: number | null };
+  entered: number;
+}): string[] {
+  const out: string[] = [];
+  if (partyKey(entry.party) !== partyKey(line.party)) out.push(`This line is for ${line.party.trim()}, but the entry says ${entry.party.trim()}.`);
+  const total = entered + (entry.qty ?? 0);
+  if (line.quantity && entry.qty && total > line.quantity) {
+    out.push(`The order is for ${fmt(line.quantity)} labels. With this entry ${fmt(total)} are entered against it, ${fmt(total - line.quantity)} more than ordered.`);
   }
   return out;
 }
@@ -69,11 +121,12 @@ const shortDay = (iso: string) => new Date(iso).toLocaleDateString('en-IN', { da
  * `others`: live entries already against the same line (or, with no line,
  * the same PO and PM code), not counting the one being edited.
  */
-export function entryWarnings({ line, others, qty, now }: {
+export function entryWarnings({ line, others, qty, now, choices = 0 }: {
   line:   { quantity: number | null } | null;
   others: { qty: number | null; created_at: string }[];
   qty:    number | null;
   now:    Date;
+  choices?: number;   // live lines this PO and PM code could mean, when it's more than one
 }): string[] {
   const out: string[] = [];
   const cutoff = now.getTime() - DUPLICATE_DAYS * 86_400_000;
@@ -83,7 +136,9 @@ export function entryWarnings({ line, others, qty, now }: {
     out.push(`Already entered for this PO and PM code in the last ${DUPLICATE_DAYS} days: ${list}. Adding it again counts it twice.`);
   }
   if (!line) {
-    out.push('No order line in Job Separation has this PO and PM code, so Reports can\'t count this against an order.');
+    out.push(choices > 1
+      ? `${choices} order lines have this PO and PM code. Pick the one this dispatch is for, or Reports can't count it against an order.`
+      : 'No order line in Job Separation has this PO and PM code, so Reports can\'t count this against an order.');
   } else if (line.quantity && qty) {
     const total = others.reduce((s, o) => s + (o.qty ?? 0), 0) + qty;
     if (total > line.quantity) {
@@ -96,7 +151,7 @@ export function entryWarnings({ line, others, qty, now }: {
 // ── Reports ───────────────────────────────────────────────────
 
 /** A confirmed, live entry as Reports reads it. `day`: IST day it was confirmed. */
-export type DispatchEntry = { id: string; party: string; po: string; pm: string | null; qty: number; day: string };
+export type DispatchEntry = { id: string; party: string; po: string; pm: string | null; qty: number; day: string; lineId?: string | null };
 
 export type LineStatus = {
   line:     SepRow;
@@ -149,17 +204,13 @@ export function dispatchOf(all: SepRow[], entries: DispatchEntry[], period: Peri
   const matches = rowMatches(filter);
 
   const live = all.filter((r) => !r.cancelled);
-  const byPo = new Map<string, SepRow[]>();
-  for (const r of live) {
-    const k = poKey(r.po_no);
-    if (k) byPo.set(k, [...(byPo.get(k) ?? []), r]);
-  }
+  const match = lineMatcher(live);
 
   const lineOf = new Map<string, SepRow>();             // entry id → line
   const perLine = new Map<string, DispatchEntry[]>();   // line id → its entries
   const loose: DispatchEntry[] = [];
   for (const e of counted) {
-    const line = lineFor(e.po, e.pm, byPo.get(poKey(e.po)) ?? []);
+    const line = match(e.po, e.pm, e.lineId);
     if (!line) { loose.push(e); continue; }
     lineOf.set(e.id, line);
     perLine.set(line.id, [...(perLine.get(line.id) ?? []), e]);
