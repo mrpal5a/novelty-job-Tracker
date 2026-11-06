@@ -2,7 +2,8 @@
 // ============================================================
 // The admin header's sections, grouped the way the floor thinks about them:
 // Dashboard, Job Separation, Production, Shade Cards, Stock, Dispatch, then
-// BOM, Follow-ups and Reports. Team, Departments and Settings sit behind the gear.
+// BOM, Follow-ups and Reports. Team, Departments, Settings and the Activity Log
+// sit behind the gear.
 //
 // One function decides who sees what, so the header strip, the phone sheet,
 // the phone tab bar and Ctrl+K can never disagree. Permission gates mirror
@@ -11,7 +12,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import {
-  BarChart3, Building2, ClipboardList, Contact, Cpu, Cylinder, Disc, LayoutDashboard, Package,
+  BarChart3, Building2, ClipboardList, Contact, Cpu, Cylinder, Disc, History, LayoutDashboard, Package,
   Palette, Printer, Scissors, Settings, SplitSquareHorizontal, Truck, Users,
 } from 'lucide-react';
 import {
@@ -139,6 +140,7 @@ export function buildAdminLinks(dept: DeptPermissions): NavLink[] {
     ...(dept.isSuperAdmin ? [
       { href: '/admin/departments', label: 'Departments', icon: Building2 },
       { href: '/admin/settings',    label: 'Settings',    icon: Settings },
+      { href: '/admin/activity',    label: 'Activity Log', icon: History },
     ] : []),
   ];
 }

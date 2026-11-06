@@ -9,6 +9,10 @@
 // from getClaimsUser(), or a full User from admin.listUsers()/getUserById().
 // ============================================================
 
+/** Who is writing, for the activity log (migration 089). Set by the middleware
+ *  once it has verified the session; forwarded to the database by createAdminClient. */
+export const ACTOR_HEADER = 'x-actor-id';
+
 type WithAppMeta = { app_metadata?: Record<string, unknown> | null } | null | undefined;
 
 /** The login's department key (e.g. 'dispatch'), or undefined if none is set. */

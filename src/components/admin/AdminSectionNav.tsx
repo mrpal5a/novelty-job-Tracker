@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/AdminSectionNav.tsx
-// The pill row above Team, Departments and Settings — the three admin-only
-// pages that configure the app rather than run production. One row so they
+// The pill row above Team, Departments, Settings and the Activity Log — the
+// admin-only pages that look after the app rather than run production. One row so they
 // read as one place, whichever of them the header link lands on.
 
 import Link from 'next/link';
@@ -12,6 +12,7 @@ const SECTIONS = [
   { href: '/admin/team',        label: 'Team' },
   { href: '/admin/departments', label: 'Departments' },
   { href: '/admin/settings',    label: 'Settings' },
+  { href: '/admin/activity',    label: 'Activity Log' },
 ] as const;
 
 export default function AdminSectionNav() {

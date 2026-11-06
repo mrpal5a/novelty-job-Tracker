@@ -25,7 +25,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDeptPermissions } from '@/lib/constants/departments';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { deptKeyOf } from '@/lib/identity';
+import { ACTOR_HEADER, deptKeyOf } from '@/lib/identity';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -33,6 +33,12 @@ const CANONICAL_HOST = process.env.NEXT_PUBLIC_CANONICAL_DOMAIN || '';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Who is writing, for the activity log (migration 089). Only this file may
+  // set it, below, once the session is verified; anything a caller sent is
+  // dropped here. That's why every pass-through forwards { request }: a bare
+  // NextResponse.next() would hand the route the caller's original headers.
+  request.headers.delete(ACTOR_HEADER);
 
   // Canonicalize the domain: send anyone on a .vercel.app host to the
   // configured canonical domain, preserving path/query. Skip /api/* —
@@ -53,7 +59,7 @@ export async function middleware(request: NextRequest) {
     if (cronSecret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    return NextResponse.next();
+    return NextResponse.next({ request });
   }
 
   // Notification fan-out: internal-only, called server-to-server with no
@@ -63,12 +69,12 @@ export async function middleware(request: NextRequest) {
     if (internalSecret !== process.env.CRON_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    return NextResponse.next();
+    return NextResponse.next({ request });
   }
 
   // Public tracking portal — no auth required
   if (pathname.startsWith('/track')) {
-    return NextResponse.next();
+    return NextResponse.next({ request });
   }
 
   // Every other /api/* route checks its own session, but a mutating call
@@ -79,7 +85,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/')) {
     // /api/push only files the caller's own device for notifications —
     // Viewers get notified too.
-    if (SAFE_METHODS.has(request.method) || pathname === '/api/push') return NextResponse.next();
+    if (SAFE_METHODS.has(request.method) || pathname === '/api/push') return NextResponse.next({ request });
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -105,7 +111,8 @@ export async function middleware(request: NextRequest) {
         { status: 403 }
       );
     }
-    return NextResponse.next();
+    if (user) request.headers.set(ACTOR_HEADER, user.id);
+    return NextResponse.next({ request });
   }
 
   // For /admin/* and / — check Supabase session

@@ -38,8 +38,8 @@ describe('buildNavGroups', () => {
 
 describe('buildAdminLinks', () => {
   it('is empty for a floor department', () => expect(buildAdminLinks(dept())).toEqual([]));
-  it('holds Team, Departments and Settings for Admin', () => {
-    expect(buildAdminLinks(dept({ isSuperAdmin: true })).map((l) => l.label)).toEqual(['Team', 'Departments', 'Settings']);
+  it('holds Team, Departments, Settings and the Activity Log for Admin', () => {
+    expect(buildAdminLinks(dept({ isSuperAdmin: true })).map((l) => l.label)).toEqual(['Team', 'Departments', 'Settings', 'Activity Log']);
   });
 });
 
