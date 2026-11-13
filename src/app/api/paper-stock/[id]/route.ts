@@ -25,6 +25,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const body = await request.json();
   const admin = createAdminClient();
 
+  // Checked before anything is written: a refused save must not have already
+  // moved the roll to its new location.
+  const remaining = Number(body.remaining_meter);
+  if ('remaining_meter' in body
+    && (body.remaining_meter === '' || body.remaining_meter === null || !Number.isFinite(remaining) || remaining < 0)) {
+    return NextResponse.json({ error: 'Remaining metres must be 0 or more' }, { status: 400 });
+  }
+
   const patch: Record<string, unknown> = {};
   if ('location' in body) patch.location = text(body.location);
   if ('supplier' in body) patch.supplier = text(body.supplier);
@@ -34,10 +42,6 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if ('remaining_meter' in body) {
-    const remaining = Number(body.remaining_meter);
-    if (body.remaining_meter === '' || body.remaining_meter === null || !Number.isFinite(remaining) || remaining < 0) {
-      return NextResponse.json({ error: 'Remaining metres must be 0 or more' }, { status: 400 });
-    }
     const { error } = await admin.rpc('adjust_paper_roll', {
       p_roll_id:   id,
       p_remaining: Math.round(remaining * 100) / 100,

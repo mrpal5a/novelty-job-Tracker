@@ -14,6 +14,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions } from '@/lib/constants/departments';
 import { toMonthKey } from '@/lib/utils';
+import { dispatchedOnTime } from '@/lib/jobViews';
 import { deptKeyOf } from '@/lib/identity';
 
 type Params = { params: Promise<{ id: string }> };
@@ -141,8 +142,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     const allDispatched = newDispatchedQty >= (job.label_qty ?? 0);
     if (allDispatched && job.delivery_date) {
       const dispatchedAt   = new Date(actual_date ?? now);
-      const deliveryDate   = new Date(job.delivery_date);
-      const isOnTime       = dispatchedAt <= deliveryDate;
+      const isOnTime       = dispatchedOnTime(dispatchedAt, job.delivery_date);
       await admin.from('on_time_dispatch_log').insert({
         job_id:        schedule.job_id,
         dispatched_at: dispatchedAt.toISOString(),

@@ -32,8 +32,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { upsertRemainingStock, clearRemainingStock, addExtraStock } from '@/lib/api/labelStock';
 import { getDeptPermissions, canDeptSetStage, canDeptOverridePOClosed, deptNamesForStage } from '@/lib/constants/departments';
 import { NOT_YOUR_STAGE, notYourStageTitle } from '@/lib/stageBlocked';
-import { getPrerequisite, getVisibleStages, isStageSkipped, isPerReleaseStage, isBackwardMove, NOTIFICATION_TRIGGER_STAGES, DISPATCH_STAGES } from '@/lib/constants/stages';
+import { getPrerequisite, getVisibleStages, isStageSkipped, isPerReleaseStage, isBackwardMove, stageIndex, NOTIFICATION_TRIGGER_STAGES, DISPATCH_STAGES } from '@/lib/constants/stages';
 import { toMonthKey } from '@/lib/utils';
+import { dispatchedOnTime } from '@/lib/jobViews';
 import type { Stage } from '@/lib/constants/stages';
 import type { StatusChangePayload, Job } from '@/lib/types';
 import { deptKeyOf } from '@/lib/identity';
@@ -326,7 +327,9 @@ async function applyStatusChange(request: NextRequest, { params }: Params) {
   }
 
   if (new_status === 'Partial Dispatch') {
-    if (!qty_dispatched || qty_dispatched <= 0) {
+    // A whole number, and a number: "500" from a hand-built request would be
+    // glued onto dispatched_qty as text below, not added to it.
+    if (!qty_dispatched || !Number.isInteger(qty_dispatched) || qty_dispatched <= 0) {
       return NextResponse.json(
         { error: 'qty_dispatched is required for Partial Dispatch' },
         { status: 400 }
@@ -361,6 +364,14 @@ async function applyStatusChange(request: NextRequest, { params }: Params) {
     // the gap for the machine-board path, which bypasses this route
     // entirely (see POST /api/jobs/[id]/confirm-slitting for that one).
     jobUpdate.slitting_confirmed_at = now;
+  }
+
+  // A revert to before Slitting withdraws that confirmation too. Left in
+  // place, the reprinted job would pass straight into Quality Check the
+  // moment the machine board put it back at Slitting, with nobody from
+  // Postpress having confirmed the new slitting.
+  if (movingBackward && stageIndex(new_status) < stageIndex('Slitting')) {
+    jobUpdate.slitting_confirmed_at = null;
   }
 
   if (new_status === 'On Hold') {
@@ -581,10 +592,7 @@ async function applyStatusChange(request: NextRequest, { params }: Params) {
   // Write on-time dispatch log if fully dispatched
   if (new_status === 'Dispatched') {
     const dispatchedAt = new Date();
-    const deliveryDate = job.delivery_date ? new Date(job.delivery_date) : null;
-    const isOnTime = deliveryDate
-      ? dispatchedAt <= deliveryDate
-      : null;
+    const isOnTime = job.delivery_date ? dispatchedOnTime(dispatchedAt, job.delivery_date) : null;
 
     sideEffects.push(admin
       .from('on_time_dispatch_log')

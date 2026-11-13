@@ -16,6 +16,7 @@ import { containsPattern, orContains } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 import { dispatchedByLine } from '@/lib/dispatchLedger';
+import { isIsoDate } from '@/lib/jobViews';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -187,6 +188,9 @@ export async function POST(request: NextRequest) {
   const poDate = text(body.po_date);
   if (!poDate) {
     return NextResponse.json({ error: 'PO Date is required' }, { status: 400 });
+  }
+  if (!isIsoDate(poDate)) {
+    return NextResponse.json({ error: 'PO Date is not a valid date' }, { status: 400 });
   }
 
   // A caller may pin an explicit Sr. No. (e.g. correcting an import); blank

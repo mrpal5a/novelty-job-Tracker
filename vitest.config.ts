@@ -13,5 +13,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // The server (Vercel) runs in UTC; a developer's laptop at the plant runs
+    // in IST. Tests take the server's clock, so a date bug that only shows
+    // there fails here too.
+    env: { TZ: 'UTC' },
   },
 });

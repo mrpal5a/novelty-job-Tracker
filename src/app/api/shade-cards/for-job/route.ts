@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
+import { escapeLike } from '@/lib/search';
 
 /** How the match was made, so the UI can be honest about its confidence. */
 export type ShadeCardMatchBasis = 'pm_code' | 'party_product' | 'none';
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest) {
     .limit(5);
 
   if (pmCode) {
-    const { data, error } = await base().ilike('pm_code', pmCode);
+    // Escaped: ilike is here for "any case", not for patterns. Unescaped, the
+    // _ in "PM_100" matched any character and could show another code's card.
+    const { data, error } = await base().ilike('pm_code', escapeLike(pmCode));
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (data && data.length > 0) {
       return NextResponse.json({ cards: data, basis: 'pm_code' satisfies ShadeCardMatchBasis });
@@ -51,7 +54,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (party && product) {
-    const { data, error } = await base().ilike('party', party).ilike('product_name', product);
+    const { data, error } = await base().ilike('party', escapeLike(party)).ilike('product_name', escapeLike(product));
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (data && data.length > 0) {
       return NextResponse.json({ cards: data, basis: 'party_product' satisfies ShadeCardMatchBasis });

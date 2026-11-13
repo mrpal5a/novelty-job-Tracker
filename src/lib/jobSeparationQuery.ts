@@ -69,17 +69,3 @@ export function parseLimit(raw: string | null): number {
   if (!Number.isFinite(n) || n <= 0) return DEFAULT_LIMIT;
   return Math.min(Math.trunc(n), MAX_LIMIT);
 }
-
-/**
- * The "All fields" search: whatever the shop can read off a PO — the sr.
- * no, the party, the PO no, the PM code, or the material (product) name.
- * Characters with meaning inside an or() clause are stripped rather than
- * escaped: this is a search box, not an expression language.
- */
-export function searchOrClause(search: string): string {
-  const escaped = search.replace(/[%,()]/g, ' ');
-  return (
-    `sr_no.ilike.%${escaped}%,party.ilike.%${escaped}%,po_no.ilike.%${escaped}%,` +
-    `pm_code.ilike.%${escaped}%,material_name.ilike.%${escaped}%`
-  );
-}

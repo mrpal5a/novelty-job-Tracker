@@ -25,6 +25,7 @@ import { getDeptPermissions, canDeptManagePrepressTodo } from '@/lib/constants/d
 import { toCsv, csvTimestamp, istDateStamp, type CsvColumn } from '@/lib/export/csv';
 import type { PrepressTodoLog } from '@/lib/types';
 import { deptKeyOf } from '@/lib/identity';
+import { orContains } from '@/lib/search';
 
 const ACTION_LABELS: Record<PrepressTodoLog['action'], string> = {
   created:   'Added',
@@ -69,8 +70,7 @@ export async function POST(request: NextRequest) {
     .limit(1000);
 
   if (q) {
-    const pattern = `%${q.replace(/[%_]/g, '\\$&').replace(/[,()]/g, ' ')}%`;
-    query = query.or(`task.ilike.${pattern},actor_email.ilike.${pattern},actor_department.ilike.${pattern}`);
+    query = query.or(orContains(['task', 'actor_email', 'actor_department'], q));
   }
 
   const { data, error } = await query;

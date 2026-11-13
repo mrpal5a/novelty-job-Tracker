@@ -14,6 +14,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageJobSeparation } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
+import { isIsoDate } from '@/lib/jobViews';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -61,6 +62,15 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     updates.party = party;
   }
 
+  // Required on create (POST), so it can't be blanked here either: the Sr. No.
+  // series is filed under the PO's month. And it has to be a real date, or
+  // Postgres refuses it with a 500.
+  if ('po_date' in body) {
+    const d = typeof body.po_date === 'string' ? body.po_date.trim() : '';
+    if (!d) return NextResponse.json({ error: 'PO Date is required' }, { status: 400 });
+    if (!isIsoDate(d)) return NextResponse.json({ error: 'PO Date is not a valid date' }, { status: 400 });
+  }
+
   for (const field of TEXT_FIELDS) {
     if (field in body) {
       updates[field] = typeof body[field] === 'string' ? body[field].trim() || null : null;
@@ -92,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     .update(updates)
     .eq('id', id)
     .select()
-    .single();
+    .maybeSingle();   // .single() turns "no such row" into an error, and the 404 below into a 500
 
   if (error) {
     if (error.code === '23505') {

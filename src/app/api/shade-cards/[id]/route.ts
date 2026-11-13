@@ -12,6 +12,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { getDeptPermissions, canDeptManageShadeCards } from '@/lib/constants/departments';
 import { isSelectableStatus, isMakingStatus } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
+import { isIsoDate } from '@/lib/jobViews';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -22,7 +23,7 @@ function optionalText(value: unknown): string | null {
 function optionalDate(value: unknown): string | null {
   const s = optionalText(value);
   if (!s) return null;
-  return Number.isNaN(Date.parse(s)) ? null : s;
+  return isIsoDate(s) ? s : null;
 }
 
 /** Who made the change, for the card's "Updated by". The login's email —

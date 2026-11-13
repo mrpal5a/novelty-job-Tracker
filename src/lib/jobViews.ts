@@ -20,6 +20,26 @@ export function istToday(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(now);
 }
 
+/**
+ * Did a dispatch at `at` make a 'YYYY-MM-DD' delivery date? Any time on that
+ * IST day counts. (Comparing instants doesn't work: new Date('2026-11-13') is
+ * 5:30 AM IST, so an afternoon dispatch on the due date read as late.)
+ */
+export function dispatchedOnTime(at: Date, deliveryDate: string): boolean {
+  return istToday(at) <= deliveryDate.slice(0, 10);
+}
+
+/**
+ * A real calendar date written 'YYYY-MM-DD', the only form a DATE column
+ * takes without arguing. Date.parse alone is too kind: it reads '2026-02-31'
+ * as 3 March and 'Tuesday 1' as a day in 2001.
+ */
+export function isIsoDate(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
 /** Whole days from `from` to `to` (both 'YYYY-MM-DD'); negative when `to` is earlier. */
 export function daysBetween(from: string, to: string): number {
   const ms = Date.UTC(+to.slice(0, 4), +to.slice(5, 7) - 1, +to.slice(8, 10))

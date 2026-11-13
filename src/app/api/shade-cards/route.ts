@@ -21,6 +21,8 @@ import {
   isMakingStatus,
 } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
+import { containsPattern, orContains } from '@/lib/search';
+import { isIsoDate } from '@/lib/jobViews';
 
 /** Most cards one CSV export returns. */
 const EXPORT_MAX = 10_000;
@@ -31,13 +33,6 @@ const SORTABLE = new Set([
   'product_name', 'shade_card_number', 'pm_code', 'making_status',
 ]);
 
-/** Strip the characters that carry meaning inside a PostgREST or() filter.
- *  Without this a party name containing a comma silently splits the filter
- *  into two clauses and the search returns nonsense. */
-function sanitizeSearch(q: string): string {
-  return q.replace(/[,()*]/g, ' ').trim();
-}
-
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() || null : null;
 }
@@ -47,7 +42,7 @@ function optionalText(value: unknown): string | null {
 function optionalDate(value: unknown): string | null {
   const s = optionalText(value);
   if (!s) return null;
-  return Number.isNaN(Date.parse(s)) ? null : s;
+  return isIsoDate(s) ? s : null;
 }
 
 /** Who made the change, for the card's "Updated by". The login's email —
@@ -98,17 +93,17 @@ export async function GET(request: NextRequest) {
       .select('*', countRows ? { count: 'exact' } : undefined)
       .eq('is_current', true);
 
-    const clean = sanitizeSearch(search);
-    if (clean) {
+    if (search) {
       // searchColumnFor resolves against a fixed list, so the column can never
       // be a raw string from the query string — an unknown ?field= widens to
       // the multi-column search rather than erroring or matching nothing.
+      // The text itself goes through lib/search.ts, which quotes it: commas
+      // and brackets used to be swapped for spaces, so "Labels (Pvt), Ltd"
+      // typed as written found nothing.
       const column = searchColumnFor(field);
-      if (column) {
-        query = query.ilike(column, `%${clean}%`);
-      } else {
-        query = query.or(SHADE_CARD_SEARCH_COLUMNS.map((f) => `${f}.ilike.%${clean}%`).join(','));
-      }
+      query = column
+        ? query.ilike(column, containsPattern(search))
+        : query.or(orContains(SHADE_CARD_SEARCH_COLUMNS, search));
     }
     // Validated against the same lists the UI offers, so an unknown value
     // narrows to nothing rather than being passed through to Postgres.
@@ -135,6 +130,13 @@ export async function GET(request: NextRequest) {
   const { data, error, count } = await filtered(true)
     .range(offset, offset + SHADE_CARD_PAGE_SIZE - 1);
 
+  // A page past the end (the last card on the last page was just approved out
+  // of the filter, or deleted): PostgREST calls that an error. It's an empty
+  // page; the total lets the list step back to a page that exists.
+  if (error?.code === 'PGRST103') {
+    const { count: total } = await filtered(true).range(0, 0);
+    return NextResponse.json({ cards: [], total: total ?? 0, page, pageSize: SHADE_CARD_PAGE_SIZE });
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({

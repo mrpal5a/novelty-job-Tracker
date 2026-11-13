@@ -20,6 +20,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptSetRunStage } from '@/lib/constants/departments';
 import { RUN_STAGES } from '@/lib/constants/runStages';
 import { toMonthKey } from '@/lib/utils';
+import { dispatchedOnTime } from '@/lib/jobViews';
 import type { PrintRunStage } from '@/lib/types';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -176,7 +177,7 @@ export async function POST(request: NextRequest, { params }: Params) {
             job_id:        id,
             dispatched_at: dispatchedAt.toISOString(),
             delivery_date: job.delivery_date,
-            is_on_time:    dispatchedAt <= new Date(job.delivery_date),
+            is_on_time:    dispatchedOnTime(dispatchedAt, job.delivery_date),
             month_key:     toMonthKey(dispatchedAt),
           });
         }

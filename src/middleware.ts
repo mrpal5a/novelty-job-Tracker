@@ -53,10 +53,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(canonicalUrl, 308);
   }
 
-  // Cron jobs: validated by secret header, not Supabase auth
+  // Cron jobs: validated by secret header, not Supabase auth. Vercel Cron
+  // sends the secret as "Authorization: Bearer <CRON_SECRET>"; x-cron-secret
+  // is for calling it by hand. No secret configured means nobody gets in.
+  const secret = process.env.CRON_SECRET;
   if (pathname.startsWith('/api/cron/')) {
-    const cronSecret = request.headers.get('x-cron-secret');
-    if (cronSecret !== process.env.CRON_SECRET) {
+    const cronSecret = request.headers.get('x-cron-secret')
+      ?? request.headers.get('authorization')?.replace(/^Bearer /, '');
+    if (!secret || cronSecret !== secret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.next({ request });
@@ -66,7 +70,7 @@ export async function middleware(request: NextRequest) {
   // user session to check — gated by the same secret-header convention.
   if (pathname.startsWith('/api/notifications/')) {
     const internalSecret = request.headers.get('x-internal-secret');
-    if (internalSecret !== process.env.CRON_SECRET) {
+    if (!secret || internalSecret !== secret) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.next({ request });

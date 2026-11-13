@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   istToday, daysBetween, daysToDelivery, needsAttention, dueThisWeek,
-  attentionCompare, deliveryWords,
+  attentionCompare, deliveryWords, dispatchedOnTime, isIsoDate,
 } from './jobViews';
 import type { Job } from '@/lib/types';
 
@@ -17,6 +17,36 @@ function job(p: Partial<Job>): Job {
 describe('istToday', () => {
   it('uses IST, not UTC — 20:00 UTC is already the next day in India', () => {
     expect(istToday(new Date('2026-10-03T20:00:00Z'))).toBe('2026-10-04');
+  });
+});
+
+describe('dispatchedOnTime', () => {
+  it('any time on the delivery date is on time', () => {
+    expect(dispatchedOnTime(new Date('2026-11-13T09:30:00Z'), '2026-11-13')).toBe(true);   // 3:00 PM IST
+    expect(dispatchedOnTime(new Date('2026-11-13T18:29:00Z'), '2026-11-13')).toBe(true);   // 11:59 PM IST
+    expect(dispatchedOnTime(new Date('2026-11-12T18:31:00Z'), '2026-11-13')).toBe(true);   // 12:01 AM IST, the day itself
+  });
+
+  it('earlier is on time, the next IST day is late', () => {
+    expect(dispatchedOnTime(new Date('2026-11-10T06:00:00Z'), '2026-11-13')).toBe(true);
+    expect(dispatchedOnTime(new Date('2026-11-13T18:31:00Z'), '2026-11-13')).toBe(false);  // 14 Nov, 12:01 AM IST
+  });
+
+  it('a delivery date that came back with a time on it', () => {
+    expect(dispatchedOnTime(new Date('2026-11-13T09:30:00Z'), '2026-11-13T00:00:00+00:00')).toBe(true);
+  });
+});
+
+describe('isIsoDate', () => {
+  it('real dates written YYYY-MM-DD', () => {
+    expect(isIsoDate('2026-11-13')).toBe(true);
+    expect(isIsoDate('2028-02-29')).toBe(true);   // leap year
+  });
+
+  it('nothing else', () => {
+    for (const s of ['2026-02-31', '2027-02-29', '2026-13-01', '13-11-2026', '2026-11-13T00:00:00Z', 'Tuesday 1', 'tomorrow', '']) {
+      expect(isIsoDate(s), s).toBe(false);
+    }
   });
 });
 

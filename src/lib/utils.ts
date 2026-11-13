@@ -5,7 +5,8 @@
 
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { istToday, daysBetween } from './jobViews';
 import { getPrerequisite } from './constants/stages';
 import type { Stage } from './constants/stages';
 import type { JobType, Job } from './types';
@@ -139,9 +140,9 @@ export function formatShortDate(iso: string | null): string {
   return format(toIST(iso), 'dd MMM yyyy');
 }
 
-/** Month key for analytics: "2026-06" */
+/** Month key for analytics: "2026-06" — the IST month, wherever this runs. */
 export function toMonthKey(date: Date = new Date()): string {
-  return format(date, 'yyyy-MM');
+  return istToday(date).slice(0, 7);
 }
 
 // ── Delivery countdown ────────────────────────────────────────
@@ -156,12 +157,9 @@ export function getDeliveryCountdown(deliveryDate: string | null): DeliveryStatu
     return { label: 'Delivery date to be confirmed', color: 'muted' };
   }
 
-  const target = new Date(deliveryDate);
-  const today  = new Date();
-  today.setHours(0, 0, 0, 0);
-  target.setHours(0, 0, 0, 0);
-
-  const diff = differenceInDays(target, today);
+  // Calendar days in IST. The server's own midnight is 5:30 AM in India, so
+  // counting from it showed "Due tomorrow" on the due date until then.
+  const diff = daysBetween(istToday(), deliveryDate.slice(0, 10));
 
   if (diff > 2)  return { label: `Delivery in ${diff} days`, color: 'green' };
   if (diff === 2) return { label: 'Due in 2 days', color: 'amber' };

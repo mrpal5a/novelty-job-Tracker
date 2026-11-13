@@ -13,7 +13,7 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, GitBranch, ChevronLeft, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -157,6 +157,12 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
   const total = data?.total ?? 0;
   const pageSize = data?.pageSize ?? 25;
   const lastPage = Math.max(1, Math.ceil(total / pageSize));
+
+  // The last card on the last page was approved out of the filter, or deleted:
+  // step back to a page that exists rather than sit on an empty one.
+  useEffect(() => {
+    if (data && page > lastPage) setPage(lastPage);
+  }, [data, page, lastPage]);
 
   function refresh() {
     queryClient.invalidateQueries({ queryKey: ['shade-cards'] });

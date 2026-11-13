@@ -151,8 +151,11 @@ export async function POST(request: NextRequest) {
   const remark    = typeof body.remark === 'string' ? body.remark.trim() : '';
   const pmCode    = typeof body.pm_code === 'string' ? body.pm_code.trim() : '';
   const status    = body.status;
-  const qty       = Number.isFinite(body.qty) ? Number(body.qty) : null;
+  const qty: number | null = body.qty ?? null;
 
+  // Reports and the worksheet add this up: a minus, a fraction or text would
+  // quietly lower a total, fail in the database, or be saved as "no qty".
+  if (qty !== null && !(Number.isInteger(qty) && qty > 0)) return NextResponse.json({ error: 'Qty must be a whole number of labels above 0' }, { status: 400 });
   if (!party)                                        return NextResponse.json({ error: 'Party is required' }, { status: 400 });
   if (!poNumber)                                      return NextResponse.json({ error: 'PO number is required' }, { status: 400 });
   if (!MANUAL_STATUSES.includes(status))              return NextResponse.json({ error: 'Status must be Partial Dispatch or Dispatched' }, { status: 400 });

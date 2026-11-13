@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     .from('job_separations')
     .select('id, cancelled_at')
     .eq('id', id)
-    .single();
+    .maybeSingle();   // .single() turns "no such row" into an error, and the 404 below into a 500
 
   if (fetchError) {
     return NextResponse.json({ error: fetchError.message }, { status: 500 });
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest, { params }: Params) {
     .eq('id', id)
     .is('cancelled_at', null)
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) {

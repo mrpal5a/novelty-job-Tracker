@@ -23,7 +23,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptUseBOM, canDeptSeeMaterialRates } from '@/lib/constants/departments';
-import { parseDateRange, rangeOrClause, parseLimit, searchOrClause } from '@/lib/jobSeparationQuery';
+import { parseDateRange, rangeOrClause, parseLimit } from '@/lib/jobSeparationQuery';
+import { orContains } from '@/lib/search';
 import { materialExpense, withoutRates } from '@/lib/bom';
 import { stockUsage } from '@/lib/paperStock';
 import type { BomCostingRow, BomCosting, BomMaterialRequest } from '@/lib/types';
@@ -124,7 +125,8 @@ export async function GET(request: NextRequest) {
 
   const rangeClause = rangeOrClause(range);
   if (rangeClause) query = query.or(rangeClause);
-  if (search) query = query.or(searchOrClause(search));
+  // Same columns and quoting as the Job Separation search (lib/search.ts).
+  if (search) query = query.or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search));
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

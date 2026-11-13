@@ -19,6 +19,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { getDeptPermissions, canDeptManagePrepressTodo } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
+import { orContains } from '@/lib/search';
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -45,11 +46,9 @@ export async function GET(request: NextRequest) {
     .limit(150);
 
   if (q) {
-    // Escape ilike wildcards so a typed % or _ matches literally, then
-    // strip comma/paren — the .or() filter syntax's own separators —
-    // before wrapping as a substring match across the searchable columns.
-    const pattern = `%${q.replace(/[%_]/g, '\\$&').replace(/[,()]/g, ' ')}%`;
-    query = query.or(`task.ilike.${pattern},actor_email.ilike.${pattern},actor_department.ilike.${pattern}`);
+    // Quoted and escaped by lib/search.ts, so a comma or bracket in a task
+    // is searched for as typed.
+    query = query.or(orContains(['task', 'actor_email', 'actor_department'], q));
   }
 
   const [{ data, error }, { count, error: countError }] = await Promise.all([

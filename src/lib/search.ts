@@ -8,7 +8,7 @@
 // LIKE wildcards. These helpers escape both layers.
 
 /** Escape LIKE's own wildcards so they match literally. */
-function escapeLike(q: string): string {
+export function escapeLike(q: string): string {
   return q.replace(/[\\%_]/g, '\\$&');
 }
 
