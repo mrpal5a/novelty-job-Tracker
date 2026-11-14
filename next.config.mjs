@@ -5,7 +5,11 @@ const config = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '*.supabase.co',
+        // Only our own project's public storage (the branding logo), not
+        // any *.supabase.co — that let anyone use our image endpoint for
+        // images from their own Supabase project.
+        hostname: 'wksvwzanacbqictxdrpw.supabase.co',
+        pathname: '/storage/v1/object/public/**',
       },
     ],
   },

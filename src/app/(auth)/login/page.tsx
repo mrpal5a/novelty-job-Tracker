@@ -5,6 +5,7 @@
 
 import React, { useState, Suspense, useRef } from 'react';
 import Link from 'next/link';
+import Script from 'next/script';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
@@ -16,6 +17,21 @@ import { Stagger } from '@/components/motion/Stagger';
 import { LoadingButton } from '@/components/ui/Loading';
 import { useBranding } from '@/components/brand/BrandingProvider';
 registerGsap();
+
+// Cloudflare Turnstile on sign-in. With CAPTCHA protection on in Supabase
+// Auth, Supabase itself rejects a password sign-in without a valid token, so
+// password guessing can't skip it by calling Supabase directly. Without the
+// site key (e.g. a dev machine) the widget is simply not shown.
+const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (el: HTMLElement, opts: Record<string, unknown>) => string;
+      reset: (widgetId: string) => void;
+    };
+  }
+}
 
 export default function LoginPage() {
   return (
@@ -38,17 +54,43 @@ function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
 
   const cardRef = useRef<HTMLDivElement>(null);
+  const captchaRef = useRef<HTMLDivElement>(null);
+  const widgetId = useRef<string | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   const supabase = createClient();
 
+  function renderCaptcha() {
+    if (!TURNSTILE_SITE_KEY || !captchaRef.current || !window.turnstile || widgetId.current) return;
+    widgetId.current = window.turnstile.render(captchaRef.current, {
+      sitekey: TURNSTILE_SITE_KEY,
+      size: 'flexible',
+      theme: 'light',
+      callback: (token: string) => setCaptchaToken(token),
+      'expired-callback': () => setCaptchaToken(null),
+      'error-callback': () => setCaptchaToken(null),
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (TURNSTILE_SITE_KEY && !captchaToken) {
+      setError('Please wait for the security check below to finish, then sign in.');
+      return;
+    }
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
 
     if (error) {
+      // A Turnstile token works once — get a fresh one for the next try.
+      if (widgetId.current) window.turnstile?.reset(widgetId.current);
+      setCaptchaToken(null);
       setError('Invalid email or password. Check your credentials and try again.');
       setLoading(false);
       return;
@@ -136,6 +178,17 @@ function LoginForm() {
                 </span>
               </label>
             </Stagger>
+
+            {TURNSTILE_SITE_KEY && (
+              <>
+                <Script
+                  id="cf-turnstile"
+                  src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
+                  onReady={renderCaptcha}
+                />
+                <div ref={captchaRef} className="min-h-[65px]" />
+              </>
+            )}
 
             {error && (
               <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm text-brand-danger">

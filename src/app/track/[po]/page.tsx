@@ -18,6 +18,7 @@ import { unstable_noStore as noStore } from 'next/cache';
 import { createAdminClient } from '@/lib/supabase/admin';
 import TrackJobAccordion from '@/components/track/TrackJobAccordion';
 import TrackAutoRefresh from '@/components/track/TrackAutoRefresh';
+import { companyMatches, normalizeRef } from '@/lib/trackMatch';
 import type { ClientStatusLog, DispatchSchedule, Job, JobStageTimestamp, PrintRun, RunStageTimestamp } from '@/lib/types';
 
 type Params = {
@@ -30,14 +31,6 @@ const JOB_COLUMNS =
   'id, po_number, pm_code, party, job_name, label_qty, po_date, delivery_date, status, job_type, ' +
   'urgent, urgent_priority, dispatched_qty, remaining_qty, halt_remark, qc_remark, ' +
   'is_scheduled_release, is_closed, total_qty_dispatched';
-
-// The /track lookup key: lowercase, letters and digits only. Mirrors the
-// jobs.po_norm / pm_norm generated columns (migration 069), so a client
-// typing "abc 123 25" finds PO "ABC-123/25". Plain equality — no pattern,
-// so a short or wildcard-looking term can never widen the search.
-function normalizeRef(term: string): string {
-  return term.replace(/[^A-Za-z0-9]/g, '').toLowerCase();
-}
 
 // Job ids whose normalised PO number or PM code equals `key`.
 async function matchingJobIds(key: string): Promise<string[] | null> {
@@ -76,11 +69,10 @@ export default async function TrackJobPage({ params, searchParams }: Params) {
     if (ids && ids.length > 0) {
       const { data, error } = await adminClient.from('client_job_view').select(JOB_COLUMNS).in('id', ids);
       if (!error) {
-        // Company Name stays a case-insensitive contains-match, applied here
-        // to the few rows sharing the PO, so it needs no DB pattern.
-        const partyNeedle = partyTerm.toLowerCase();
+        // Company Name must cover at least the party's whole first word
+        // (companyMatches), applied here to the few rows sharing the PO.
         jobs = ((data ?? []) as unknown as Job[])
-          .filter((row) => (row.party ?? '').toLowerCase().includes(partyNeedle));
+          .filter((row) => companyMatches(row.party, partyTerm));
       }
     }
   }

@@ -9,13 +9,13 @@
 // /api/dispatch-notifications/send (consolidated party + internal dispatch
 // email) — all send through this one transporter.
 
-import nodemailer from 'nodemailer';
+import nodemailer, { type Transporter } from 'nodemailer';
 import { getLogoDataUri, LOGO_CID } from './logoDataUri';
 import { getBranding } from '@/lib/branding';
 
-let transporter: nodemailer.Transporter | null = null;
+let transporter: Transporter | null = null;
 
-function getTransporter(): nodemailer.Transporter {
+function getTransporter(): Transporter {
   if (transporter) return transporter;
 
   transporter = nodemailer.createTransport({
