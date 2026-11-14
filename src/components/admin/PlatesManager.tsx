@@ -80,6 +80,7 @@ const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
 // Stable reference — `data ?? []` would otherwise hand back a fresh array
 // every render, defeating the sortedPlates useMemo below.
 const EMPTY_PLATES: Plate[] = [];
+const SHOW_STEP = 100;
 
 // Mirrors PLATE_SEARCH_FIELDS in src/app/api/plates/route.ts — the value
 // sent as ?field=. "All fields" (value 'all') skips the param, falling
@@ -170,6 +171,15 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
     });
     return sorted;
   }, [plates, sortField, sortDir]);
+
+  // Every plate is loaded (sort and export need them all), but only SHOW_STEP
+  // are drawn at a time — thousands of rows or cards at once is slow, and on
+  // a phone the card list would run tens of thousands of pixels. A new
+  // search or sort starts again from the top.
+  const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
+  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, sortField, sortDir]);
+  const visiblePlates = useMemo(() => sortedPlates.slice(0, visibleCount), [sortedPlates, visibleCount]);
+  const hiddenCount = sortedPlates.length - visiblePlates.length;
 
   useEffect(() => {
     if (platesQuery.error) toast.error((platesQuery.error as Error).message);
@@ -306,7 +316,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           {/* Phone / tablet: card list. Tapping the top of a card opens the
               plate's detail, where every plate ID is listed. */}
           <ul className="xl:hidden space-y-3">
-            {sortedPlates.map((plate) => {
+            {visiblePlates.map((plate) => {
               const ids = plateIdsOf(plate);
               return (
                 <li key={plate.id} className="glass rounded-xl p-4">
@@ -409,11 +419,14 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
               text truncates, so nothing pushes the table sideways. Click a
               row for the full record. */}
           <div className="hidden xl:block rounded-xl glass overflow-hidden">
-            <div className="max-h-[70vh] overflow-y-auto">
+            {/* `relative`: the rows' sr-only text is absolutely positioned;
+                without a positioned scroll box it escapes to the page and
+                stretches the document to the full table height. */}
+            <div className="relative max-h-[70vh] overflow-y-auto">
               <table className="w-full table-fixed border-collapse text-sm">
                 {tableHead(true)}
                 <tbody>
-                  {sortedPlates.map((plate, i) => {
+                  {visiblePlates.map((plate, i) => {
                     const ids = plateIdsOf(plate);
                     return (
                       <tr
@@ -510,6 +523,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
               </table>
             </div>
           </div>
+
+          {hiddenCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 pt-1">
+              <p className="text-sm text-[var(--glass-muted)]">
+                Showing <strong className="text-[var(--glass-ink)] font-mono">{visiblePlates.length}</strong> of{' '}
+                <strong className="text-[var(--glass-ink)] font-mono">{sortedPlates.length}</strong>, search to jump straight to a plate
+              </p>
+              <Button intent="ghost" onClick={() => setVisibleCount((n) => n + SHOW_STEP)}>
+                Show {Math.min(SHOW_STEP, hiddenCount)} more
+              </Button>
+            </div>
+          )}
         </>
       )}
 

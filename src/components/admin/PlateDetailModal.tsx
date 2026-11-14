@@ -47,7 +47,20 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
         </div>
 
         <div className="px-5 py-4 overflow-y-auto space-y-5">
-          <section>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <Detail label="PM code" value={plate.pm_code} mono />
+            <Detail label="Location" value={plate.location} />
+            <Detail label="Size (across × around)" value={size} mono />
+            <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
+            <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
+            <Detail label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />
+            <Detail label="Added" value={formatAdminDate(plate.created_at)} mono />
+            <Detail label="Added by" value={plate.created_by} />
+          </dl>
+
+          {/* Last: a set can carry a dozen IDs, and the specs above shouldn't
+              be pushed out of view by them. */}
+          <section className="pt-4 border-t border-black/[0.08]">
             <h3 className="text-xs font-medium text-[var(--glass-muted)]">
               {plateIds.length === 1 ? 'Plate ID' : `Plate IDs (${plateIds.length})`}
             </h3>
@@ -63,17 +76,6 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
               <p className="mt-1 text-sm text-[var(--glass-muted)]">Not recorded</p>
             )}
           </section>
-
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
-            <Detail label="PM code" value={plate.pm_code} mono />
-            <Detail label="Location" value={plate.location} />
-            <Detail label="Size (across × around)" value={size} mono />
-            <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
-            <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
-            <Detail label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />
-            <Detail label="Added" value={formatAdminDate(plate.created_at)} mono />
-            <Detail label="Added by" value={plate.created_by} />
-          </dl>
         </div>
 
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-black/[0.08] shrink-0">
