@@ -12,6 +12,7 @@ import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/dep
 import { DIE_STATUSES, type DieStatus } from '@/lib/types';
 import { containsPattern, orMatch } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
+import { allPages } from '@/lib/api/allPages';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -81,40 +82,50 @@ export async function GET(request: NextRequest) {
   // ±mm on length and width — the "near enough" size search (0 = exact).
   const tol    = Math.min(5, Math.max(0, Math.trunc(Number(searchParams.get('tol')) || 0)));
 
-  let query = supabase
-    .from('dies')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (search) {
-    const config = field ? DIE_SEARCH_FIELDS[field] : undefined;
-    if (config?.type === 'int') {
-      const n = Number(search);
-      // Not a whole number — an integer column can't contain it, so the
-      // answer is "no matches" rather than a query error.
-      if (!Number.isFinite(n)) return NextResponse.json({ dies: [] });
-      query = query.eq(config.column, Math.trunc(n));
-    } else if (config) {
-      // Picked a specific text field — search just that column. Sizes match
-      // on the whole millimetre: "210" finds 210 and 210.84, not 1210 or 2100.
-      query = config.type === 'size'
-        ? query.or(orMatch([], [config.column], search, tol))
-        : query.ilike(config.column, containsPattern(search));
-    } else {
-      // "All fields" — someone holding a die searches by whatever they can
-      // read off it: the job it was cut for, its size, its material, its
-      // corner style, or its serial — or where it should be sitting.
-      // Length and width match on the whole millimetre, as above.
-      query = query.or(orMatch(
-        ['job_name', 'material', 'corner', 'serial_no', 'location'], ['length', 'width'], search, tol,
-      ));
-    }
+  const config = search && field ? DIE_SEARCH_FIELDS[field] : undefined;
+  // Not a whole number — an integer column can't contain it, so the
+  // answer is "no matches" rather than a query error.
+  if (search && config?.type === 'int' && !Number.isFinite(Number(search))) {
+    return NextResponse.json({ dies: [] });
   }
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // ~1000 dies since the ROTO Die.xlsx import: page past PostgREST's
+  // 1000-row cap. id breaks created_at ties so pages never overlap.
+  const page = (from: number, to: number) => {
+    let query = supabase
+      .from('dies')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to);
 
-  return NextResponse.json({ dies: data ?? [] });
+    if (search) {
+      if (config?.type === 'int') {
+        query = query.eq(config.column, Math.trunc(Number(search)));
+      } else if (config) {
+        // Picked a specific text field — search just that column. Sizes match
+        // on the whole millimetre: "210" finds 210 and 210.84, not 1210 or 2100.
+        query = config.type === 'size'
+          ? query.or(orMatch([], [config.column], search, tol))
+          : query.ilike(config.column, containsPattern(search));
+      } else {
+        // "All fields" — someone holding a die searches by whatever they can
+        // read off it: the job it was cut for, its size, its material, its
+        // corner style, or its serial — or where it should be sitting.
+        // Length and width match on the whole millimetre, as above.
+        query = query.or(orMatch(
+          ['job_name', 'material', 'corner', 'serial_no', 'location'], ['length', 'width'], search, tol,
+        ));
+      }
+    }
+    return query;
+  };
+
+  try {
+    return NextResponse.json({ dies: await allPages(page) });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
 }
 
 // ── POST ──────────────────────────────────────────────────────
@@ -171,15 +182,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
-      return NextResponse.json(
-        { error: `Serial no ${serialNo} is already on another die` },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ die: data }, { status: 201 });
 }

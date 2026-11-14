@@ -114,15 +114,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
-      return NextResponse.json(
-        { error: `Serial no ${updates.serial_no} is already on another die` },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: 'Die not found' }, { status: 404 });
 
   return NextResponse.json({ die: data });
