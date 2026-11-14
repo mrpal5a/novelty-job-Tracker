@@ -11,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { containsPattern, orContains } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
+import { allPages } from '@/lib/api/allPages';
 
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() || null : null;
@@ -53,34 +54,44 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search')?.trim();
   const field  = searchParams.get('field')?.trim();
 
-  let query = supabase
-    .from('plates')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (search) {
-    const config = field ? PLATE_SEARCH_FIELDS[field] : undefined;
-    if (config?.type === 'int') {
-      const n = Number(search);
-      // Not a whole number — an integer column can't contain it, so the
-      // answer is "no matches" rather than a query error.
-      if (!Number.isFinite(n)) return NextResponse.json({ plates: [] });
-      query = query.eq(config.column, Math.trunc(n));
-    } else if (config) {
-      // Picked a specific text field — search just that column.
-      query = query.ilike(config.column, containsPattern(search));
-    } else {
-      // "All fields" — someone standing at the rack searches by whatever
-      // they have: the party that ordered it, the PM code, the item, or
-      // the serial on the plate.
-      query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
-    }
+  const config = search && field ? PLATE_SEARCH_FIELDS[field] : undefined;
+  // Not a whole number — an integer column can't contain it, so the
+  // answer is "no matches" rather than a query error.
+  if (search && config?.type === 'int' && !Number.isFinite(Number(search))) {
+    return NextResponse.json({ plates: [] });
   }
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Thousands of plates since the Plates.xlsx import: page past PostgREST's
+  // 1000-row cap. id breaks created_at ties so pages never overlap.
+  const page = (from: number, to: number) => {
+    let query = supabase
+      .from('plates')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id')
+      .range(from, to);
 
-  return NextResponse.json({ plates: data ?? [] });
+    if (search) {
+      if (config?.type === 'int') {
+        query = query.eq(config.column, Math.trunc(Number(search)));
+      } else if (config) {
+        // Picked a specific text field — search just that column.
+        query = query.ilike(config.column, containsPattern(search));
+      } else {
+        // "All fields" — someone standing at the rack searches by whatever
+        // they have: the party that ordered it, the PM code, the item, or
+        // the serial on the plate.
+        query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
+      }
+    }
+    return query;
+  };
+
+  try {
+    return NextResponse.json({ plates: await allPages(page) });
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+  }
 }
 
 // ── POST ──────────────────────────────────────────────────────
@@ -126,15 +137,7 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) {
-    if (error.code === '23505') {
-      return NextResponse.json(
-        { error: 'A plate with that plate ID already exists' },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ plate: data }, { status: 201 });
 }
