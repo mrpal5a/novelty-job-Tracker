@@ -1,0 +1,28 @@
+import { describe, it, expect } from 'vitest';
+import { dieUpsFor } from './plateDie';
+import type { Die } from '@/lib/types';
+
+const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
+  ({ id: `${length}x${width}-${cylinder}-${ups}-${status}`, length, width, cylinder, ups, status }) as unknown as Die;
+
+describe('label per round from the die', () => {
+  const dies = [
+    die('165', '48', 110, 8),
+    die('48.6', '165', 110, 8, 'DAMAGE'),  // other way round, decimal: same die size
+    die('165', '48', 115, 6),              // other cylinder
+    die('1650', '48', 110, 2),             // not 165
+  ];
+
+  it('matches on cylinder and whole-mm size either way round', () => {
+    const r = dieUpsFor(dies, '48', '165', '110');
+    expect(r.ups).toBe(8);
+    expect(r.dies).toHaveLength(2);
+    expect(r.dies[0].status).toBe('IN USE'); // in-use die named first
+  });
+
+  it('leaves it blank when dies disagree or none match', () => {
+    expect(dieUpsFor([...dies, die('165', '48', 110, 4)], '165', '48', '110')).toMatchObject({ ups: null, options: [8, 4] });
+    expect(dieUpsFor(dies, '165', '48', '97').dies).toHaveLength(0);
+    expect(dieUpsFor(dies, '', '48', '110').dies).toHaveLength(0);
+  });
+});

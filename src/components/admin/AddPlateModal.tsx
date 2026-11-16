@@ -7,7 +7,7 @@
 // the party is required — a plate is often entered before its serial is
 // etched or its rack decided.
 
-import React, { useState, useId, useRef } from 'react';
+import React, { useState, useId, useRef, useEffect } from 'react';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import PartySuggestInput from './PartySuggestInput';
+import { dieUpsFor, type DieUps } from '@/lib/plateDie';
 
 const inputCls = cn(
   'w-full px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -55,6 +56,40 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     setParty(fillIfUntouched(party, prev.party, lastFill.current.party));
     setItemName(fillIfUntouched(itemName, prev.item, lastFill.current.item));
   });
+
+  // Sizes + cylinder → the die cut for them: its ups is this plate's label
+  // per round, and the note says which die and where it sits.
+  const [dieUps, setDieUps] = useState<DieUps | null>(null);
+  const lastUps = useRef('');   // what this lookup last wrote, '' if nothing
+  const lprNow = useRef(labelPerRound);
+  lprNow.current = labelPerRound;
+  useEffect(() => {
+    const a = parseFloat(acrossSize), b = parseFloat(aroundSize), cyl = parseFloat(cylinder);
+    // Takes back its own fill when the die no longer matches; a typed value stays.
+    const refill = (next: string) => {
+      const current = lprNow.current;
+      if (current.trim() && current !== lastUps.current) return;
+      lastUps.current = next;
+      setLabelPerRound(next);
+    };
+    if (!(a > 0 && b > 0 && cyl > 0)) { setDieUps(null); refill(''); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ search: String(Math.trunc(a)), field: 'size' });
+        const res = await fetch(`/api/dies?${params.toString()}`);
+        if (!res.ok || cancelled) return;
+        const found = dieUpsFor((await res.json()).dies ?? [], acrossSize, aroundSize, cylinder);
+        if (cancelled) return;
+        setDieUps(found);
+        refill(found.ups !== null ? String(found.ups) : '');
+      } catch {
+        // Best-effort: label per round can still be typed.
+      }
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [acrossSize, aroundSize, cylinder]);
+  const matchedDie = dieUps?.dies[0];
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -230,6 +265,17 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                 onChange={(e) => setLabelPerRound(e.target.value)}
                 className={cn(inputCls, 'font-mono')}
               />
+              {dieUps && (
+                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                  {!matchedDie
+                    ? 'No die of this size and cylinder.'
+                    : dieUps.ups !== null
+                      ? `${dieUps.ups} ups, from die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''}.`
+                      : dieUps.options.length
+                        ? `Dies for this size have ${dieUps.options.join(' or ')} ups: enter yours.`
+                        : `Die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''} has no ups recorded.`}
+                </p>
+              )}
             </div>
           </div>
 
