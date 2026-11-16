@@ -117,8 +117,7 @@ const DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[]
   { value: 'material',  label: 'Material',      placeholder: 'Search by material' },
   { value: 'corner',    label: 'Corner',        placeholder: 'Search by corner' },
   { value: 'location',  label: 'Location',      placeholder: 'Search by location' },
-  { value: 'length',    label: 'Size (length)', placeholder: 'Search by length' },
-  { value: 'width',     label: 'Size (width)',  placeholder: 'Search by width' },
+  { value: 'size',      label: 'Size',          placeholder: 'Search by length or width' },
   { value: 'cylinder',  label: 'Cylinder',      placeholder: 'Search by cylinder' },
   { value: 'gap',       label: 'Gap across',    placeholder: 'Search by gap across' },
   { value: 'ups',       label: 'Ups / repeat',  placeholder: 'Search by ups / repeat' },
@@ -338,7 +337,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           {/* Desk: table skeleton */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1450px] border-collapse text-sm text-center">
+              <table className="w-full min-w-[1450px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {DIE_COLUMNS.map((col) => (
@@ -473,7 +472,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           {/* Desk: table with a fixed header, scrolling through the rows. */}
           {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1450px] border-collapse text-sm text-center">
+              <table className="w-full min-w-[1450px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {DIE_COLUMNS.map((col) => (
@@ -531,7 +530,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{sizeOf(die) ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
                         <td className="px-3 py-1.5 whitespace-nowrap">{die.material || '—'}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">{die.location || '—'}</td>
+                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
                         <td className="px-3 py-1.5 whitespace-nowrap">{die.gap || '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{formatNumericDate(die.die_received_on) || '—'}</td>

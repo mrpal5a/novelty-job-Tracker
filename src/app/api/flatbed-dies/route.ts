@@ -39,8 +39,8 @@ const FLATBED_DIE_SEARCH_FIELDS: Record<string, FlatbedDieSearchField> = {
   shape:     { column: 'shape',     type: 'text' },
   corner:    { column: 'corner',    type: 'text' },
   location:  { column: 'location',  type: 'text' },
-  length:    { column: 'length',    type: 'size' },
-  width:     { column: 'width',     type: 'size' },
+  // One "Size" option: a number can be read off either side of the die.
+  size:      { column: 'size',      type: 'size' },
   repeat_length: { column: 'repeat_length', type: 'text' },
   gap:       { column: 'gap',       type: 'text' },
   ups:       { column: 'ups',       type: 'int' },
@@ -71,9 +71,10 @@ export async function GET(request: NextRequest) {
       if (!Number.isFinite(n)) return NextResponse.json({ flatbed_dies: [] });
       query = query.eq(config.column, Math.trunc(n));
     } else if (config) {
-      // Sizes match on the whole millimetre: "87" finds 87 and 87.5, not 187 or 870.
+      // Size looks at length and width, on the whole millimetre: "87" finds
+      // 87 and 87.5, not 187 or 870.
       query = config.type === 'size'
-        ? query.or(orMatch([], [config.column], search, tol))
+        ? query.or(orMatch([], ['length', 'width'], search, tol))
         : query.ilike(config.column, containsPattern(search));
     } else {
       // "All fields" — shape, corner and location match loosely; length and

@@ -2,12 +2,12 @@
 // src/components/admin/AddPlateModal.tsx
 // Recording a plate, or correcting one already recorded.
 //
-// Field order matches the Prepress spreadsheet this replaces, so someone
-// copying a row across reads down the form in the same order they read
-// across the sheet. Only the party is required — a plate is often entered
-// before its serial is etched or its rack decided.
+// PM code comes first: on a new plate it fills the party and item name from
+// Job Separation. The rest follows the Prepress spreadsheet's order. Only
+// the party is required — a plate is often entered before its serial is
+// etched or its rack decided.
 
-import React, { useState, useId } from 'react';
+import React, { useState, useId, useRef } from 'react';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
+import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
+import PartySuggestInput from './PartySuggestInput';
 
 const inputCls = cn(
   'w-full px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -43,6 +45,16 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
   const [location,      setLocation]      = useState(editing?.location ?? '');
   const [saving,        setSaving]        = useState(false);
+
+  // PM code → its Job Separation line: party and item name fill in, spelt
+  // the way the worksheet and the party list spell them. New plates only.
+  const lastFill = useRef({ party: '', item: '' });
+  const pmMatch = usePmCodeLookup(pmCode, !editing, (row) => {
+    const prev = lastFill.current;
+    lastFill.current = { party: row.party ?? '', item: row.material_name ?? '' };
+    setParty(fillIfUntouched(party, prev.party, lastFill.current.party));
+    setItemName(fillIfUntouched(itemName, prev.item, lastFill.current.item));
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -117,22 +129,28 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
         <div className="px-5 py-4 overflow-y-auto space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <PlateLabel required>Party</PlateLabel>
-              <WithExample example="DHANUKA - SANAND">
-                  <input
-                  value={party}
-                  onChange={(e) => setParty(e.target.value)}
-                  className={inputCls}
-                />
-              </WithExample>
-            </div>
-            <div>
               <PlateLabel>PM code</PlateLabel>
               <input
                 value={pmCode}
                 onChange={(e) => setPmCode(e.target.value)}
+                autoComplete="off"
+                autoFocus={!editing}
+                aria-label="PM code"
                 className={cn(inputCls, 'font-mono')}
               />
+              {!editing && pmMatch && (
+                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                  {pmMatch === 'none'
+                    ? 'Not in Job Separation: enter party and item by hand.'
+                    : `Party and item filled from Job Separation${pmMatch.sr_no ? ` ${pmMatch.sr_no}` : ''}.`}
+                </p>
+              )}
+            </div>
+            <div>
+              <PlateLabel required>Party</PlateLabel>
+              <WithExample example="DHANUKA - SANAND">
+                <PartySuggestInput value={party} onChange={setParty} className={inputCls} />
+              </WithExample>
             </div>
           </div>
 

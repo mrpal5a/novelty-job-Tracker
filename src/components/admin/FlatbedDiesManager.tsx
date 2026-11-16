@@ -96,8 +96,7 @@ const FLATBED_DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: st
   { value: 'shape',     label: 'Shape',      placeholder: 'Search by shape' },
   { value: 'corner',    label: 'Corner',     placeholder: 'Search by corner' },
   { value: 'location',  label: 'Location',   placeholder: 'Search by location' },
-  { value: 'length',    label: 'Size (length)', placeholder: 'Search by length' },
-  { value: 'width',     label: 'Size (width)',  placeholder: 'Search by width' },
+  { value: 'size',      label: 'Size',       placeholder: 'Search by length or width' },
   { value: 'repeat_length', label: 'Repeat length', placeholder: 'Search by repeat length' },
   { value: 'gap',       label: 'Gap',        placeholder: 'Search by gap' },
   { value: 'ups',       label: 'Ups',        placeholder: 'Search by ups' },
@@ -313,7 +312,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
           {/* Desk: table skeleton */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1000px] border-collapse text-sm text-center">
+              <table className="w-full min-w-[1000px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {FLATBED_DIE_COLUMNS.map((col) => (
@@ -423,7 +422,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
           {/* Desk: table with a fixed header, scrolling through the rows. */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1000px] border-collapse text-sm text-center">
+              <table className="w-full min-w-[1000px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {FLATBED_DIE_COLUMNS.map((col) => (

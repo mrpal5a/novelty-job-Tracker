@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import type { JobSeparation, Party } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
+import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import { useListKeys } from '@/hooks/useListKeys';
 
 const inputCls = cn(
@@ -79,6 +80,43 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
   const [jcStatus,     setJcStatus]     = useState(seed?.jc_status ?? '');
   const [awSendTo,     setAwSendTo]     = useState(seed?.aw_send_to ?? '');
   const [saving, setSaving] = useState(false);
+
+  // Unit 1 jobs don't go through artwork or a job card here. Moving off
+  // Unit 1 takes back the N/A it filled in, if still untouched.
+  function applyUnit(next: string) {
+    setUnit(next);
+    if (next === '1') { setJobStatus('N/A'); setJcStatus('N/A'); }
+    else if (unit === '1') {
+      if (jobStatus === 'N/A') setJobStatus('');
+      if (jcStatus === 'N/A') setJcStatus('');
+    }
+  }
+
+  // ── PM code → the last order for it ─────────────────────────
+  // A third of all lines are re-orders of a code already on the sheet, and a
+  // re-order nearly always keeps the party, material, unit and rate. New
+  // lines only (Add and Duplicate); quantity and PO stay the user's to enter.
+  const lastFill = useRef({ party: '', material: '', unit: '', rate: '' });
+  const pmMatch = usePmCodeLookup(pmCode, !editing, (row) => {
+    const prev = lastFill.current;
+    const next = {
+      party:    row.party ?? '',
+      material: row.material_name ?? '',
+      unit:     row.unit ?? '',
+      rate:     row.rate?.toString() ?? '',
+    };
+    lastFill.current = next;
+    if (fillIfUntouched(party, prev.party, next.party) !== party) {
+      suppressPartyLookup.current = true;
+      setParty(next.party);
+      setPartyConfirmed(true); // a party already saved on a line is a real one
+      setShowPartySuggestions(false);
+    }
+    setMaterialName(fillIfUntouched(materialName, prev.material, next.material));
+    setRate(fillIfUntouched(rate, prev.rate, next.rate));
+    const nextUnit = fillIfUntouched(unit, prev.unit, next.unit);
+    if (nextUnit !== unit) applyUnit(nextUnit);
+  });
 
   const qtyNum  = Number(quantity);
   const rateNum = Number(rate);
@@ -278,9 +316,17 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
                   <input
                   value={pmCode}
                   onChange={(e) => setPmCode(e.target.value)}
+                  autoComplete="off"
                   className={cn(inputCls, 'font-mono')}
                 />
               </WithExample>
+              {!editing && pmMatch && (
+                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                  {pmMatch === 'none'
+                    ? 'New PM code: enter the details by hand.'
+                    : `Filled from the last order${pmMatch.sr_no ? ` (${pmMatch.sr_no})` : ''}. Check the rate.`}
+                </p>
+              )}
             </div>
             <div>
               <JsLabel required>Material Name</JsLabel>
@@ -327,7 +373,7 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
               <JsLabel>Unit</JsLabel>
               <select
                 value={unit}
-                onChange={(e) => setUnit(e.target.value)}
+                onChange={(e) => applyUnit(e.target.value)}
                 className={cn(inputCls, 'font-mono appearance-none')}
               >
                 <option value="">Not set</option>

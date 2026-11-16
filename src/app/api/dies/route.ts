@@ -62,8 +62,8 @@ const DIE_SEARCH_FIELDS: Record<string, DieSearchField> = {
   material:  { column: 'material',  type: 'text' },
   corner:    { column: 'corner',    type: 'text' },
   location:  { column: 'location',  type: 'text' },
-  length:    { column: 'length',    type: 'size' },
-  width:     { column: 'width',     type: 'size' },
+  // One "Size" option: a number can be read off either side of the die.
+  size:      { column: 'size',      type: 'size' },
   gap:       { column: 'gap',       type: 'text' },
   cylinder:  { column: 'cylinder',  type: 'int' },
   ups:       { column: 'ups',       type: 'int' },
@@ -103,10 +103,11 @@ export async function GET(request: NextRequest) {
       if (config?.type === 'int') {
         query = query.eq(config.column, Math.trunc(Number(search)));
       } else if (config) {
-        // Picked a specific text field — search just that column. Sizes match
-        // on the whole millimetre: "210" finds 210 and 210.84, not 1210 or 2100.
+        // Picked a specific text field — search just that column. Size looks
+        // at length and width, on the whole millimetre: "210" finds 210 and
+        // 210.84, not 1210 or 2100.
         query = config.type === 'size'
-          ? query.or(orMatch([], [config.column], search, tol))
+          ? query.or(orMatch([], ['length', 'width'], search, tol))
           : query.ilike(config.column, containsPattern(search));
       } else {
         // "All fields" — someone holding a die searches by whatever they can

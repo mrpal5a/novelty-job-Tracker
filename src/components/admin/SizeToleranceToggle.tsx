@@ -3,14 +3,14 @@
 // "±2 mm" beside the die search. A die cut a millimetre or two off the job's
 // size still runs, so the useful question at the rack is often "anything
 // near 210?" rather than "exactly 210". Only means something for a number
-// searched on length, width or all fields, so it's disabled otherwise.
+// searched by size (length or width) or all fields, so it's disabled otherwise.
 
 import { cn } from '@/lib/utils';
 
 export const SIZE_TOLERANCE_MM = 2;
 
 export function canUseTolerance(search: string, field: string): boolean {
-  return /^\d+(\.\d*)?$/.test(search.trim()) && ['all', 'length', 'width'].includes(field);
+  return /^\d+(\.\d*)?$/.test(search.trim()) && ['all', 'size'].includes(field);
 }
 
 export default function SizeToleranceToggle({
