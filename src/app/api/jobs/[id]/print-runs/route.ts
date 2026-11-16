@@ -140,7 +140,13 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // ── Quantity math — server recomputes, never trusts the client ──
-  const remainingBefore = job.label_qty - (job.total_qty_dispatched ?? 0);
+  // What has already left the building, by either route. Runs and releases
+  // add to both counters; a "Partial Dispatch" picked from the stage
+  // dropdown adds only to dispatched_qty. Reading total_qty_dispatched alone
+  // let a first run be planned for labels that had already shipped — and
+  // the database then refused that run's dispatch (jobs_dispatched_qty_in_range).
+  const alreadyDispatched = Math.max(job.dispatched_qty ?? 0, job.total_qty_dispatched ?? 0);
+  const remainingBefore = job.label_qty - alreadyDispatched;
 
   if (qtyThisRun > remainingBefore) {
     return NextResponse.json(
