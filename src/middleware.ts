@@ -31,6 +31,20 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 const CANONICAL_HOST = process.env.NEXT_PUBLIC_CANONICAL_DOMAIN || '';
 
+// Constant-time secret check. `!==` stops at the first wrong character, so
+// response time leaks how much of a guess is right. Hashing first makes both
+// sides the same length (no length leak either); Edge has no timingSafeEqual.
+async function secretMatches(given: string | null | undefined, secret: string | undefined): Promise<boolean> {
+  if (!secret || !given) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([given, secret].map((s) => crypto.subtle.digest('SHA-256', enc.encode(s))));
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  let diff = 0;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -60,7 +74,7 @@ export async function middleware(request: NextRequest) {
   if (pathname.startsWith('/api/cron/')) {
     const cronSecret = request.headers.get('x-cron-secret')
       ?? request.headers.get('authorization')?.replace(/^Bearer /, '');
-    if (!secret || cronSecret !== secret) {
+    if (!(await secretMatches(cronSecret, secret))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.next({ request });
@@ -70,7 +84,7 @@ export async function middleware(request: NextRequest) {
   // user session to check — gated by the same secret-header convention.
   if (pathname.startsWith('/api/notifications/')) {
     const internalSecret = request.headers.get('x-internal-secret');
-    if (!secret || internalSecret !== secret) {
+    if (!(await secretMatches(internalSecret, secret))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.next({ request });

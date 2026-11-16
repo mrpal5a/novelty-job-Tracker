@@ -21,7 +21,8 @@ const ALLOWED_TYPES: Record<string, string> = {
   'image/png':  'png',
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
-  'image/svg+xml': 'svg',
+  // No SVG: a public SVG can carry script, and emails can't show one.
+  // Storage enforces the same list + size (migration 093).
 };
 const MAX_BYTES = 2 * 1024 * 1024; // 2 MB — this is a logo, not a photo library
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
   }
   const ext = ALLOWED_TYPES[file.type];
   if (!ext) {
-    return NextResponse.json({ error: 'Logo must be PNG, JPEG, WebP, or SVG' }, { status: 400 });
+    return NextResponse.json({ error: 'Logo must be PNG, JPEG or WebP' }, { status: 400 });
   }
 
   const admin = createAdminClient();

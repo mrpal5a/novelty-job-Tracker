@@ -13,7 +13,6 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -63,7 +62,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const denied = await verifyActingPassword(user.email!, body.password);
+    const denied = await verifyActingPassword(user.id, body.password);
     if (denied) return denied;
   }
 
@@ -83,19 +82,22 @@ function memberLookupFailed(error: { status?: number } | null): NextResponse {
   return NextResponse.json({ error: 'Couldn’t reach the account service — try again' }, { status: 502 });
 }
 
-// Re-enter-your-password check for the acting Admin. A fresh anon-key
-// client, not the cookie-bound server client — signing in on that would
-// mutate the caller's own session cookies as a side effect of the request.
-async function verifyActingPassword(email: string, password: unknown): Promise<NextResponse | null> {
+// Re-enter-your-password check for the acting Admin. Compared against the
+// stored hash in the database (migration 094), not by signing in again:
+// with CAPTCHA on, a server-side sign-in has no token and is always refused.
+// ponytail: no attempt limit — only reachable with a live Admin session;
+// add a per-user counter if that ever stops being enough.
+async function verifyActingPassword(userId: string, password: unknown): Promise<NextResponse | null> {
   if (typeof password !== 'string' || !password) {
     return NextResponse.json({ error: 'Enter your password to confirm' }, { status: 400 });
   }
-  const verifier = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { error } = await verifier.auth.signInWithPassword({ email, password });
-  if (error) return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
+  const { data, error } = await createAdminClient()
+    .rpc('verify_user_password', { p_user_id: userId, p_password: password });
+  if (error) {
+    console.error('[team/[id]] password check failed:', error);
+    return NextResponse.json({ error: 'Couldn’t check your password — try again' }, { status: 502 });
+  }
+  if (data !== true) return NextResponse.json({ error: 'Incorrect password' }, { status: 401 });
   return null;
 }
 
@@ -138,7 +140,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
     const targetPerms = await getDeptPermissions(deptKeyOf(target.user));
     if (targetPerms?.isSuperAdmin || id === user.id) {
-      const denied = await verifyActingPassword(user.email!, body.password);
+      const denied = await verifyActingPassword(user.id, body.password);
       if (denied) return denied;
     }
     update.password = next;
@@ -150,6 +152,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   const { data, error } = await admin.auth.admin.updateUserById(id, update);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  // A new password must end the old one's sign-ins everywhere — that's
+  // usually why it was reset. The Admin's own current sign-in is kept.
+  if (update.password) {
+    const { error: revokeError } = await admin.rpc('revoke_user_sessions', {
+      p_user_id: id,
+      p_keep_session_id: id === user.id ? user.sessionId ?? null : null,
+    });
+    if (revokeError) {
+      console.error('[team/[id]] session revoke failed:', revokeError);
+      return NextResponse.json(
+        { error: 'Password changed, but their existing sign-ins could not be ended — try again' },
+        { status: 502 },
+      );
+    }
+  }
 
   return NextResponse.json({ member: { id, username: usernameOf(appMetaOf(data.user), data.user.email) } });
 }

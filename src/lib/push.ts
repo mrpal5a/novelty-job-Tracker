@@ -26,6 +26,21 @@ export type PushPayload = {
   open:  PushOpen;
 };
 
+// The server POSTs to every saved endpoint, so a "device" must be a real
+// browser push service — otherwise any login could aim our server at an
+// arbitrary host. Chrome/Android (FCM), Firefox, Edge (WNS), Safari/iOS.
+const PUSH_HOSTS = ['fcm.googleapis.com', 'push.services.mozilla.com', 'notify.windows.com', 'push.apple.com'];
+
+export function isPushEndpoint(endpoint: string): boolean {
+  try {
+    const url = new URL(endpoint);
+    if (url.protocol !== 'https:' || url.port || url.username || url.password) return false;
+    return PUSH_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith(`.${h}`));
+  } catch {
+    return false;
+  }
+}
+
 type Row = { endpoint: string; p256dh: string; auth: string };
 type Send = (sub: PushSubscription, body: string) => Promise<unknown>;
 

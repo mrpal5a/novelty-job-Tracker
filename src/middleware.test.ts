@@ -41,6 +41,12 @@ describe('/api/cron/*', () => {
     expect((await middleware(req('/api/cron/overdue-check', { headers: { 'x-cron-secret': 'nope' } }))).status).toBe(401);
   });
 
+  it('401 on a near miss: right length, last character wrong', async () => {
+    const nearMiss = SECRET.slice(0, -1) + (SECRET.endsWith('x') ? 'y' : 'x');
+    expect((await middleware(req('/api/cron/overdue-check', { headers: { 'x-cron-secret': nearMiss } }))).status).toBe(401);
+    expect((await middleware(req('/api/notifications/email', { method: 'POST', headers: { 'x-internal-secret': nearMiss } }))).status).toBe(401);
+  });
+
   it('401 for everyone when CRON_SECRET is not configured', async () => {
     delete process.env.CRON_SECRET;
     const attempts: Record<string, string>[] = [{}, { authorization: 'Bearer undefined' }, { authorization: 'Bearer ' }, { 'x-cron-secret': '' }, { 'x-cron-secret': 'undefined' }];

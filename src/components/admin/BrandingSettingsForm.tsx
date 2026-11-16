@@ -141,9 +141,9 @@ export default function BrandingSettingsForm({ initial }: { initial: Branding })
           )}>
             <Upload className="h-4 w-4" aria-hidden="true" />
             {uploadingLogo ? 'Uploading…' : 'Upload new'}
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="sr-only" onChange={handleLogoChange} />
+            <input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={handleLogoChange} />
           </label>
-          <span className="text-xs text-brand-muted">PNG, JPEG, WebP or SVG, under 2 MB. Square or wide.</span>
+          <span className="text-xs text-brand-muted">PNG, JPEG or WebP, under 2 MB. Square or wide.</span>
         </div>
       </div>
 

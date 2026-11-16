@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { isPushEndpoint } from '@/lib/push';
 
 const str = (v: unknown, max: number) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
 
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
   const endpoint = str(body?.endpoint, 1000);
   const p256dh   = str(body?.keys?.p256dh, 200);
   const auth     = str(body?.keys?.auth, 100);
-  if (!endpoint?.startsWith('https://') || !p256dh || !auth) {
+  if (!endpoint || !isPushEndpoint(endpoint) || !p256dh || !auth) {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 });
   }
 

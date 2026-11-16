@@ -27,6 +27,36 @@ export interface ClaimsUser {
   email: string;
   /** Service-role-only metadata: department and username. Safe to trust. */
   app_metadata: Record<string, unknown>;
+  /** The sign-in this token belongs to (auth.sessions.id). */
+  sessionId?: string;
+}
+
+// A valid signature only proves the token was issued — not that the login
+// still exists. Removing a team member or resetting their password deletes
+// their sessions (migration 095), so each token's session is looked up too.
+// ponytail: a live answer is remembered 60 s per server instance, so a
+// revoked login can linger that long; shorten LIVE_TTL_MS if that's too much.
+const LIVE_TTL_MS = 60_000;
+const liveUntil = new Map<string, number>();
+
+async function sessionIsLive(sessionId: string): Promise<boolean> {
+  const now = Date.now();
+  if ((liveUntil.get(sessionId) ?? 0) > now) return true;
+
+  const { data, error } = await createAdminClient().rpc('session_is_live', { p_session_id: sessionId });
+  if (error) {
+    // The signature already checked out; a database hiccup must not sign
+    // everyone out. Not cached, so the next request asks again.
+    console.error('[claims] session check failed:', error);
+    return true;
+  }
+  if (data !== true) {
+    liveUntil.delete(sessionId);
+    return false;
+  }
+  if (liveUntil.size > 1000) liveUntil.clear();
+  liveUntil.set(sessionId, now + LIVE_TTL_MS);
+  return true;
 }
 
 export async function getClaimsUser(
@@ -36,6 +66,9 @@ export async function getClaimsUser(
   if (error || !data?.claims) return null;
 
   const { claims } = data;
+  const sessionId = typeof claims.session_id === 'string' ? claims.session_id : undefined;
+  if (sessionId && !(await sessionIsLive(sessionId))) return null;
+
   let appMeta = (claims.app_metadata as Record<string, unknown> | undefined) ?? {};
 
   if (typeof appMeta.department !== 'string') {
@@ -47,5 +80,6 @@ export async function getClaimsUser(
     id: claims.sub,
     email: claims.email ?? '',
     app_metadata: appMeta,
+    sessionId,
   };
 }

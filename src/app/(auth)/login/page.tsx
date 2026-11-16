@@ -11,6 +11,7 @@ import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { registerGsap } from '@/lib/gsap/register';
 import { createClient } from '@/lib/supabase/client';
+import { safeRedirect } from '@/lib/safeRedirect';
 import { GradientMesh } from '@/components/motion/GradientMesh';
 import { LogoReveal } from '@/components/motion/LogoReveal';
 import { Stagger } from '@/components/motion/Stagger';
@@ -45,7 +46,7 @@ function LoginForm() {
   const branding = useBranding();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirectTo') ?? '/admin';
+  const redirectTo = safeRedirect(searchParams.get('redirectTo'));
 
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');

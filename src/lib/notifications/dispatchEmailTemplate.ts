@@ -8,6 +8,18 @@ import type { Stage } from '@/lib/constants/stages';
 import { LOGO_CID } from './logoDataUri';
 import { getBranding } from '@/lib/branding';
 
+// Job, party and branding text is typed by staff — escape it before it goes
+// into HTML so a stray "<" can't break the layout or inject markup.
+// Subjects are plain-text headers, so getSubject/getConsolidatedSubject don't.
+export function esc(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export type NotifyPayload = {
   job_id:    string;
   job_name:  string | null;
@@ -124,11 +136,11 @@ export async function getConsolidatedEmailHTML(payload: {
 }): Promise<string> {
   const { party, contactName, items, audience = 'party' } = payload;
   const branding = await getBranding();
-  const greetingName = audience === 'team' ? 'Team' : (contactName?.trim() || party);
+  const greetingName = esc(audience === 'team' ? 'Team' : (contactName?.trim() || party));
   const introText = audience === 'team'
-    ? `These are the dispatch details of today for <strong>${party}</strong>.`
+    ? `These are the dispatch details of today for <strong>${esc(party)}</strong>.`
     : 'Please find the dispatch details below for your reference and records.';
-  const subject  = getConsolidatedSubject(items, party);
+  const subject  = esc(getConsolidatedSubject(items, party));
   const sentAt   = new Date().toLocaleString('en-GB', {
     timeZone: 'Asia/Kolkata',
     day: '2-digit', month: 'short', year: 'numeric',
@@ -148,16 +160,16 @@ export async function getConsolidatedEmailHTML(payload: {
       ? `
           <tr style="background-color:${bg};">
             <td colspan="5" style="padding:2px 6px 8px;border-bottom:1px solid #c8e0c7;color:#9a7800;font-size:11px;font-style:italic;word-break:break-word;">
-              Remark: ${item.remark.trim()}
+              Remark: ${esc(item.remark.trim())}
             </td>
           </tr>`
       : '';
 
     return `
           <tr style="background-color:${bg};">
-            <td style="${cellCls}color:#1a1a1a;font-weight:600;font-size:12px;">${material}</td>
-            <td style="${cellCls}color:#4a7549;font-size:15px;font-weight:600;font-family:monospace;">${item.pm_code?.trim() || '—'}</td>
-            <td style="${cellCls}color:#4a7549;font-size:15px;font-weight:600;font-family:monospace;">${item.po_number}</td>
+            <td style="${cellCls}color:#1a1a1a;font-weight:600;font-size:12px;">${esc(material)}</td>
+            <td style="${cellCls}color:#4a7549;font-size:15px;font-weight:600;font-family:monospace;">${esc(item.pm_code?.trim() || '—')}</td>
+            <td style="${cellCls}color:#4a7549;font-size:15px;font-weight:600;font-family:monospace;">${esc(item.po_number)}</td>
             <td style="${cellCls}color:#10540f;font-weight:600;font-size:11px;">${partial ? 'Partial Dispatch' : 'Dispatched'}</td>
             <td style="${cellCls}color:#1a1a1a;font-size:12px;text-align:right;white-space:nowrap;">${item.qty ? item.qty.toLocaleString('en-IN') : '—'}</td>
           </tr>${remarkRow}`;
@@ -175,11 +187,11 @@ export async function getConsolidatedEmailHTML(payload: {
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#10540f;">
       <tr>
         <td style="padding:18px 16px;">
-          <h3 style="margin:0 0 4px;color:#ffffff;font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:700;">${branding.name}</h3>
+          <h3 style="margin:0 0 4px;color:#ffffff;font-size:14px;letter-spacing:2px;text-transform:uppercase;font-weight:700;">${esc(branding.name)}</h3>
           <h2 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.6px;">Dispatch Notification</h2>
         </td>
         <td style="padding:18px 16px 18px 0;text-align:right;vertical-align:middle;width:100px;">
-          <img src="cid:${LOGO_CID}" alt="${branding.shortName}" width="80" style="display:block;margin-left:auto;background-color:#ffffff;border-radius:6px;padding:5px 8px;max-width:100%;height:auto;" />
+          <img src="cid:${LOGO_CID}" alt="${esc(branding.shortName)}" width="80" style="display:block;margin-left:auto;background-color:#ffffff;border-radius:6px;padding:5px 8px;max-width:100%;height:auto;" />
         </td>
       </tr>
     </table>
@@ -215,7 +227,7 @@ export async function getConsolidatedEmailHTML(payload: {
     </div>
 
     <div style="background-color:#f0f7f0;padding:15px 16px;border-top:1px solid #b8d9b7;">
-      <p style="margin:0 0 5px 0;color:#10540f;font-size:12px;font-weight:600;">${branding.shortName} · Dispatch Team</p>
+      <p style="margin:0 0 5px 0;color:#10540f;font-size:12px;font-weight:600;">${esc(branding.shortName)} · Dispatch Team</p>
       <p style="margin:0;color:#10540f;font-size:11px;">${sentAt}</p>
     </div>
 
@@ -240,9 +252,9 @@ export async function getEmailHTML(
       case 'Dispatched':
         return `Your order has been dispatched.${qty ? ` <strong>${qty.toLocaleString('en-IN')} labels</strong> sent.` : ''}`;
       case 'On Hold':
-        return `Your order has been temporarily placed on hold.<br><br><strong>Reason:</strong> ${remark ?? 'Please contact us for details.'}`;
+        return `Your order has been temporarily placed on hold.<br><br><strong>Reason:</strong> ${esc(remark ?? 'Please contact us for details.')}`;
       default:
-        return `Your order status has been updated to <strong>${status}</strong>.`;
+        return `Your order status has been updated to <strong>${esc(status)}</strong>.`;
     }
   })();
 
@@ -259,19 +271,19 @@ export async function getEmailHTML(
         <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;">
           <tr>
             <td style="background:#1a1a18;padding:24px 32px;border-radius:10px 10px 0 0;">
-              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">${branding.name}</p>
+              <p style="margin:0;color:#ffffff;font-size:18px;font-weight:600;">${esc(branding.name)}</p>
               <p style="margin:4px 0 0;color:#a8a8a0;font-size:13px;">Order Status Update</p>
             </td>
           </tr>
           <tr>
             <td style="background:#ffffff;padding:32px;border:1px solid #e5e5e2;border-top:none;">
               <p style="margin:0 0 8px;color:#a8a8a0;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">Order Details</p>
-              <p style="margin:0 0 4px;font-size:15px;font-weight:600;color:#1a1a18;">${job_name ?? 'Order'}</p>
-              <p style="margin:0 0 24px;font-size:13px;color:#a8a8a0;font-family:monospace;">PO: ${po_number}</p>
+              <p style="margin:0 0 4px;font-size:15px;font-weight:600;color:#1a1a18;">${esc(job_name ?? 'Order')}</p>
+              <p style="margin:0 0 24px;font-size:13px;color:#a8a8a0;font-family:monospace;">PO: ${esc(po_number)}</p>
               <p style="margin:0 0 24px;font-size:15px;color:#1a1a18;line-height:1.6;">
-                Dear ${party},<br><br>${messageBody}
+                Dear ${esc(party)},<br><br>${messageBody}
               </p>
-              <a href="${trackUrl}" style="display:inline-block;background:#1a1a18;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:500;">
+              <a href="${esc(trackUrl)}" style="display:inline-block;background:#1a1a18;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:500;">
                 Track Your Order →
               </a>
             </td>
@@ -279,7 +291,7 @@ export async function getEmailHTML(
           <tr>
             <td style="background:#f7f7f5;padding:16px 32px;border-radius:0 0 10px 10px;border:1px solid #e5e5e2;border-top:none;">
               <p style="margin:0;font-size:12px;color:#a8a8a0;">
-                ${branding.name} · ${branding.address}<br>
+                ${esc(branding.name)} · ${esc(branding.address)}<br>
                 This is an automated notification. Reply to this email to reach our team.
               </p>
             </td>
