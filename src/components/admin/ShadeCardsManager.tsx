@@ -24,6 +24,7 @@ import type { SortDir } from '@/lib/sort';
 import { SHADE_CARD_STATUSES, MAKING_STATUSES, SHADE_CARD_STATUS_COLORS, MAKING_STATUS_COLORS, SHADE_CARD_SEARCH_FIELDS, type ShadeCardStatus, type MakingStatus, SHADE_CARD_STATUS_DOT, MAKING_STATUS_DOT } from '@/lib/constants/shadeCards';
 import { StateChip } from '@/components/ui/StateChip';
 import type { ShadeCard } from '@/lib/types';
+import { shadeCardListQuery, shadeCardListParams } from '@/lib/listQueries';
 import { WITH_PARTY_LATE_DAYS, daysWithParty, withPartyLabel } from '@/lib/shadeCardView';
 import type { ShadeCardSummary } from '@/app/api/shade-cards/summary/route';
 import type { ShadeCardModalMode } from './AddShadeCardModal';
@@ -59,13 +60,6 @@ const COLUMN_SORT_FIELDS: Partial<Record<typeof COLUMNS[number], SortField>> = {
   'Status':       'status',
   'Made':         'making_status',
   'Last updated': 'updated_at',
-};
-
-type ListResponse = {
-  cards:    ShadeCard[];
-  total:    number;
-  page:     number;
-  pageSize: number;
 };
 
 const CSV_COLUMNS: CsvColumn<ShadeCard>[] = [
@@ -128,24 +122,26 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
     },
   });
 
-  const params = new URLSearchParams();
-  if (search) params.set('search', search);
-  if (search && field !== 'all') params.set('field', field);
-  if (status) params.set('status', status);
+  // The list asks the server 300 ms after typing stops — it used to ask on
+  // every keystroke, each one a full search + count. Clearing is immediate.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   // "Last 7 days" filters on the exact cutoff the summary counted, so the
   // list is the same set as the number on the card (see the summary route).
-  if (filter === 'recent' && summary) params.set('created_from', summary.added_since);
-  params.set('page', String(page));
-  params.set('sort', sort);
-  params.set('dir', dir);
+  const listArgs = {
+    search: debouncedSearch, field, status, sort, dir,
+    createdFrom: filter === 'recent' ? summary?.added_since ?? null : null,
+  };
+  // Without the page: the CSV export reuses these and adds export=1.
+  const params = shadeCardListParams(listArgs);
 
-  const { data, isLoading } = useQuery<ListResponse>({
-    queryKey: ['shade-cards', search, field, filter, summary?.added_since, page, sort, dir],
-    queryFn: async () => {
-      const res = await fetch(`/api/shade-cards?${params.toString()}`);
-      if (!res.ok) throw new Error('Failed to load shade cards');
-      return res.json();
-    },
+  const { data, isLoading } = useQuery({
+    // Key + fetch live in lib/listQueries so the menu can warm this up.
+    ...shadeCardListQuery({ ...listArgs, filter, page }),
     // The 7-day list waits for the cutoff, or it would briefly show every card.
     enabled: filter !== 'recent' || Boolean(summary),
     // Keeps the previous page on screen while the next one loads, so paging

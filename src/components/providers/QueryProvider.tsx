@@ -26,10 +26,12 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
             // already uses elsewhere — a page revisited inside that window
             // renders instantly from cache instead of re-fetching.
             staleTime: 30_000,
-            // Cached data past its stale time is still kept around for a
-            // few minutes so a quick back-and-forth between two pages
-            // doesn't throw the second page's cache away immediately.
-            gcTime: 5 * 60_000,
+            // A list you've left stays in this tab's memory for 30 minutes
+            // (it was 5), so coming back shows it at once and refreshes it
+            // in the background — staleTime above still decides when to
+            // re-ask. Memory only: gone when the tab closes, and cleared on
+            // sign-out (AdminHeader), so nothing outlives the session.
+            gcTime: 30 * 60_000,
             // This app already has its own visibility-aware polling per
             // feature; a second refetch-on-focus trigger on top of that
             // would just be redundant network traffic.

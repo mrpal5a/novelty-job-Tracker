@@ -16,6 +16,8 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useIsDesk } from '@/hooks/useIsDesk';
+import { jobSeparationListQuery, JOB_SEPARATION_PAGE_SIZE } from '@/lib/listQueries';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useRefetchOnChange } from '@/hooks/useRefetchOnChange';
 import Link from 'next/link';
@@ -74,7 +76,8 @@ const WITHOUT_DISPATCHED = JOB_SEPARATION_COLUMNS.filter((c) => c !== 'Dispatche
 // month" (400-700 rows) fits in one page today; "All data" won't once it
 // covers years of history, so it's capped the same way and grown via
 // "Load more" instead of fetched in one shot.
-const PAGE_SIZE = 500;
+// 100 rows a load: 500 was ~300 KB and a thousand DOM rows per search.
+const PAGE_SIZE = JOB_SEPARATION_PAGE_SIZE;
 
 // A stable reference for "no data yet" — `data?.rows ?? []` would otherwise
 // hand back a fresh array every render, defeating the sortedRows useMemo.
@@ -258,6 +261,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   const money = (value: number | null) => (hideMoney ? MASK : formatMoney(value));
 
   const queryClient = useQueryClient();
+  const isDesk = useIsDesk();
 
   // Debounced only while typing — range/field changes apply immediately.
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -276,23 +280,8 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   // (the API has no real cursor), so it's one more dimension of the query
   // key rather than a separate pagination mechanism.
   const rowsQuery = useQuery({
-    queryKey: ['job-separations', debouncedSearch, searchField, range, limit],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set('range', range);
-      params.set('limit', String(limit));
-      if (debouncedSearch) {
-        params.set('search', debouncedSearch);
-        if (searchField !== 'all') params.set('field', searchField);
-      }
-      const res  = await fetch(`/api/job-separations?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to load job separation rows');
-      return {
-        rows:    (data.job_separations ?? []) as JobSeparation[],
-        hasMore: Boolean(data.hasMore),
-      };
-    },
+    // Key + fetch live in lib/listQueries so the menu can warm this up.
+    ...jobSeparationListQuery({ search: debouncedSearch, field: searchField, range, limit }),
     placeholderData: keepPreviousData,
   });
   // A row someone else just added shows up without a manual refresh: every
@@ -348,16 +337,20 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
     [rows, sortField, sortDir],
   );
 
-  // Live sum of what's currently on screen — reacts to search, date range
-  // and "Load more" the same way the row count above the table does.
-  // Cancelled rows don't count: that order isn't being produced or billed.
-  const totalOrderValue = useMemo(
+  // Total of everything that matches the search and date range. Cancelled
+  // rows don't count: that order isn't being produced or billed. When more
+  // rows match than are loaded the server sends the full total; otherwise
+  // it's summed here, so a row edited on screen updates it at once.
+  const loadedOrderValue = useMemo(
     () => sortedRows.reduce(
       (sum, r) => r.cancelled_at ? sum : sum + (r.order_value ?? 0),
       0,
     ),
     [sortedRows],
   );
+  const serverTotal = hasMore ? rowsQuery.data?.totalOrderValue ?? null : null;
+  const totalOrderValue = serverTotal ?? loadedOrderValue;
+  const totalIsPartial = hasMore && serverTotal === null;
 
   async function recordDispatch(row: JobSeparation, qty: number, confirm = false) {
     setBusyId(row.id);
@@ -563,10 +556,10 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           {canSeeTotal && (
             <p
               className="text-sm font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1"
-              title={hasMore ? 'Totals only what’s loaded — narrow the search or "Load more" to cover the rest' : 'Total order value of the rows shown above, excluding cancelled rows'}
+              title={totalIsPartial ? 'Totals only what’s loaded — narrow the search or "Load more" to cover the rest' : 'Total order value of every row matching the search and date range, excluding cancelled rows'}
             >
               Total order value: ₹{money(totalOrderValue)}
-              {hasMore && <span className="text-emerald-700">*</span>}
+              {totalIsPartial && <span className="text-emerald-700">*</span>}
             </p>
           )}
         </div>
@@ -628,7 +621,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
       ) : (
         <>
           {/* Phone: card list */}
-          <ul className="sm:hidden space-y-3">
+          {!isDesk && <ul className="space-y-3">
             {sortedRows.map((row) => {
               const isRepeat = (row.aw_send_to ?? '').trim().toUpperCase() === 'REPEAT';
               const isCancelled = Boolean(row.cancelled_at);
@@ -776,11 +769,11 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                 </li>
               );
             })}
-          </ul>
+          </ul>}
 
           {/* Desk: table with a fixed header, scrolling through the rows —
               the spreadsheet reading this worksheet was modeled on. */}
-          <div className="hidden sm:block rounded-xl glass overflow-hidden">
+          {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
               <table className="w-full min-w-[980px] border-collapse text-sm">
                 <thead>
@@ -985,7 +978,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
 
           {hasMore && (
             <div className="flex justify-center pt-1">

@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getDeptPermissions, canDeptManageJobSeparation, canDeptSeeDispatchedQty } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptManageJobSeparation, canDeptSeeDispatchedQty, canDeptSeeMoneyTotals } from '@/lib/constants/departments';
 import { parseDateRange, rangeOrClause, parseLimit, type DateRange } from '@/lib/jobSeparationQuery';
 import { containsPattern, orContains } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
@@ -85,55 +85,72 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ job_separations: data ?? [], hasMore: false });
   }
 
-  let query = supabase
-    .from('job_separations')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(limit + 1);
+  const config = search && field ? JOB_SEPARATION_SEARCH_FIELDS[field] : undefined;
+  const intSearch = config?.type === 'int' ? Number(search) : null;
+  // Not a whole number — an integer column can't contain it, so the
+  // answer is "no matches" rather than a query error.
+  if (intSearch !== null && !Number.isFinite(intSearch)) return NextResponse.json({ job_separations: [] });
 
-  // Scoped exactly the way Bill of Material scopes the same rows — see
-  // src/lib/jobSeparationQuery.ts for the po_date/created_at bucketing.
-  const rangeClause = rangeOrClause(range);
-  if (rangeClause) query = query.or(rangeClause);
-
-  if (search) {
-    const config = field ? JOB_SEPARATION_SEARCH_FIELDS[field] : undefined;
-    if (config?.type === 'int') {
-      const n = Number(search);
-      // Not a whole number — an integer column can't contain it, so the
-      // answer is "no matches" rather than a query error.
-      if (!Number.isFinite(n)) return NextResponse.json({ job_separations: [] });
-      query = query.eq(config.column, Math.trunc(n));
-    } else if (config) {
-      // Picked a specific text field — search just that column.
-      query = query.ilike(config.column, containsPattern(search));
-    } else {
-      // "All fields" — the shop looks this up by whatever they can read
-      // off a PO: the sr. no, the party, the PO no, the PM code, or the
-      // material name.
-      query = query.or(orContains(
-        ['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search,
-      ));
-    }
+  // The same range + search on any query over the table: the page of rows,
+  // and the order-value total when there are more rows than the page holds.
+  type Filterable<Q> = { or: (f: string) => Q; eq: (c: string, v: number) => Q; ilike: (c: string, p: string) => Q };
+  function applyFilters<Q extends Filterable<Q>>(q: Q): Q {
+    // Scoped exactly the way Bill of Material scopes the same rows — see
+    // src/lib/jobSeparationQuery.ts for the po_date/created_at bucketing.
+    const rangeClause = rangeOrClause(range);
+    if (rangeClause) q = q.or(rangeClause);
+    if (!search) return q;
+    if (config && intSearch !== null) return q.eq(config.column, Math.trunc(intSearch));
+    // Picked a specific text field — search just that column.
+    if (config) return q.ilike(config.column, containsPattern(search));
+    // "All fields" — the shop looks this up by whatever they can read off a
+    // PO: the sr. no, the party, the PO no, the PM code, or the material name.
+    return q.or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search));
   }
 
-  const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Dispatched figures and money totals are Admin-granted features. The
+  // dispatch ledger doesn't depend on the rows, so it loads alongside them.
+  const perms = await getDeptPermissions(deptKeyOf(user));
+  const dispatchedPromise = canDeptSeeDispatchedQty(perms) ? dispatchedPerLine() : null;
+  dispatchedPromise?.catch(() => {}); // reported below; never an unhandled rejection
 
-  const all = data ?? [];
+  // limit + 1 rows, to know whether more exist. PostgREST hands back at most
+  // 1000 rows a request, so past that it is read in slices — one request used
+  // to stop at 1000 and report "no more" with rows still unread. `id` breaks
+  // created_at ties so slices never overlap.
+  const SLICE = 1000;
+  const all: { id: string }[] = [];
+  for (let from = 0; from <= limit; from += SLICE) {
+    const { data, error } = await applyFilters(
+      supabase.from('job_separations').select('*').order('created_at', { ascending: false }).order('id'),
+    ).range(from, Math.min(from + SLICE - 1, limit));
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    all.push(...(data ?? []));
+    if ((data?.length ?? 0) < SLICE) break;
+  }
   const hasMore = all.length > limit;
   const rows = hasMore ? all.slice(0, limit) : all;
 
-  // Dispatched figures are an Admin-granted feature: without it the rows go
-  // out as they always did, with no `dispatched` at all.
-  if (!rows.length || !canDeptSeeDispatchedQty(await getDeptPermissions(deptKeyOf(user)))) {
-    return NextResponse.json({ job_separations: rows, hasMore });
-  }
   try {
-    const dispatched = await dispatchedPerLine();
+    // The page shows one total for everything that matches. When it all fits
+    // on the page the browser adds it up; otherwise only the order values of
+    // the live (not cancelled) rows are read here — a few bytes a row.
+    let totalOrderValue: number | undefined;
+    if (hasMore && canDeptSeeMoneyTotals(perms)) {
+      const values = await allPages<{ order_value: number | null }>((from, to) => applyFilters(
+        supabase.from('job_separations').select('order_value').is('cancelled_at', null).order('id').range(from, to),
+      ));
+      totalOrderValue = values.reduce((sum, r) => sum + (Number(r.order_value) || 0), 0);
+    }
+
+    if (!rows.length || !dispatchedPromise) {
+      return NextResponse.json({ job_separations: rows, hasMore, totalOrderValue });
+    }
+    const dispatched = await dispatchedPromise;
     return NextResponse.json({
       job_separations: rows.map((r) => ({ ...r, dispatched: dispatched.get(r.id) ?? null })),
       hasMore,
+      totalOrderValue,
     });
   } catch (err) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });

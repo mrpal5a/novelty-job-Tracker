@@ -9,6 +9,8 @@
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
+import { useIsDesk } from '@/hooks/useIsDesk';
+import { dieListQuery } from '@/lib/listQueries';
 import SizeToleranceToggle, { canUseTolerance, SIZE_TOLERANCE_MM } from './SizeToleranceToggle';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Scissors, ArrowUp, ArrowDown } from 'lucide-react';
@@ -36,6 +38,7 @@ const DIE_COLS = DIE_COLUMNS.length;
 // Stable reference — `data ?? []` would create a new array every render,
 // making the sortedDies useMemo below recompute even when data hasn't changed.
 const EMPTY_DIES: Die[] = [];
+const SHOW_STEP = 100;
 
 // Click-to-sort, mirroring JobSeparationManager.tsx's approach. Size
 // (length/width) and Damage (date/reason) are merged headers — each sorts
@@ -187,19 +190,8 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
   const tolerance = nearSize && canUseTolerance(debouncedSearch, searchField) ? SIZE_TOLERANCE_MM : 0;
 
   const diesQuery = useQuery({
-    queryKey: ['dies', debouncedSearch, searchField, tolerance],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (debouncedSearch) {
-        params.set('search', debouncedSearch);
-        if (searchField !== 'all') params.set('field', searchField);
-        if (tolerance) params.set('tol', String(tolerance));
-      }
-      const res  = await fetch(`/api/dies?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to load dies');
-      return (data.dies ?? []) as Die[];
-    },
+    // Key + fetch live in lib/listQueries so the menu can warm this up.
+    ...dieListQuery({ search: debouncedSearch, field: searchField, tolerance }),
     placeholderData: keepPreviousData,
   });
   const dies    = diesQuery.data ?? EMPTY_DIES;
@@ -209,6 +201,16 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
     () => sortDies(dies, sortField, sortDir),
     [dies, sortField, sortDir]
   );
+
+  // Every die is loaded (Sr No, sort and export need them all), but only
+  // SHOW_STEP are drawn at a time, and only the layout that fits the screen:
+  // a thousand dies as cards and again as table rows froze slower machines.
+  // A new search or sort starts again from the top.
+  const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
+  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, tolerance, sortField, sortDir]);
+  const visibleDies = useMemo(() => sortedDies.slice(0, visibleCount), [sortedDies, visibleCount]);
+  const hiddenCount = sortedDies.length - visibleDies.length;
+  const isDesk = useIsDesk();
 
   const srNoMap = useMemo(() => buildSrNoMap(dies), [dies]);
   const exportColumns = useMemo(() => buildDieExportColumns(srNoMap), [srNoMap]);
@@ -364,8 +366,8 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
       ) : (
         <>
           {/* Phone: card list */}
-          <ul className="sm:hidden space-y-3">
-            {sortedDies.map((die) => {
+          {!isDesk && <ul className="space-y-3">
+            {visibleDies.map((die) => {
               const isDamaged = die.status === 'DAMAGE';
               return (
               <li
@@ -466,10 +468,10 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
               </li>
               );
             })}
-          </ul>
+          </ul>}
 
           {/* Desk: table with a fixed header, scrolling through the rows. */}
-          <div className="hidden sm:block rounded-xl glass overflow-hidden">
+          {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
               <table className="w-full min-w-[1450px] border-collapse text-sm text-center">
                 <thead>
@@ -499,7 +501,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedDies.map((die, i) => {
+                  {visibleDies.map((die, i) => {
                     const isDamaged = die.status === 'DAMAGE';
                     const damageText = [
                       die.damage_date ? formatNumericDate(die.damage_date) : null,
@@ -594,7 +596,19 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
+
+          {hiddenCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 pt-1">
+              <p className="text-sm text-[var(--glass-muted)]">
+                Showing <strong className="text-[var(--glass-ink)] font-mono">{visibleDies.length}</strong> of{' '}
+                <strong className="text-[var(--glass-ink)] font-mono">{sortedDies.length}</strong>, search to jump straight to a die
+              </p>
+              <Button intent="ghost" onClick={() => setVisibleCount((n) => n + SHOW_STEP)}>
+                Show {Math.min(SHOW_STEP, hiddenCount)} more
+              </Button>
+            </div>
+          )}
         </>
       )}
 

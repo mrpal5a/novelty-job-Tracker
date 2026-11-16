@@ -43,6 +43,12 @@ const PLATE_SEARCH_FIELDS: Record<string, PlateSearchField> = {
   label_per_round: { column: 'label_per_round', type: 'int' },
 };
 
+// Columns a header click may sort by — a whitelist, never a raw query value.
+const PLATE_SORT_COLUMNS = new Set([
+  'plate_id', 'party', 'pm_code', 'item_name', 'across_size', 'cylinder',
+  'label_per_round', 'location', 'plate_date', 'created_at',
+]);
+
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -63,32 +69,33 @@ export async function GET(request: NextRequest) {
 
   // Thousands of plates since the Plates.xlsx import: page past PostgREST's
   // 1000-row cap. id breaks created_at ties so pages never overlap.
-  const page = (from: number, to: number) => {
-    let query = supabase
-      .from('plates')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .order('id')
-      .range(from, to);
+  // One page at a time, sorted here: the whole table is ~4,000 plates and
+  // 1.8 MB, far too much to send on every load and search. `total` is how
+  // many match, for "showing X of Y". ?all=1 is the CSV export.
+  const sort = PLATE_SORT_COLUMNS.has(searchParams.get('sort') ?? '') ? searchParams.get('sort')! : 'created_at';
+  const ascending = searchParams.get('dir') === 'asc';
+  const rawLimit = Number(searchParams.get('limit'));
+  const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.trunc(rawLimit), 1000) : 100;
 
+  // Blank values sort last going up and first going down, as the page did
+  // when it sorted in the browser. `id` breaks ties so pages don't shuffle.
+  const sorted = (from: number, to: number, count?: 'exact') => {
+    let query = supabase.from('plates').select('*', count ? { count } : undefined);
     if (search) {
-      if (config?.type === 'int') {
-        query = query.eq(config.column, Math.trunc(Number(search)));
-      } else if (config) {
-        // Picked a specific text field — search just that column.
-        query = query.ilike(config.column, containsPattern(search));
-      } else {
-        // "All fields" — someone standing at the rack searches by whatever
-        // they have: the party that ordered it, the PM code, the item, or
-        // the serial on the plate.
-        query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
-      }
+      if (config?.type === 'int') query = query.eq(config.column, Math.trunc(Number(search)));
+      else if (config) query = query.ilike(config.column, containsPattern(search));
+      else query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
     }
-    return query;
+    return query.order(sort, { ascending, nullsFirst: !ascending }).order('id').range(from, to);
   };
 
   try {
-    return NextResponse.json({ plates: await allPages(page) });
+    if (searchParams.get('all') === '1') {
+      return NextResponse.json({ plates: await allPages((from, to) => sorted(from, to)) });
+    }
+    const { data, error, count } = await sorted(0, limit - 1, 'exact');
+    if (error) throw new Error(error.message);
+    return NextResponse.json({ plates: data ?? [], total: count ?? data?.length ?? 0 });
   } catch (e) {
     return NextResponse.json({ error: (e as Error).message }, { status: 500 });
   }

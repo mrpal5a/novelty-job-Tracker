@@ -8,15 +8,17 @@
 // have to be fixable.
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
+import { useIsDesk } from '@/hooks/useIsDesk';
+import { plateListQuery, plateListParams, PLATE_PAGE_SIZE } from '@/lib/listQueries';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Layers, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
-import { compareValues, type SortDir } from '@/lib/sort';
+import type { SortDir } from '@/lib/sort';
 import type { Plate } from '@/lib/types';
 import CsvExportButton from './CsvExportButton';
 import SortableHeaderLabel from './SortableHeaderLabel';
@@ -71,16 +73,10 @@ const COLUMN_SORT_FIELDS: Partial<Record<PlateColumn, SortField>> = {
   'Plate date':       'plate_date',
 };
 
-const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
-  plate_id: 'text', party: 'text', pm_code: 'text', item_name: 'text',
-  across_size: 'text', cylinder: 'number', label_per_round: 'number',
-  location: 'text', plate_date: 'date', created_at: 'date',
-};
-
 // Stable reference — `data ?? []` would otherwise hand back a fresh array
-// every render, defeating the sortedPlates useMemo below.
+// every render.
 const EMPTY_PLATES: Plate[] = [];
-const SHOW_STEP = 100;
+const SHOW_STEP = PLATE_PAGE_SIZE;
 
 // Mirrors PLATE_SEARCH_FIELDS in src/app/api/plates/route.ts — the value
 // sent as ?field=. "All fields" (value 'all') skips the param, falling
@@ -144,42 +140,34 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const platesQuery = useQuery({
-    queryKey: ['plates', debouncedSearch, searchField],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (debouncedSearch) {
-        params.set('search', debouncedSearch);
-        if (searchField !== 'all') params.set('field', searchField);
-      }
-      const res  = await fetch(`/api/plates?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to load plates');
-      return (data.plates ?? []) as Plate[];
-    },
-    placeholderData: keepPreviousData,
-  });
-  const plates  = platesQuery.data ?? EMPTY_PLATES;
-  const loading = platesQuery.isLoading;
-
-  const sortedPlates = useMemo(() => {
-    const kind = SORT_FIELD_KIND[sortField];
-    const sorted = [...plates];
-    sorted.sort((a, b) => {
-      const diff = compareValues(a[sortField], b[sortField], kind);
-      return sortDir === 'asc' ? diff : -diff;
-    });
-    return sorted;
-  }, [plates, sortField, sortDir]);
-
-  // Every plate is loaded (sort and export need them all), but only SHOW_STEP
-  // are drawn at a time — thousands of rows or cards at once is slow, and on
-  // a phone the card list would run tens of thousands of pixels. A new
+  // The server sorts and sends one page (lib note in api/plates/route.ts):
+  // the whole table is ~4,000 plates. "Show more" grows the page; a new
   // search or sort starts again from the top.
   const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
   useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, sortField, sortDir]);
-  const visiblePlates = useMemo(() => sortedPlates.slice(0, visibleCount), [sortedPlates, visibleCount]);
-  const hiddenCount = sortedPlates.length - visiblePlates.length;
+
+  // Search + sort, shared by the page query and the CSV export. Key + fetch
+  // live in lib/listQueries so the menu can warm this up.
+  const listArgs = { search: debouncedSearch, field: searchField, sort: sortField, dir: sortDir };
+  const platesQuery = useQuery({
+    ...plateListQuery({ ...listArgs, limit: visibleCount }),
+    placeholderData: keepPreviousData,
+  });
+  const visiblePlates = platesQuery.data?.plates ?? EMPTY_PLATES;
+  const total   = platesQuery.data?.total ?? 0;
+  const loading = platesQuery.isLoading;
+  const hiddenCount = Math.max(0, total - visiblePlates.length);
+  const isWide = useIsDesk(1280); // Tailwind `xl`: table above, cards below
+
+  // Every matching plate, in the order on screen — for the CSV export only.
+  async function fetchAllPlates(): Promise<Plate[]> {
+    const params = plateListParams(listArgs);
+    params.set('all', '1');
+    const res  = await fetch(`/api/plates?${params.toString()}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Failed to load plates');
+    return (data.plates ?? []) as Plate[];
+  }
 
   useEffect(() => {
     if (platesQuery.error) toast.error((platesQuery.error as Error).message);
@@ -194,9 +182,9 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         toast.error(data.error ?? 'Failed to delete plate');
         return;
       }
-      queryClient.setQueriesData<Plate[]>(
+      queryClient.setQueriesData<{ plates: Plate[]; total: number }>(
         { queryKey: ['plates'] },
-        (old) => old?.filter((p) => p.id !== plate.id)
+        (old) => old && { plates: old.plates.filter((p) => p.id !== plate.id), total: Math.max(0, old.total - 1) }
       );
       toast.success('Plate deleted');
     } catch {
@@ -274,7 +262,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <CsvExportButton rows={plates} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
+        <CsvExportButton fetchRows={fetchAllPlates} count={total} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
 
         {canManage && (
           <Button intent="primary" icon={Plus} onClick={() => setAdding(true)}>
@@ -283,10 +271,10 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         )}
       </div>
 
-      {!loading && plates.length > 0 && (
+      {!loading && total > 0 && (
         <p className="text-sm text-[var(--glass-muted)]">
-          <strong className="text-[var(--glass-ink)]">{plates.length}</strong>
-          {' '}{plates.length === 1 ? 'plate' : 'plates'}
+          <strong className="text-[var(--glass-ink)]">{total}</strong>
+          {' '}{total === 1 ? 'plate' : 'plates'}
           {search && ' matching your search'}
         </p>
       )}
@@ -309,13 +297,13 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
             </table>
           </div>
         </>
-      ) : plates.length === 0 ? (
+      ) : visiblePlates.length === 0 ? (
         <EmptyState hasSearch={Boolean(search)} />
       ) : (
         <>
           {/* Phone / tablet: card list. Tapping the top of a card opens the
               plate's detail, where every plate ID is listed. */}
-          <ul className="xl:hidden space-y-3">
+          {!isWide && <ul className="space-y-3">
             {visiblePlates.map((plate) => {
               const ids = plateIdsOf(plate);
               return (
@@ -413,12 +401,12 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                 </li>
               );
             })}
-          </ul>
+          </ul>}
 
           {/* Desk: fixed-layout table — every column has a set width, long
               text truncates, so nothing pushes the table sideways. Click a
               row for the full record. */}
-          <div className="hidden xl:block rounded-xl glass overflow-hidden">
+          {isWide && <div className="rounded-xl glass overflow-hidden">
             {/* `relative`: the rows' sr-only text is absolutely positioned;
                 without a positioned scroll box it escapes to the page and
                 stretches the document to the full table height. */}
@@ -522,13 +510,13 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
 
           {hiddenCount > 0 && (
             <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 pt-1">
               <p className="text-sm text-[var(--glass-muted)]">
                 Showing <strong className="text-[var(--glass-ink)] font-mono">{visiblePlates.length}</strong> of{' '}
-                <strong className="text-[var(--glass-ink)] font-mono">{sortedPlates.length}</strong>, search to jump straight to a plate
+                <strong className="text-[var(--glass-ink)] font-mono">{total}</strong>, search to jump straight to a plate
               </p>
               <Button intent="ghost" onClick={() => setVisibleCount((n) => n + SHOW_STEP)}>
                 Show {Math.min(SHOW_STEP, hiddenCount)} more

@@ -17,6 +17,7 @@ import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
+import { LIST_WARMUP } from '@/lib/listQueries';
 import { ChevronDown, Cpu, LayoutDashboard, LogOut, Menu, MessageSquare, MoreHorizontal, Package, Printer, Search, Settings, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
@@ -109,13 +110,26 @@ function onMenuArrows(e: React.KeyboardEvent<HTMLElement>) {
 const menuPanel =
   'nav-menu-in absolute top-[calc(100%+6px)] z-50 min-w-[200px] rounded-xl border border-brand-border bg-white p-1.5 text-brand-ink shadow-[0_12px_32px_rgba(12,42,32,0.18)]';
 
+// Pointer or keyboard focus reaching a menu link starts loading that page's
+// list (lib/listQueries), so it is usually in memory by the time the click
+// lands. prefetchQuery never throws and does nothing while the cached copy
+// is still fresh, so sweeping across the menu costs one request per page.
+function useWarmList(href: string) {
+  const queryClient = useQueryClient();
+  const warm = LIST_WARMUP[href];
+  return warm ? () => { void queryClient.prefetchQuery(warm()); } : undefined;
+}
+
 function MenuLink({ item, pathname, onPick }: { item: NavLink; pathname: string; onPick: () => void }) {
   const active = isActiveHref(pathname, item.href);
   const Icon = item.icon;
+  const warm = useWarmList(item.href);
   return (
     <Link
       href={item.href}
       onClick={onPick}
+      onPointerEnter={warm}
+      onFocus={warm}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex min-h-11 items-center gap-2.5 rounded-lg px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-primary/40',
@@ -137,12 +151,13 @@ const tabCls = (active: boolean) => cn(
 
 function GroupTab({ group, pathname }: { group: NavGroup; pathname: string }) {
   const active = isGroupActive(pathname, group);
+  const warm = useWarmList(group.items.length === 1 ? group.items[0].href : '');
 
   // One page in the group: no menu to open, just go there.
   if (group.items.length === 1) {
     const item = group.items[0];
     return (
-      <Link href={item.href} aria-current={active ? 'page' : undefined} className={tabCls(active)}>
+      <Link href={item.href} aria-current={active ? 'page' : undefined} className={tabCls(active)} onPointerEnter={warm} onFocus={warm}>
         {group.label}
         <CountPill n={item.badge ?? 0} label={item.badgeLabel?.(item.badge ?? 0)} className="ml-1" />
       </Link>
