@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search')?.trim();
   const field  = searchParams.get('field')?.trim();
+  // The Party box beside the search — ANDed with it ("this party's jobs").
+  const party  = searchParams.get('party')?.trim();
   const range: DateRange = parseDateRange(searchParams.get('range'));
   const limit = parseLimit(searchParams.get('limit'));
 
@@ -99,6 +101,7 @@ export async function GET(request: NextRequest) {
     // src/lib/jobSeparationQuery.ts for the po_date/created_at bucketing.
     const rangeClause = rangeOrClause(range);
     if (rangeClause) q = q.or(rangeClause);
+    if (party) q = q.ilike('party', containsPattern(party));
     if (!search) return q;
     if (config && intSearch !== null) return q.eq(config.column, Math.trunc(intSearch));
     // Picked a specific text field — search just that column.

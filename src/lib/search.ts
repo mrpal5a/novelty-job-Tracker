@@ -65,6 +65,16 @@ export function orContains(columns: readonly string[], q: string): string {
   return orMatch(columns, [], q);
 }
 
+/** Two sizes typed together (L × W), each on the whole millimetre and
+ *  either way round — the sheets don't agree on which side is which — so
+ *  60 × 146 finds 60 × 146 and 146 × 60. With one size blank, the other is
+ *  looked for on either column. For `.or(...)`; ANDs with the main search. */
+export function orSizePair([c1, c2]: readonly [string, string], a: string, b: string, tolerance = 0): string {
+  if (!a || !b) return orMatch([], [c1, c2], a || b, tolerance);
+  const on = (col: string, q: string) => `or(${orMatch([], [col], q, tolerance)})`;
+  return `and(${on(c1, a)},${on(c2, b)}),and(${on(c1, b)},${on(c2, a)})`;
+}
+
 /** Contains-match on `contains` columns and size-match (see sizePatterns)
  *  on `sizes` ones, OR'd together for one `.or(...)`. */
 export function orMatch(contains: readonly string[], sizes: readonly string[], q: string, tolerance = 0): string {

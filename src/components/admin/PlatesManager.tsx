@@ -24,6 +24,7 @@ import CsvExportButton from './CsvExportButton';
 import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import SizePairSearch, { useSizePair } from './SizePairSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddPlateModal = dynamic(() => import('./AddPlateModal'), { ssr: false });
@@ -111,6 +112,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
   const [search,      setSearch]      = useState('');
   useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
+  const sizes = useSizePair();
   const [adding,      setAdding]      = useState(false);
   const [editing,     setEditing]     = useState<Plate | null>(null);
   const [viewing,     setViewing]     = useState<Plate | null>(null);
@@ -143,11 +145,14 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
   // the whole table is ~4,000 plates. "Show more" grows the page; a new
   // search or sort starts again from the top.
   const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
-  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, sortField, sortDir]);
+  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, sizes.debounced, sortField, sortDir]);
 
   // Search + sort, shared by the page query and the CSV export. Key + fetch
   // live in lib/listQueries so the menu can warm this up.
-  const listArgs = { search: debouncedSearch, field: searchField, sort: sortField, dir: sortDir };
+  const listArgs = {
+    search: debouncedSearch, field: searchField, sort: sortField, dir: sortDir,
+    sizeA: sizes.debounced[0], sizeB: sizes.debounced[1],
+  };
   const platesQuery = useQuery({
     ...plateListQuery({ ...listArgs, limit: visibleCount }),
     placeholderData: keepPreviousData,
@@ -261,6 +266,8 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Across', 'Around']} />
+
         <CsvExportButton fetchRows={fetchAllPlates} count={total} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
 
         {canManage && (
@@ -274,7 +281,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         <p className="text-sm text-[var(--glass-muted)]">
           <strong className="text-[var(--glass-ink)]">{total}</strong>
           {' '}{total === 1 ? 'plate' : 'plates'}
-          {search && ' matching your search'}
+          {(search || sizes.active) && ' matching your search'}
         </p>
       )}
 
@@ -297,7 +304,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           </div>
         </>
       ) : visiblePlates.length === 0 ? (
-        <EmptyState hasSearch={Boolean(search)} />
+        <EmptyState hasSearch={Boolean(search) || sizes.active} />
       ) : (
         <>
           {/* Phone / tablet: card list. Tapping the top of a card opens the

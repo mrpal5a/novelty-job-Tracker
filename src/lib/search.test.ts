@@ -4,7 +4,7 @@
 // millimetre, whether the stored value or the search carries decimals.
 
 import { describe, expect, it } from 'vitest';
-import { containsPattern, nameMatches, orContains, orMatch, sizePatterns, startsFirst } from './search';
+import { containsPattern, nameMatches, orContains, orMatch, orSizePair, sizePatterns, startsFirst } from './search';
 
 describe('nameMatches', () => {
   it('finds a party by any part of its name, ignoring spaces and dashes', () => {
@@ -94,5 +94,18 @@ describe('orMatch', () => {
   it('keeps orContains output unchanged for the other searches', () => {
     expect(orContains(['party', 'job_name'], 'ABC, Ltd')).toBe('party.ilike."%ABC, Ltd%",job_name.ilike."%ABC, Ltd%"');
     expect(containsPattern('50%')).toBe('%50\\%%');
+  });
+});
+
+describe('orSizePair', () => {
+  it('matches both sizes, either way round', () => {
+    expect(orSizePair(['length', 'width'], '60', '146')).toBe(
+      'and(or(length.ilike."60",length.ilike."60.%"),or(width.ilike."146",width.ilike."146.%")),'
+      + 'and(or(length.ilike."146",length.ilike."146.%"),or(width.ilike."60",width.ilike."60.%"))',
+    );
+  });
+
+  it('with one size blank, looks for the other on either side', () => {
+    expect(orSizePair(['length', 'width'], '', '87')).toBe(orMatch([], ['length', 'width'], '87'));
   });
 });

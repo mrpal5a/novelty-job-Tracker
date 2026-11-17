@@ -24,9 +24,9 @@ describe('list warm-up from the menu', () => {
   // The warm-up only helps if it fills the exact cache entry the page opens
   // on. These are each page's opening state; change one, change the other.
   it('default keys are the pages’ opening state', () => {
-    expect(jobSeparationListQuery().queryKey).toEqual(['job-separations', '', 'all', 'month', 100]);
-    expect(plateListQuery().queryKey).toEqual(['plates', '', 'all', 'created_at', 'desc', 100]);
-    expect(dieListQuery().queryKey).toEqual(['dies', '', 'all', 0]);
+    expect(jobSeparationListQuery().queryKey).toEqual(['job-separations', '', 'all', 'month', '', 100]);
+    expect(plateListQuery().queryKey).toEqual(['plates', '', 'all', 'created_at', 'desc', '', '', 100]);
+    expect(dieListQuery().queryKey).toEqual(['dies', '', 'all', 0, '', '']);
     expect(shadeCardListQuery().queryKey).toEqual(['shade-cards', '', 'all', 'all', null, 1, 'shade_card_number', 'asc']);
   });
 });

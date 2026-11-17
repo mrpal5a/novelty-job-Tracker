@@ -9,7 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
-import { containsPattern, orContains, orMatch } from '@/lib/search';
+import { containsPattern, orContains, orMatch, orSizePair } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 
@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search')?.trim();
   const field  = searchParams.get('field')?.trim();
+  // The two size boxes beside the search — both sizes at once, ANDed with it.
+  const sizeA  = searchParams.get('size_a')?.trim() ?? '';
+  const sizeB  = searchParams.get('size_b')?.trim() ?? '';
 
   const config = search && field ? PLATE_SEARCH_FIELDS[field] : undefined;
   // Not a whole number — an integer column can't contain it, so the
@@ -89,6 +92,7 @@ export async function GET(request: NextRequest) {
       else if (config) query = query.ilike(config.column, containsPattern(search));
       else query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
     }
+    if (sizeA || sizeB) query = query.or(orSizePair(['across_size', 'around_size'], sizeA, sizeB));
     return query.order(sort, { ascending, nullsFirst: !ascending }).order('id').range(from, to);
   };
 

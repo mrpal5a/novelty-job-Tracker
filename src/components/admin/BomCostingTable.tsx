@@ -482,7 +482,7 @@ export default function BomCostingTable({ canDecide, canSeeTotals, canSeeRates }
       {loading ? (
         <div className="rounded-xl glass overflow-hidden">
           <div ref={fitRef} className="table-scroll-wrapper relative max-h-[70vh] overflow-y-auto">
-            <table className="w-full min-w-[1080px] border-collapse text-sm">
+            <table className="w-full min-w-[1080px] border-collapse text-sm [&_td]:px-2 [&_th]:px-2">
               <thead><tr>{columns.map((col) => <th key={col} scope="col" className={headerClass(col)}>{col}</th>)}</tr></thead>
               <tbody><SkeletonRows rows={6} cols={columns.length} /></tbody>
             </table>
@@ -554,7 +554,7 @@ export default function BomCostingTable({ canDecide, canSeeTotals, canSeeRates }
           {/* Desk: the sheet, header pinned, rows scrolling */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div ref={fitRef} className="table-scroll-wrapper relative max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1080px] border-collapse text-sm">
+              <table className="w-full min-w-[1080px] border-collapse text-sm [&_td]:px-2 [&_th]:px-2">
                 <thead>
                   <tr>{columns.map((col) => <th key={col} scope="col" className={headerClass(col)}>{col}</th>)}</tr>
                 </thead>

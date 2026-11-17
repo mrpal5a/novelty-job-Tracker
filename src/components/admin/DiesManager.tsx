@@ -19,10 +19,12 @@ import { StateChip } from '@/components/ui/StateChip';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
-import type { Die, DieStatus } from '@/lib/types';
+import type { Die } from '@/lib/types';
+import DieDetailModal, { STATUS_DOT, STATUS_LABEL } from './DieDetailModal';
 import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import SizePairSearch, { useSizePair } from './SizePairSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
@@ -30,8 +32,8 @@ const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
 // Header labels for the desk table — must stay in the same order as the
 // <td>s rendered below.
 const DIE_COLUMNS = [
-  'Sr No', 'Status', 'Serial No', 'Job Name', 'Corner', 'Size', 'Cylinder', 'Material',
-  'Location', 'Gap across', 'Ups / repeat', 'Received', 'Damage', 'Actions',
+  'Sr No', 'Serial No', 'Job Name', 'Corner', 'Size', 'Cylinder', 'Material',
+  'Location', 'Gap across', 'Ups / repeat', 'First Used', 'Actions',
 ] as const;
 const DIE_COLS = DIE_COLUMNS.length;
 
@@ -50,7 +52,6 @@ type SortDir = 'asc' | 'desc';
 
 const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>> = {
   'Sr No':         'created_at',
-  'Status':        'status',
   'Serial No':     'serial_no',
   'Job Name':      'job_name',
   'Corner':        'corner',
@@ -60,8 +61,7 @@ const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>>
   'Location':      'location',
   'Gap across':    'gap',
   'Ups / repeat':  'ups',
-  'Received':      'die_received_on',
-  'Damage':        'damage_date',
+  'First Used':    'die_received_on',
 };
 
 const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
@@ -94,18 +94,6 @@ function sortDies(dies: Die[], field: SortField, dir: SortDir): Die[] {
   return sorted;
 }
 
-// A die's state as a dot + its name (StateChip). The stored values are
-// upper case; the screen says them in sentence case.
-const STATUS_DOT: Record<DieStatus, string> = {
-  'IN USE': '#059669',
-  'EXTRA':  '#D97706',
-  'DAMAGE': '#B91C1C',
-};
-const STATUS_LABEL: Record<DieStatus, string> = {
-  'IN USE': 'In use',
-  'EXTRA':  'Extra',
-  'DAMAGE': 'Damaged',
-};
 
 // Mirrors DIE_SEARCH_FIELDS in src/app/api/dies/route.ts — the value sent
 // as ?field=. "All fields" (value 'all') skips the param, falling back to
@@ -160,10 +148,13 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
   useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
   const [nearSize,    setNearSize]    = useState(false);
+  const sizes = useSizePair();
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');
   const [adding,      setAdding]      = useState(false);
   const [editing,     setEditing]     = useState<Die | null>(null);
+  // The die whose detail view is open — a click on its row.
+  const [viewing,     setViewing]     = useState<Die | null>(null);
   // The row whose Delete has been armed. Deleting is two taps, never a dialog.
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busyId,     setBusyId]     = useState<string | null>(null);
@@ -186,11 +177,14 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const tolerance = nearSize && canUseTolerance(debouncedSearch, searchField) ? SIZE_TOLERANCE_MM : 0;
+  const tolerance = nearSize && (canUseTolerance(debouncedSearch, searchField) || sizes.debounced.some(Boolean))
+    ? SIZE_TOLERANCE_MM : 0;
 
   const diesQuery = useQuery({
     // Key + fetch live in lib/listQueries so the menu can warm this up.
-    ...dieListQuery({ search: debouncedSearch, field: searchField, tolerance }),
+    ...dieListQuery({
+      search: debouncedSearch, field: searchField, tolerance, sizeA: sizes.debounced[0], sizeB: sizes.debounced[1],
+    }),
     placeholderData: keepPreviousData,
   });
   const dies    = diesQuery.data ?? EMPTY_DIES;
@@ -206,7 +200,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
   // a thousand dies as cards and again as table rows froze slower machines.
   // A new search or sort starts again from the top.
   const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
-  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, tolerance, sortField, sortDir]);
+  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, tolerance, sizes.debounced, sortField, sortDir]);
   const visibleDies = useMemo(() => sortedDies.slice(0, visibleCount), [sortedDies, visibleCount]);
   const hiddenCount = sortedDies.length - visibleDies.length;
   const isDesk = useIsDesk();
@@ -307,7 +301,9 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField)} />
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Length', 'Width']} />
+
+        <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField) || sizes.active} />
 
         <CsvExportButton rows={dies} columns={exportColumns} filename="dies" />
 
@@ -322,7 +318,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
         <p className="text-sm text-[var(--glass-muted)]">
           <strong className="text-[var(--glass-ink)]">{dies.length}</strong>
           {' '}{dies.length === 1 ? 'die' : 'dies'}
-          {search && ' matching your search'}
+          {(search || sizes.active) && ' matching your search'}
         </p>
       )}
 
@@ -337,7 +333,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           {/* Desk: table skeleton */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1450px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
+              <table className="w-full border-collapse text-sm text-center [&_td]:px-2 [&_th]:px-2 [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {DIE_COLUMNS.map((col) => (
@@ -361,7 +357,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           </div>
         </>
       ) : dies.length === 0 ? (
-        <EmptyState hasSearch={Boolean(search)} />
+        <EmptyState hasSearch={Boolean(search) || sizes.active} />
       ) : (
         <>
           {/* Phone: card list */}
@@ -411,7 +407,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                       <SpecField label="Location" value={die.location} />
                       <SpecField label="Gap across" value={die.gap} />
                       <SpecField label="Ups / repeat" value={die.ups?.toString()} mono />
-                      <SpecField label="Received" value={formatNumericDate(die.die_received_on)} mono />
+                      <SpecField label="First used" value={formatNumericDate(die.die_received_on)} mono />
                     </div>
 
                     {isDamaged && (die.damage_date || die.damage_reason) && (
@@ -472,7 +468,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           {/* Desk: table with a fixed header, scrolling through the rows. */}
           {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[1450px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
+              <table className="w-full border-collapse text-sm text-center [&_td]:px-2 [&_th]:px-2 [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
                   <tr>
                     {DIE_COLUMNS.map((col) => (
@@ -483,8 +479,10 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         // Job name is the widest text a person reads, so it gets a floor
                         // and the spare width; Corner and Material wrap instead of letting
                         // one long value stretch the whole column.
-                        col === 'Job Name' && 'min-w-[300px]',
-                        (col === 'Corner' || col === 'Material') && 'whitespace-normal',
+                        col === 'Job Name' && 'min-w-[220px]',
+                        // Short values under long labels: let the label wrap so the
+                        // table fits a 1366 px screen without a sideways scroll.
+                        ['Corner', 'Material', 'Gap across', 'Ups / repeat', 'First Used'].includes(col) && 'whitespace-normal',
                         // Sr No is the team's floor reference number — keep it pinned to the
                         // left edge through both scroll axes so it's always visible. z-20
                         // (above the plain top-sticky headers at z-10) so it stays on top at
@@ -499,15 +497,12 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                 <tbody>
                   {visibleDies.map((die, i) => {
                     const isDamaged = die.status === 'DAMAGE';
-                    const damageText = [
-                      die.damage_date ? formatNumericDate(die.damage_date) : null,
-                      die.damage_reason,
-                    ].filter(Boolean).join(' — ');
                     return (
                       <tr
                         key={die.id}
+                        onClick={() => setViewing(die)}
                         className={cn(
-                          'border-b transition-colors',
+                          'border-b transition-colors cursor-pointer',
                           isDamaged
                             ? 'border-red-200/70 bg-red-50 hover:bg-red-100/70'
                             : cn('border-white/8 hover:bg-black/[0.03]', i % 2 === 1 && 'bg-[var(--glass-bg)]'),
@@ -516,25 +511,34 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         <td className="sticky left-0 z-10 px-3 py-1.5 font-mono text-xs whitespace-nowrap bg-[var(--glass-bg-strong)] backdrop-blur-[14px] border-r border-white/8">
                           {srNoMap.get(die.id) ?? '—'}
                         </td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">
-                          <StateChip label={STATUS_LABEL[die.status] ?? die.status} dot={STATUS_DOT[die.status]} className="text-xs" />
+                        {/* Status rides on the serial as its dot: green in use, orange
+                            extra, red damaged. The name is in the tooltip and for
+                            screen readers. */}
+                        <td className="px-3 py-1.5 whitespace-nowrap" title={STATUS_LABEL[die.status] ?? die.status}>
+                          {/* The row opens the detail view; this button is the keyboard way in. */}
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setViewing(die); }}
+                            aria-label={`View die ${die.serial_no || die.job_name}, ${STATUS_LABEL[die.status] ?? die.status}`}
+                            className="inline-flex items-center min-h-11 rounded-lg"
+                          >
+                            <StateChip
+                              label={die.serial_no ? die.serial_no.toUpperCase() : '—'}
+                              dot={STATUS_DOT[die.status]}
+                              className="font-mono text-xs text-[var(--glass-ink)]"
+                            />
+                          </button>
                         </td>
-                        <td className="px-3 py-1.5 font-mono text-xs font-semibold text-[var(--glass-ink)] whitespace-nowrap">
-                          {die.serial_no ? die.serial_no.toUpperCase() : '—'}
-                        </td>
-                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] min-w-[300px] whitespace-normal break-words">{die.job_name}</td>
+                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] min-w-[220px] whitespace-normal break-words">{die.job_name}</td>
                         <td className="px-3 py-1.5 min-w-[96px] max-w-[160px] whitespace-normal break-words">{die.corner || '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{sizeOf(die) ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
-                        <td className="px-3 py-1.5 min-w-[120px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
+                        <td className="px-3 py-1.5 min-w-[100px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
                         <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
                         <td className="px-3 py-1.5 whitespace-nowrap">{die.gap || '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{formatNumericDate(die.die_received_on) || '—'}</td>
-                        <td className="px-3 py-1.5 text-xs text-red-800 max-w-[220px] truncate" title={damageText || undefined}>
-                          {damageText || '—'}
-                        </td>
-                        <td className="px-3 py-1.5 text-center whitespace-nowrap">
+                        <td className="px-3 py-1.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {canManage && (
                             <div className="inline-flex items-center gap-1.5">
                               <button
@@ -608,6 +612,14 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
         </>
       )}
 
+      {viewing && (
+        <DieDetailModal
+          die={viewing}
+          srNo={srNoMap.get(viewing.id)}
+          onClose={() => setViewing(null)}
+          onEdit={canManage ? () => { setEditing(viewing); setViewing(null); } : undefined}
+        />
+      )}
       {(adding || editing) && (
         <AddDieModal
           editing={editing ?? undefined}

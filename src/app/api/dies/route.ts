@@ -10,7 +10,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { DIE_STATUSES, type DieStatus } from '@/lib/types';
-import { containsPattern, orMatch } from '@/lib/search';
+import { containsPattern, orMatch, orSizePair } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 
@@ -81,6 +81,9 @@ export async function GET(request: NextRequest) {
   const field  = searchParams.get('field')?.trim();
   // ±mm on length and width — the "near enough" size search (0 = exact).
   const tol    = Math.min(5, Math.max(0, Math.trunc(Number(searchParams.get('tol')) || 0)));
+  // The two size boxes beside the search — both sizes at once, ANDed with it.
+  const sizeA  = searchParams.get('size_a')?.trim() ?? '';
+  const sizeB  = searchParams.get('size_b')?.trim() ?? '';
 
   const config = search && field ? DIE_SEARCH_FIELDS[field] : undefined;
   // Not a whole number — an integer column can't contain it, so the
@@ -119,6 +122,7 @@ export async function GET(request: NextRequest) {
         ));
       }
     }
+    if (sizeA || sizeB) query = query.or(orSizePair(['length', 'width'], sizeA, sizeB, tol));
     return query;
   };
 

@@ -11,8 +11,8 @@ import type { Party } from '@/lib/types';
 import { useListKeys } from '@/hooks/useListKeys';
 
 export default function PartySuggestInput({
-  value, onChange, className, ariaLabel = 'Party',
-}: { value: string; onChange: (v: string) => void; className?: string; ariaLabel?: string }) {
+  value, onChange, className, ariaLabel = 'Party', placeholder,
+}: { value: string; onChange: (v: string) => void; className?: string; ariaLabel?: string; placeholder?: string }) {
   const [suggestions, setSuggestions] = useState<Party[]>([]);
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -65,6 +65,7 @@ export default function PartySuggestInput({
       <input
         value={value}
         aria-label={ariaLabel}
+        placeholder={placeholder}
         autoComplete="off"
         {...keys.inputProps}
         onChange={(e) => { onChange(e.target.value); search(e.target.value); }}

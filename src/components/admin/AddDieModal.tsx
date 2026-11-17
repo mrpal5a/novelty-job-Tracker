@@ -84,7 +84,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
     if (!gap.trim())        { toast.error('Enter the gap across'); return; }
     if (!corner.trim())     { toast.error('Enter the corner radius'); return; }
     if (!serialNo.trim())   { toast.error('Enter the serial no'); return; }
-    if (!receivedOn.trim()) { toast.error('Enter the date the die was received on'); return; }
+    if (!receivedOn.trim()) { toast.error('Enter the date the die was first used'); return; }
     if (!location.trim())   { toast.error('Enter the die location'); return; }
     if (status === 'DAMAGE' && (!damageDate.trim() || !damageReason.trim())) {
       toast.error('Enter the damage date and reason');
@@ -280,7 +280,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <DieLabel required>Die received on</DieLabel>
+              <DieLabel required>First used</DieLabel>
               <input
                 type="date"
                 value={receivedOn}

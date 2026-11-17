@@ -368,7 +368,9 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
               Same vocabulary as the Job Separation table: a thin vertical rule
               between columns, and none after the last one. */}
           <table className={cn(
-            'w-full min-w-[1100px] border-collapse text-sm',
+            // Cells are px-4; px-3 here lets the eleven columns fit a 1366 px
+            // screen without a sideways scroll.
+            'w-full min-w-[1100px] border-collapse text-sm [&_td]:px-3 [&_th]:px-3',
             '[&_td:not(:last-child)]:border-r [&_td:not(:last-child)]:border-white/8',
             '[&_th:not(:last-child)]:border-r [&_th:not(:last-child)]:border-white/12',
           )}>

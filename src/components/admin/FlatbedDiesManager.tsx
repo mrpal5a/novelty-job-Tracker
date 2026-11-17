@@ -24,6 +24,7 @@ import type { FlatbedDie } from '@/lib/types';
 import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import SizePairSearch, { useSizePair } from './SizePairSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddFlatbedDieModal = dynamic(() => import('./AddFlatbedDieModal'), { ssr: false });
@@ -139,6 +140,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
     FLATBED_DIE_SEARCH_FIELDS.some((f) => f.value === urlField) ? urlField! : 'all',
   );
   const [nearSize,    setNearSize]    = useState(false);
+  const sizes = useSizePair();
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');
   const [adding,      setAdding]      = useState(false);
@@ -165,17 +167,20 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
     return () => clearTimeout(timer);
   }, [search]);
 
-  const tolerance = nearSize && canUseTolerance(debouncedSearch, searchField) ? SIZE_TOLERANCE_MM : 0;
+  const tolerance = nearSize && (canUseTolerance(debouncedSearch, searchField) || sizes.debounced.some(Boolean))
+    ? SIZE_TOLERANCE_MM : 0;
 
   const flatbedDiesQuery = useQuery({
-    queryKey: ['flatbed-dies', debouncedSearch, searchField, tolerance],
+    queryKey: ['flatbed-dies', debouncedSearch, searchField, tolerance, ...sizes.debounced],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (debouncedSearch) {
         params.set('search', debouncedSearch);
         if (searchField !== 'all') params.set('field', searchField);
-        if (tolerance) params.set('tol', String(tolerance));
       }
+      if (sizes.debounced[0]) params.set('size_a', sizes.debounced[0]);
+      if (sizes.debounced[1]) params.set('size_b', sizes.debounced[1]);
+      if (tolerance) params.set('tol', String(tolerance));
       const res  = await fetch(`/api/flatbed-dies?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to load flatbed dies');
@@ -287,7 +292,9 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField)} />
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Length', 'Width']} />
+
+        <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField) || sizes.active} />
 
         <CsvExportButton rows={flatbedDies} columns={exportColumns} filename="flatbed-dies" />
 
@@ -302,7 +309,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
         <p className="text-sm text-[var(--glass-muted)]">
           <strong className="text-[var(--glass-ink)]">{flatbedDies.length}</strong>
           {' '}{flatbedDies.length === 1 ? 'flatbed die' : 'flatbed dies'}
-          {search && ' matching your search'}
+          {(search || sizes.active) && ' matching your search'}
         </p>
       )}
 
@@ -341,7 +348,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
           </div>
         </>
       ) : flatbedDies.length === 0 ? (
-        <EmptyState hasSearch={Boolean(search)} />
+        <EmptyState hasSearch={Boolean(search) || sizes.active} />
       ) : (
         <>
           {/* Phone: card list */}

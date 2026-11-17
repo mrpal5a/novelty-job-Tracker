@@ -38,6 +38,7 @@ import MeterCalculatorPanel from './MeterCalculatorPanel';
 import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import PartySuggestInput from './PartySuggestInput';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddJobSeparationModal = dynamic(() => import('./AddJobSeparationModal'), { ssr: false });
@@ -216,6 +217,8 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   // Opened with ?q= (the jobs table's "Look in Job Separation", Ctrl K): pre-fill the search.
   useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
+  // The Party box: this party's jobs, ANDed with the search box.
+  const [party,       setParty]       = useState('');
   const [range,       setRange]       = useState<DateRangeOption>('month');
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('desc');
@@ -269,19 +272,24 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
     const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
     return () => clearTimeout(timer);
   }, [search]);
+  const [debouncedParty, setDebouncedParty] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedParty(party.trim()), party ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [party]);
 
   // A new search/field/range starts back at page one — the limit a previous
   // "Load more" click reached doesn't carry over to an unrelated query.
   useEffect(() => {
     setLimit(PAGE_SIZE);
-  }, [debouncedSearch, searchField, range]);
+  }, [debouncedSearch, searchField, debouncedParty, range]);
 
   // "Load more" just grows `limit` and re-fetches the whole 0..limit range
   // (the API has no real cursor), so it's one more dimension of the query
   // key rather than a separate pagination mechanism.
   const rowsQuery = useQuery({
     // Key + fetch live in lib/listQueries so the menu can warm this up.
-    ...jobSeparationListQuery({ search: debouncedSearch, field: searchField, range, limit }),
+    ...jobSeparationListQuery({ search: debouncedSearch, field: searchField, range, party: debouncedParty, limit }),
     placeholderData: keepPreviousData,
   });
   // A row someone else just added shows up without a manual refresh: every
@@ -499,6 +507,22 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
+        <div className="relative sm:w-56 shrink-0" title="Only this party's jobs — works together with the search box">
+          <PartySuggestInput
+            value={party}
+            onChange={setParty}
+            ariaLabel="Filter by party"
+            placeholder="Party"
+            className={cn(
+              'w-full min-h-11 px-3 pr-11 rounded-xl text-sm',
+              'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
+              'placeholder:text-[var(--glass-muted)] focus:outline-none',
+              'focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
+            )}
+          />
+          <SearchClearButton value={party} onClear={() => setParty('')} />
+        </div>
+
         <button
           type="button"
           onClick={toggleHideMoney}
@@ -544,7 +568,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
             <strong className="text-[var(--glass-ink)]">{sortedRows.length}</strong>
             {hasMore && '+'}
             {' '}{sortedRows.length === 1 ? 'row' : 'rows'}
-            {search && ' matching your search'}
+            {(search || party) && ' matching your search'}
             {range !== 'all' && (
               <>{' '}in {DATE_RANGE_OPTIONS.find((r) => r.value === range)?.label.toLowerCase()}</>
             )}
@@ -576,7 +600,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           {/* Desk: table skeleton */}
           <div className="hidden sm:block rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[980px] border-collapse text-sm">
+              <table className="w-full border-collapse text-sm [&_td]:px-2 [&_th]:px-2">
                 <thead>
                   <tr>
                     {columns.map((col) => (
@@ -598,6 +622,9 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         // Chrome derives from the longest unbreakable "word" in any row's
                         // material name and otherwise ignores the explicit width above.
                         col === 'PM Code / Material' && 'w-[200px] min-w-0 whitespace-normal',
+                        // Two-word labels over short values wrap, so the table fits a
+                        // 1366 px screen without a sideways scroll.
+                        ['Qty / Rate', 'Artwork Status', 'Order Value', 'Job Card Status', 'AW SENT to U1'].includes(col) && 'whitespace-normal',
                         // A thin vertical rule between every column but the last —
                         // Sr No already gets its own (slightly stronger) divider from
                         // the sticky styling above, so it's excluded here to avoid a
@@ -617,7 +644,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           </div>
         </>
       ) : sortedRows.length === 0 ? (
-        <EmptyState hasSearch={Boolean(search)} range={range} />
+        <EmptyState hasSearch={Boolean(search || party)} range={range} />
       ) : (
         <>
           {/* Phone: card list */}
@@ -775,7 +802,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
               the spreadsheet reading this worksheet was modeled on. */}
           {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
-              <table className="w-full min-w-[980px] border-collapse text-sm">
+              <table className="w-full border-collapse text-sm [&_td]:px-2 [&_th]:px-2">
                 <thead>
                   <tr>
                     {columns.map((col) => (
@@ -797,6 +824,9 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         // Chrome derives from the longest unbreakable "word" in any row's
                         // material name and otherwise ignores the explicit width above.
                         col === 'PM Code / Material' && 'w-[200px] min-w-0 whitespace-normal',
+                        // Two-word labels over short values wrap, so the table fits a
+                        // 1366 px screen without a sideways scroll.
+                        ['Qty / Rate', 'Artwork Status', 'Order Value', 'Job Card Status', 'AW SENT to U1'].includes(col) && 'whitespace-normal',
                         // A thin vertical rule between every column but the last —
                         // Sr No already gets its own (slightly stronger) divider from
                         // the sticky styling above, so it's excluded here to avoid a
@@ -893,10 +923,10 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                           ) : '—'}
                         </td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap border-r border-white/8">{money(row.order_value) ?? '—'}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap border-r border-white/8">
+                        <td className="px-3 py-1.5 whitespace-normal break-words min-w-[90px] border-r border-white/8">
                           {row.jc_status ? (
                             <span className={cn(
-                              'text-[11px] font-medium px-1.5 py-0.5 rounded border no-underline',
+                              'inline-block text-[11px] font-medium px-1.5 py-0.5 rounded border no-underline',
                               row.jc_status.trim().toUpperCase() === 'DONE'
                                 ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                                 : 'bg-amber-100 text-amber-800 border-amber-200',

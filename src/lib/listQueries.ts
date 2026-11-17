@@ -22,16 +22,17 @@ export const JOB_SEPARATION_PAGE_SIZE = 100;
 export type JobSeparationList = { rows: JobSeparation[]; hasMore: boolean; totalOrderValue: number | null };
 
 export function jobSeparationListQuery({
-  search = '', field = 'all', range = 'month', limit = JOB_SEPARATION_PAGE_SIZE,
-}: { search?: string; field?: string; range?: string; limit?: number } = {}) {
+  search = '', field = 'all', range = 'month', party = '', limit = JOB_SEPARATION_PAGE_SIZE,
+}: { search?: string; field?: string; range?: string; party?: string; limit?: number } = {}) {
   return {
-    queryKey: ['job-separations', search, field, range, limit] as const,
+    queryKey: ['job-separations', search, field, range, party, limit] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<JobSeparationList> => {
       const params = new URLSearchParams({ range, limit: String(limit) });
       if (search) {
         params.set('search', search);
         if (field !== 'all') params.set('field', field);
       }
+      if (party) params.set('party', party);
       const data = await getJson(`/api/job-separations?${params}`, signal, 'Failed to load job separation rows');
       return {
         rows:    (data.job_separations ?? []) as JobSeparation[],
@@ -48,24 +49,31 @@ export const PLATE_PAGE_SIZE = 100;
 export type PlateList = { plates: Plate[]; total: number };
 
 /** Search + sort only — shared with the CSV export, which adds `all=1`. */
-export function plateListParams({ search = '', field = 'all', sort = 'created_at', dir = 'desc' }: {
-  search?: string; field?: string; sort?: string; dir?: string;
+export function plateListParams({ search = '', field = 'all', sort = 'created_at', dir = 'desc', sizeA = '', sizeB = '' }: {
+  search?: string; field?: string; sort?: string; dir?: string; sizeA?: string; sizeB?: string;
 } = {}): URLSearchParams {
   const params = new URLSearchParams({ sort, dir });
   if (search) {
     params.set('search', search);
     if (field !== 'all') params.set('field', field);
   }
+  setSizePair(params, sizeA, sizeB);
   return params;
 }
 
+/** The two size boxes beside a search (see orSizePair). */
+function setSizePair(params: URLSearchParams, sizeA: string, sizeB: string) {
+  if (sizeA) params.set('size_a', sizeA);
+  if (sizeB) params.set('size_b', sizeB);
+}
+
 export function plateListQuery({
-  search = '', field = 'all', sort = 'created_at', dir = 'desc', limit = PLATE_PAGE_SIZE,
-}: { search?: string; field?: string; sort?: string; dir?: string; limit?: number } = {}) {
+  search = '', field = 'all', sort = 'created_at', dir = 'desc', sizeA = '', sizeB = '', limit = PLATE_PAGE_SIZE,
+}: { search?: string; field?: string; sort?: string; dir?: string; sizeA?: string; sizeB?: string; limit?: number } = {}) {
   return {
-    queryKey: ['plates', search, field, sort, dir, limit] as const,
+    queryKey: ['plates', search, field, sort, dir, sizeA, sizeB, limit] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<PlateList> => {
-      const params = plateListParams({ search, field, sort, dir });
+      const params = plateListParams({ search, field, sort, dir, sizeA, sizeB });
       params.set('limit', String(limit));
       const data = await getJson(`/api/plates?${params}`, signal, 'Failed to load plates');
       return { plates: (data.plates ?? []) as Plate[], total: Number(data.total) || 0 };
@@ -74,18 +82,19 @@ export function plateListQuery({
 }
 
 // ── Dies ───────────────────────────────────────────────────────
-export function dieListQuery({ search = '', field = 'all', tolerance = 0 }: {
-  search?: string; field?: string; tolerance?: number;
+export function dieListQuery({ search = '', field = 'all', tolerance = 0, sizeA = '', sizeB = '' }: {
+  search?: string; field?: string; tolerance?: number; sizeA?: string; sizeB?: string;
 } = {}) {
   return {
-    queryKey: ['dies', search, field, tolerance] as const,
+    queryKey: ['dies', search, field, tolerance, sizeA, sizeB] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<Die[]> => {
       const params = new URLSearchParams();
       if (search) {
         params.set('search', search);
         if (field !== 'all') params.set('field', field);
-        if (tolerance) params.set('tol', String(tolerance));
       }
+      setSizePair(params, sizeA, sizeB);
+      if (tolerance) params.set('tol', String(tolerance));
       const data = await getJson(`/api/dies?${params}`, signal, 'Failed to load dies');
       return (data.dies ?? []) as Die[];
     },
@@ -96,7 +105,7 @@ export function dieListQuery({ search = '', field = 'all', tolerance = 0 }: {
 // unsearched list so the two share one cache entry.
 export function flatbedDieListQuery() {
   return {
-    queryKey: ['flatbed-dies', '', 'all', 0] as const,
+    queryKey: ['flatbed-dies', '', 'all', 0, '', ''] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<FlatbedDie[]> => {
       const data = await getJson('/api/flatbed-dies', signal, 'Failed to load flatbed dies');
       return (data.flatbed_dies ?? []) as FlatbedDie[];

@@ -14,7 +14,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
-import { containsPattern, orMatch } from '@/lib/search';
+import { containsPattern, orMatch, orSizePair } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 
 // Optional free text: blank means "not recorded", not an empty string.
@@ -58,6 +58,9 @@ export async function GET(request: NextRequest) {
   const field  = searchParams.get('field')?.trim();
   // ±mm on length and width — the "near enough" size search (0 = exact).
   const tol    = Math.min(5, Math.max(0, Math.trunc(Number(searchParams.get('tol')) || 0)));
+  // The two size boxes beside the search — both sizes at once, ANDed with it.
+  const sizeA  = searchParams.get('size_a')?.trim() ?? '';
+  const sizeB  = searchParams.get('size_b')?.trim() ?? '';
 
   let query = supabase
     .from('flatbed_dies')
@@ -82,6 +85,7 @@ export async function GET(request: NextRequest) {
       query = query.or(orMatch(['shape', 'corner', 'location'], ['length', 'width'], search, tol));
     }
   }
+  if (sizeA || sizeB) query = query.or(orSizePair(['length', 'width'], sizeA, sizeB, tol));
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
