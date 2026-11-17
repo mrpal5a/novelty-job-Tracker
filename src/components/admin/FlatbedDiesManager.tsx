@@ -11,6 +11,7 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
 import SizeToleranceToggle, { canUseTolerance, SIZE_TOLERANCE_MM } from './SizeToleranceToggle';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
@@ -132,7 +133,11 @@ function buildFlatbedDieExportColumns(srNoMap: Map<string, number>): CsvColumn<F
 export default function FlatbedDiesManager({ canManage }: { canManage: boolean }) {
   const [search,      setSearch]      = useState('');
   useUrlSearch(setSearch);
-  const [searchField, setSearchField] = useState('all');
+  // ?field=size — a plate's "matching die" link opens on a size search.
+  const urlField = useSearchParams().get('field');
+  const [searchField, setSearchField] = useState(
+    FLATBED_DIE_SEARCH_FIELDS.some((f) => f.value === urlField) ? urlField! : 'all',
+  );
   const [nearSize,    setNearSize]    = useState(false);
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');

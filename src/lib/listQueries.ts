@@ -8,7 +8,7 @@
 // different search, sort or range than these simply misses the warm-up.
 
 import type { QueryFunctionContext } from '@tanstack/react-query';
-import type { JobSeparation, Plate, Die, ShadeCard } from '@/lib/types';
+import type { JobSeparation, Plate, Die, FlatbedDie, ShadeCard } from '@/lib/types';
 
 async function getJson(url: string, signal: AbortSignal, fallback: string) {
   const res  = await fetch(url, { signal });
@@ -88,6 +88,18 @@ export function dieListQuery({ search = '', field = 'all', tolerance = 0 }: {
       }
       const data = await getJson(`/api/dies?${params}`, signal, 'Failed to load dies');
       return (data.dies ?? []) as Die[];
+    },
+  };
+}
+
+// The whole flatbed library (~70 dies) — key matches FlatbedDiesManager's
+// unsearched list so the two share one cache entry.
+export function flatbedDieListQuery() {
+  return {
+    queryKey: ['flatbed-dies', '', 'all', 0] as const,
+    queryFn: async ({ signal }: QueryFunctionContext): Promise<FlatbedDie[]> => {
+      const data = await getJson('/api/flatbed-dies', signal, 'Failed to load flatbed dies');
+      return (data.flatbed_dies ?? []) as FlatbedDie[];
     },
   };
 }

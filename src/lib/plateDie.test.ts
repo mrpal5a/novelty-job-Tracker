@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { dieUpsFor, commonValues } from './plateDie';
-import type { Die } from '@/lib/types';
+import { dieUpsFor, commonValues, flatbedDiesFor } from './plateDie';
+import type { Die, FlatbedDie } from '@/lib/types';
 
 const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
   ({ id: `${length}x${width}-${cylinder}-${ups}-${status}`, length, width, cylinder, ups, status }) as unknown as Die;
@@ -32,5 +32,14 @@ describe('die pick-lists', () => {
     const d = (corner: string | null) => ({ corner }) as unknown as Die;
     const dies = [d('SPECIAL'), d('SQUARE'), d('SQUARE '), d('SQUARE'), d('SPECIAL'), d('SQAURE'), d(null), d('')];
     expect(commonValues(dies, 'corner')).toEqual(['SQUARE', 'SPECIAL']);
+  });
+});
+
+describe('flatbed dies for a plate', () => {
+  it('match on whole-mm size either way round, no cylinder', () => {
+    const fb = (id: string, length: string, width: string) => ({ id, length, width }) as unknown as FlatbedDie;
+    const dies = [fb('a', '60', '146'), fb('b', '146.4', '60'), fb('c', '60', '1460'), fb('d', '61', '146')];
+    expect(flatbedDiesFor(dies, '60', '146').map((d) => d.id)).toEqual(['a', 'b']);
+    expect(flatbedDiesFor(dies, '', '146')).toEqual([]);
   });
 });

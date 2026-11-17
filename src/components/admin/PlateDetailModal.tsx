@@ -5,11 +5,24 @@
 // one ID per line, lives here.
 
 import { useId } from 'react';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 import { Pencil, X } from 'lucide-react';
 import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import type { Plate } from '@/lib/types';
+import { dieListQuery, flatbedDieListQuery } from '@/lib/listQueries';
+import { dieUpsFor, flatbedDiesFor } from '@/lib/plateDie';
+
+type MatchedDie = {
+  id: string;
+  kind: 'Roto' | 'Flatbed';
+  location: string | null;
+  detail: (string | number | false | null)[];
+  status: 'Damaged' | 'Extra' | null;
+  href: string;
+};
 
 type Props = {
   plate: Plate;
@@ -23,6 +36,33 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
   const size = plate.across_size || plate.around_size
     ? `${plate.across_size ?? '—'} × ${plate.around_size ?? '—'} mm`
     : null;
+
+  // The dies this plate can run with: roto dies of the same cylinder and
+  // whole-mm size either way round (the label-per-round rule), and flatbed
+  // dies of the same size (they have no cylinder).
+  const across = plate.across_size ?? '', around = plate.around_size ?? '';
+  const rotoQuery    = useQuery(dieListQuery());
+  const flatbedQuery = useQuery(flatbedDieListQuery());
+  const loading = rotoQuery.isLoading || flatbedQuery.isLoading;
+  const failed  = rotoQuery.isError || flatbedQuery.isError;
+  const dies: MatchedDie[] = [
+    ...dieUpsFor(rotoQuery.data ?? [], across, around, plate.cylinder?.toString() ?? '').dies.map((d) => ({
+      id: d.id,
+      kind: 'Roto' as const,
+      location: d.location,
+      detail: [d.serial_no, d.job_name, d.ups != null && `${d.ups} ups`],
+      status: d.status === 'DAMAGE' ? 'Damaged' as const : d.status === 'EXTRA' ? 'Extra' as const : null,
+      href: `/admin/dies?q=${encodeURIComponent(d.serial_no || d.job_name)}`,
+    })),
+    ...flatbedDiesFor(flatbedQuery.data ?? [], across, around).map((d) => ({
+      id: d.id,
+      kind: 'Flatbed' as const,
+      location: d.location,
+      detail: [`${d.length} × ${d.width} mm`, d.ups != null && `${d.ups} ups`, d.shape],
+      status: null,
+      href: `/admin/dies?tab=flatbed&field=size&q=${encodeURIComponent(d.length ?? '')}`,
+    })),
+  ];
 
   return (
     <ModalShell titleId={titleId} onClose={onClose}>
@@ -57,6 +97,47 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
             <Detail label="Added" value={formatAdminDate(plate.created_at)} mono />
             <Detail label="Added by" value={plate.created_by} />
           </dl>
+
+          <section className="pt-4 border-t border-black/[0.08]">
+            <h3 className="text-xs font-medium text-[var(--glass-muted)]">
+              {dies.length > 1 ? `Matching dies (${dies.length})` : 'Matching die'}
+            </h3>
+            {loading ? (
+              <p className="mt-1 text-sm text-[var(--glass-muted)]">Looking for the die…</p>
+            ) : dies.length === 0 ? (
+              <p className="mt-1 text-sm text-[var(--glass-muted)]">
+                {failed ? 'Couldn’t load dies' : 'No roto or flatbed die of this size on record'}
+              </p>
+            ) : (
+              <ul className="mt-1.5 rounded-lg border border-black/[0.08] divide-y divide-black/[0.06]">
+                {dies.map((d) => (
+                  <li key={`${d.kind}-${d.id}`}>
+                    <Link
+                      href={d.href}
+                      className="flex items-start gap-3 min-h-11 px-3 py-2 hover:bg-black/[0.03] transition-colors"
+                    >
+                      <span className="shrink-0 w-[60px] pt-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--glass-muted)]">
+                        {d.kind}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--glass-ink)]">
+                          Location: {d.location || 'not recorded'}
+                        </span>
+                        <span className="block text-xs text-[var(--glass-muted)] break-words">
+                          {d.detail.filter(Boolean).join(' · ')}
+                          {d.status && (
+                            <span className={cn('ml-1 font-semibold', d.status === 'Damaged' ? 'text-red-700' : 'text-amber-700')}>
+                              · {d.status}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
 
           {/* Last: a set can carry a dozen IDs, and the specs above shouldn't
               be pushed out of view by them. */}
