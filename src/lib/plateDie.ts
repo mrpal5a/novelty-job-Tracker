@@ -30,3 +30,14 @@ export function dieUpsFor(dies: Die[], sizeA: string, sizeB: string, cylinder: s
   const options = Array.from(new Set(matched.map((d) => d.ups).filter((u): u is number => u != null && u > 0)));
   return { dies: matched, ups: options.length === 1 ? options[0] : null, options };
 }
+
+// Pick-list for a free-text die column: the spellings already in use, most
+// common first. One-offs are left out so typos ("SQAURE") aren't offered back.
+export function commonValues(dies: Die[], key: 'material' | 'corner' | 'gap', min = 2): string[] {
+  const counts = new Map<string, number>();
+  for (const d of dies) {
+    const v = d[key]?.trim();
+    if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
+  }
+  return Array.from(counts).filter(([, n]) => n >= min).sort((a, b) => b[1] - a[1]).map(([v]) => v);
+}

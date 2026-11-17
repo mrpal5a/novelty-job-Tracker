@@ -480,14 +480,11 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         'sticky top-0 z-10 px-3 py-1.5 text-center text-[11px] font-semibold text-[var(--glass-muted)]',
                         'uppercase tracking-[0.06em] whitespace-nowrap bg-[var(--glass-bg-strong)] backdrop-blur-[14px]',
                         'border-b border-white/12',
-                        // The header label's own nowrap width was the real floor keeping
-                        // this column from shrinking — a td-only width doesn't constrain a
-                        // table column if its header cell is wider. Match the body cell's
-                        // width here too, and let the label wrap instead of forcing nowrap.
-                        // min-w-0 overrides the table's default per-column floor, which
-                        // Chrome derives from the longest unbreakable "word" in any row's
-                        // job name and otherwise ignores the explicit width above.
-                        col === 'Job Name' && 'w-[220px] min-w-0 whitespace-normal',
+                        // Job name is the widest text a person reads, so it gets a floor
+                        // and the spare width; Corner and Material wrap instead of letting
+                        // one long value stretch the whole column.
+                        col === 'Job Name' && 'min-w-[300px]',
+                        (col === 'Corner' || col === 'Material') && 'whitespace-normal',
                         // Sr No is the team's floor reference number — keep it pinned to the
                         // left edge through both scroll axes so it's always visible. z-20
                         // (above the plain top-sticky headers at z-10) so it stays on top at
@@ -525,11 +522,11 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         <td className="px-3 py-1.5 font-mono text-xs font-semibold text-[var(--glass-ink)] whitespace-nowrap">
                           {die.serial_no ? die.serial_no.toUpperCase() : '—'}
                         </td>
-                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] w-[220px] min-w-0 whitespace-normal break-words">{die.job_name}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">{die.corner || '—'}</td>
+                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] min-w-[300px] whitespace-normal break-words">{die.job_name}</td>
+                        <td className="px-3 py-1.5 min-w-[96px] max-w-[160px] whitespace-normal break-words">{die.corner || '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{sizeOf(die) ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">{die.material || '—'}</td>
+                        <td className="px-3 py-1.5 min-w-[120px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
                         <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
                         <td className="px-3 py-1.5 whitespace-nowrap">{die.gap || '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>

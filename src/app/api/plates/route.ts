@@ -9,7 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
-import { containsPattern, orContains } from '@/lib/search';
+import { containsPattern, orContains, orMatch } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 
@@ -29,7 +29,7 @@ function optionalInt(value: unknown): number | null {
 // and PostgREST/supabase-js does not apply a `column::text` cast through
 // the filter builder (confirmed: it raises "operator does not exist:
 // integer ~~* unknown") — so those match on the exact number instead.
-type PlateSearchField = { column: string; type: 'text' | 'int' };
+type PlateSearchField = { column: string; type: 'text' | 'size' | 'int' };
 
 const PLATE_SEARCH_FIELDS: Record<string, PlateSearchField> = {
   party:           { column: 'party',           type: 'text' },
@@ -37,8 +37,8 @@ const PLATE_SEARCH_FIELDS: Record<string, PlateSearchField> = {
   pm_code:         { column: 'pm_code',         type: 'text' },
   item_name:       { column: 'item_name',       type: 'text' },
   location:        { column: 'location',        type: 'text' },
-  across_size:     { column: 'across_size',     type: 'text' },
-  around_size:     { column: 'around_size',     type: 'text' },
+  // One "Size" option, as on dies: a number read off either side of the plate.
+  size:            { column: 'size',            type: 'size' },
   cylinder:        { column: 'cylinder',        type: 'int' },
   label_per_round: { column: 'label_per_round', type: 'int' },
 };
@@ -83,6 +83,9 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('plates').select('*', count ? { count } : undefined);
     if (search) {
       if (config?.type === 'int') query = query.eq(config.column, Math.trunc(Number(search)));
+      // Size matches across or around on the whole millimetre: "60" finds 60
+      // and 60.5, not 160 or 600.
+      else if (config?.type === 'size') query = query.or(orMatch([], ['across_size', 'around_size'], search));
       else if (config) query = query.ilike(config.column, containsPattern(search));
       else query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
     }

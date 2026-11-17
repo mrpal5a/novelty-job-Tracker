@@ -33,8 +33,8 @@ const PlateDetailModal = dynamic(() => import('./PlateDetailModal'), { ssr: fals
 // <td>s rendered below. Party and item share a cell (party over item) so
 // the table fits the 1240px content width with no sideways scroll.
 const PLATE_COLUMNS = [
-  'Plate ID', 'Party · item', 'PM code', 'Size', 'Cylinder',
-  'Labels / round', 'Location', 'Plate date', 'Actions',
+  'Location', 'Party · item', 'PM code', 'Size', 'Cylinder',
+  'Labels / round', 'Plate date', 'Plate ID', 'Actions',
 ] as const;
 type PlateColumn = typeof PLATE_COLUMNS[number];
 
@@ -88,8 +88,7 @@ const PLATE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }
   { value: 'pm_code',         label: 'PM code',          placeholder: 'Search by PM code' },
   { value: 'item_name',       label: 'Item name',        placeholder: 'Search by item name' },
   { value: 'location',        label: 'Location',         placeholder: 'Search by location' },
-  { value: 'across_size',     label: 'Size (across / H)', placeholder: 'Search by across size' },
-  { value: 'around_size',     label: 'Size (around / W)', placeholder: 'Search by around size' },
+  { value: 'size',            label: 'Size',             placeholder: 'Search by across or around size' },
   { value: 'cylinder',        label: 'Cylinder',         placeholder: 'Search by cylinder' },
   { value: 'label_per_round', label: 'Labels / round',   placeholder: 'Search by labels per round' },
 ];
@@ -289,7 +288,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           </div>
           {/* Desk: table skeleton */}
           <div className="hidden xl:block rounded-xl glass overflow-hidden">
-            <table className="w-full table-fixed border-collapse text-sm">
+            <table className="w-full table-fixed border-collapse text-sm [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
               {tableHead(false)}
               <tbody>
                 <SkeletonRows rows={5} cols={columns.length} />
@@ -411,7 +410,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                 without a positioned scroll box it escapes to the page and
                 stretches the document to the full table height. */}
             <div className="relative max-h-[70vh] overflow-y-auto">
-              <table className="w-full table-fixed border-collapse text-sm">
+              <table className="w-full table-fixed border-collapse text-sm [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 {tableHead(true)}
                 <tbody>
                   {visiblePlates.map((plate, i) => {
@@ -425,16 +424,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                           i % 2 === 1 && 'bg-[var(--glass-bg)]',
                         )}
                       >
-                        <td className="px-2.5 py-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); setViewing(plate); }}
-                            aria-label={`View plate ${ids[0] ?? plate.item_name ?? ''}`.trim()}
-                            className="flex items-center gap-1.5 max-w-full min-h-11 text-left"
-                          >
-                            <PlateIdChip ids={ids} />
-                          </button>
-                        </td>
+                        <td className="px-2.5 py-1.5 font-semibold text-[var(--glass-ink)] truncate" title={plate.location ?? undefined}>{plate.location || '—'}</td>
                         <td className="px-2.5 py-1.5">
                           <p className="font-semibold text-[var(--glass-ink)] [overflow-wrap:anywhere]">
                             {plate.party || '—'}
@@ -449,9 +439,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                         <td className="px-2.5 py-1.5 font-mono">{sizeOf(plate) ?? '—'}</td>
                         <td className="px-2.5 py-1.5 font-mono text-right">{plate.cylinder ?? '—'}</td>
                         <td className="px-2.5 py-1.5 font-mono text-right">{plate.label_per_round ?? '—'}</td>
-                        <td className="px-2.5 py-1.5 truncate" title={plate.location ?? undefined}>{plate.location || '—'}</td>
                         <td className="px-2.5 py-1.5 font-mono text-[var(--glass-muted)] whitespace-nowrap">
                           {plate.plate_date ? formatNumericDate(plate.plate_date) : '—'}
+                        </td>
+                        <td className="px-2.5 py-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setViewing(plate); }}
+                            aria-label={`View plate ${ids[0] ?? plate.item_name ?? ''}`.trim()}
+                            className="flex items-center gap-1.5 max-w-full min-h-11 text-left"
+                          >
+                            <PlateIdChip ids={ids} />
+                          </button>
                         </td>
                         {canManage && (
                           <td className="px-2 py-1 text-right" onClick={(e) => e.stopPropagation()}>

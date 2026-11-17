@@ -6,7 +6,8 @@
 // is reading across a printed row, and reordering the form would make every
 // entry a lookup instead of a straight copy.
 
-import React, { useState, useId } from 'react';
+import React, { useState, useId, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -14,6 +15,11 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import { DIE_STATUSES, type Die, type DieStatus } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
+import { dieListQuery } from '@/lib/listQueries';
+import { dieUpsFor, commonValues } from '@/lib/plateDie';
+import { istToday } from '@/lib/jobViews';
+
+const NO_DIES: Die[] = [];
 
 const inputCls = cn(
   'w-full px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -30,6 +36,16 @@ type Props = {
 
 export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   const titleId = useId();
+  const listId  = useId();
+
+  // The whole library (already cached by the list page) feeds the pick-lists
+  // and the "already have this die" check.
+  const allDies = useQuery(dieListQuery()).data ?? NO_DIES;
+  const picks = useMemo(() => ({
+    material: commonValues(allDies, 'material'),
+    corner:   commonValues(allDies, 'corner'),
+    gap:      commonValues(allDies, 'gap'),
+  }), [allDies]);
 
   const [jobName,  setJobName]  = useState(editing?.job_name ?? '');
   const [length,   setLength]   = useState(editing?.length ?? '');
@@ -42,13 +58,19 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   const [serialNo, setSerialNo] = useState(editing?.serial_no ?? '');
   // <input type="date"> only speaks yyyy-MM-dd; the column is a DATE, so the
   // stored value already is one.
-  const [receivedOn, setReceivedOn] = useState(editing?.die_received_on ?? '');
+  const [receivedOn, setReceivedOn] = useState(editing ? editing.die_received_on ?? '' : istToday());
   const [location, setLocation] = useState(editing?.location ?? '');
   const [status,   setStatus]   = useState<DieStatus>(editing?.status ?? 'IN USE');
   // Only meaningful while status is 'DAMAGE' — cleared server-side otherwise.
   const [damageDate,   setDamageDate]   = useState(editing?.damage_date ?? '');
   const [damageReason, setDamageReason] = useState(editing?.damage_reason ?? '');
   const [saving, setSaving] = useState(false);
+
+  // Same cylinder and whole-mm size either way round — the plate matcher's rule.
+  const twins = useMemo(
+    () => dieUpsFor(allDies, length, width, cylinder).dies.filter((d) => d.id !== editing?.id),
+    [allDies, length, width, cylinder, editing?.id],
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -183,11 +205,28 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
                   <input
                   value={material}
                   onChange={(e) => setMaterial(e.target.value)}
+                  list={`${listId}-material`}
+                  autoComplete="off"
                   className={inputCls}
                 />
               </WithExample>
             </div>
           </div>
+
+          {twins.length > 0 && (
+            <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <p className="font-semibold">
+                {twins.length === 1 ? 'A die' : `${twins.length} dies`} of this size and cylinder already on record
+              </p>
+              <ul className="mt-1 space-y-0.5">
+                {twins.slice(0, 3).map((d) => (
+                  <li key={d.id}>
+                    {d.job_name} · {d.location || 'no location'} · {d.status}{d.ups != null && ` · ${d.ups} ups`}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -208,6 +247,8 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
                   <input
                   value={gap}
                   onChange={(e) => setGap(e.target.value)}
+                  list={`${listId}-gap`}
+                  autoComplete="off"
                   className={inputCls}
                 />
               </WithExample>
@@ -221,6 +262,8 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
                   <input
                   value={corner}
                   onChange={(e) => setCorner(e.target.value)}
+                  list={`${listId}-corner`}
+                  autoComplete="off"
                   className={inputCls}
                 />
               </WithExample>
@@ -294,6 +337,12 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </div>
           )}
         </div>
+
+        {(['material', 'corner', 'gap'] as const).map((k) => (
+          <datalist key={k} id={`${listId}-${k}`}>
+            {picks[k].map((v) => <option key={v} value={v} />)}
+          </datalist>
+        ))}
 
         <div className="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-white/12 shrink-0">
           <Button

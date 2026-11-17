@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dieUpsFor } from './plateDie';
+import { dieUpsFor, commonValues } from './plateDie';
 import type { Die } from '@/lib/types';
 
 const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
@@ -24,5 +24,13 @@ describe('label per round from the die', () => {
     expect(dieUpsFor([...dies, die('165', '48', 110, 4)], '165', '48', '110')).toMatchObject({ ups: null, options: [8, 4] });
     expect(dieUpsFor(dies, '165', '48', '97').dies).toHaveLength(0);
     expect(dieUpsFor(dies, '', '48', '110').dies).toHaveLength(0);
+  });
+});
+
+describe('die pick-lists', () => {
+  it('offers repeated spellings, most common first, never one-offs', () => {
+    const d = (corner: string | null) => ({ corner }) as unknown as Die;
+    const dies = [d('SPECIAL'), d('SQUARE'), d('SQUARE '), d('SQUARE'), d('SPECIAL'), d('SQAURE'), d(null), d('')];
+    expect(commonValues(dies, 'corner')).toEqual(['SQUARE', 'SPECIAL']);
   });
 });

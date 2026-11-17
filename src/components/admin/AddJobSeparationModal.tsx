@@ -81,14 +81,19 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
   const [awSendTo,     setAwSendTo]     = useState(seed?.aw_send_to ?? '');
   const [saving, setSaving] = useState(false);
 
-  // Unit 1 jobs don't go through artwork or a job card here. Moving off
-  // Unit 1 takes back the N/A it filled in, if still untouched.
+  // Fields a unit makes N/A: Unit 1 jobs don't go through artwork or a job
+  // card here; Unit 2 jobs never send artwork to Unit 1. Changing unit takes
+  // back an N/A the old unit filled in, if still untouched.
   function applyUnit(next: string) {
     setUnit(next);
-    if (next === '1') { setJobStatus('N/A'); setJcStatus('N/A'); }
-    else if (unit === '1') {
-      if (jobStatus === 'N/A') setJobStatus('');
-      if (jcStatus === 'N/A') setJcStatus('');
+    const fields = [
+      { unit: '1', value: jobStatus, set: setJobStatus },
+      { unit: '1', value: jcStatus,  set: setJcStatus },
+      { unit: '2', value: awSendTo,  set: setAwSendTo },
+    ];
+    for (const f of fields) {
+      if (f.unit === next) f.set('N/A');
+      else if (f.unit === unit && f.value === 'N/A') f.set('');
     }
   }
 
