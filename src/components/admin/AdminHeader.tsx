@@ -36,7 +36,7 @@ import {
 import { initials } from '@/lib/team';
 import { Logo } from '@/components/brand/Logo';
 import ExportButton from './ExportButton';
-import CommandPalette from './CommandPalette';
+import CommandPalette, { warmSearch } from './CommandPalette';
 import { useBomPendingCount, useDispatchPendingCount } from '@/hooks/useBadgeCounts';
 
 type Props = {
@@ -293,6 +293,7 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
           <button
             type="button"
             onClick={() => setPaletteOpen(true)}
+            onPointerEnter={warmSearch}
             aria-label="Search everything (Ctrl K)"
             title="Search everything (Ctrl K)"
             className={iconBtn}

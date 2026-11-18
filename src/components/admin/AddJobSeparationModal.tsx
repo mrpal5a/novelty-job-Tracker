@@ -14,6 +14,8 @@
 // derived server-side from quantity × rate.
 
 import React, { useState, useEffect, useRef, useId } from 'react';
+import { useParties } from '@/hooks/useReferenceData';
+import { findParties } from '@/lib/search';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
@@ -132,7 +134,9 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
 
   // Party typeahead — searches the master list as soon as the first
   // letter is typed (min length 1, unlike the PM-code lookup's min of 2,
-  // per how the team wants to search this field).
+  // per how the team wants to search this field). The list is cached in the
+  // browser, so suggestions follow each key with no wait.
+  const parties = useParties().data;
   useEffect(() => {
     if (suppressPartyLookup.current) {
       suppressPartyLookup.current = false;
@@ -144,21 +148,12 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
       setShowPartySuggestions(false);
       return;
     }
-    const timer = setTimeout(async () => {
-      try {
-        const res  = await fetch(`/api/parties?search=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        if (res.ok) {
-          setPartySuggestions(data.parties ?? []);
-          setShowPartySuggestions(true);
-        }
-      } catch {
-        // Best-effort — the confirmed-party validation below still guards
-        // submission without it.
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [party]);
+    // Still loading: this runs again when the list arrives. If it can't
+    // load, the confirmed-party validation below still guards submission.
+    if (!parties) return;
+    setPartySuggestions(findParties(parties, q));
+    setShowPartySuggestions(true);
+  }, [party, parties]);
 
   function selectParty(p: Party) {
     suppressPartyLookup.current = true;

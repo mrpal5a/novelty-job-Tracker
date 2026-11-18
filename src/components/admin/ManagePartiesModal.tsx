@@ -14,6 +14,8 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { ModalShell } from './modals';
 import type { Party } from '@/lib/types';
+import { useQueryClient } from '@tanstack/react-query';
+import { PARTIES_KEY } from '@/hooks/useReferenceData';
 
 const inputCls = cn(
   'w-full min-h-11 px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -30,6 +32,8 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
   const [adding,     setAdding]     = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busyId,     setBusyId]     = useState<string | null>(null);
+  // The party boxes in the forms suggest from a cached list: refresh it.
+  const queryClient = useQueryClient();
 
   const load = useCallback(async () => {
     try {
@@ -71,6 +75,7 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
             )
       );
       setNewName('');
+      queryClient.invalidateQueries({ queryKey: PARTIES_KEY });
       toast.success('Party added');
     } catch {
       toast.error('Network error');
@@ -89,6 +94,7 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
         return;
       }
       setParties((prev) => prev.filter((p) => p.id !== party.id));
+      queryClient.invalidateQueries({ queryKey: PARTIES_KEY });
       toast.success('Party removed');
     } catch {
       toast.error('Network error');

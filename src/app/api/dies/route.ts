@@ -11,6 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { DIE_STATUSES, type DieStatus } from '@/lib/types';
 import { containsPattern, orMatch, orSizePair } from '@/lib/search';
+import { ROTO_DIE_SEARCH } from '@/lib/dieSearch';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 
@@ -54,20 +55,9 @@ function resolveStatus(body: Record<string, unknown>):
 // and PostgREST/supabase-js does not apply a `column::text` cast through
 // the filter builder (confirmed: it raises "operator does not exist:
 // integer ~~* unknown") — so those match on the exact number instead.
-type DieSearchField = { column: string; type: 'text' | 'size' | 'int' };
-
-const DIE_SEARCH_FIELDS: Record<string, DieSearchField> = {
-  job_name:  { column: 'job_name',  type: 'text' },
-  serial_no: { column: 'serial_no', type: 'text' },
-  material:  { column: 'material',  type: 'text' },
-  corner:    { column: 'corner',    type: 'text' },
-  location:  { column: 'location',  type: 'text' },
-  // One "Size" option: a number can be read off either side of the die.
-  size:      { column: 'size',      type: 'size' },
-  gap:       { column: 'gap',       type: 'text' },
-  cylinder:  { column: 'cylinder',  type: 'int' },
-  ups:       { column: 'ups',       type: 'int' },
-};
+// The fields themselves live in src/lib/dieSearch.ts, shared with the Dies
+// page, which filters the same way in the browser.
+const DIE_SEARCH_FIELDS = ROTO_DIE_SEARCH.fields;
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -117,9 +107,7 @@ export async function GET(request: NextRequest) {
         // read off it: the job it was cut for, its size, its material, its
         // corner style, or its serial — or where it should be sitting.
         // Length and width match on the whole millimetre, as above.
-        query = query.or(orMatch(
-          ['job_name', 'material', 'corner', 'serial_no', 'location'], ['length', 'width'], search, tol,
-        ));
+        query = query.or(orMatch(ROTO_DIE_SEARCH.allText, ['length', 'width'], search, tol));
       }
     }
     if (sizeA || sizeB) query = query.or(orSizePair(['length', 'width'], sizeA, sizeB, tol));

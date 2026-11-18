@@ -7,12 +7,13 @@
 // a die for this" before ordering another. Prepress and Admin own the entries.
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useIsDesk } from '@/hooks/useIsDesk';
 import { dieListQuery } from '@/lib/listQueries';
+import { dieRowTest, ROTO_DIE_SEARCH } from '@/lib/dieSearch';
 import SizeToleranceToggle, { canUseTolerance, SIZE_TOLERANCE_MM } from './SizeToleranceToggle';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Pencil, Trash2, Scissors, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { StateChip } from '@/components/ui/StateChip';
@@ -95,9 +96,9 @@ function sortDies(dies: Die[], field: SortField, dir: SortDir): Die[] {
 }
 
 
-// Mirrors DIE_SEARCH_FIELDS in src/app/api/dies/route.ts — the value sent
-// as ?field=. "All fields" (value 'all') skips the param, falling back to
-// the server's multi-column OR search.
+// The search box's field picker: values are the keys of ROTO_DIE_SEARCH in
+// src/lib/dieSearch.ts. "All fields" ('all') looks in every text field and
+// the sizes.
 const DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[] = [
   { value: 'all',       label: 'All fields',    placeholder: 'Search job, length, width, material, corner, serial no or location' },
   { value: 'job_name',  label: 'Job name',      placeholder: 'Search by job name' },
@@ -145,10 +146,11 @@ function buildDieExportColumns(srNoMap: Map<string, number>): CsvColumn<Die>[] {
 
 export default function DiesManager({ canManage }: { canManage: boolean }) {
   const [search,      setSearch]      = useState('');
-  useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
   const [nearSize,    setNearSize]    = useState(false);
   const sizes = useSizePair();
+  // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
+  useUrlSearch(setSearch, undefined, sizes.setSize);
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');
   const [adding,      setAdding]      = useState(false);
@@ -171,24 +173,22 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
 
   const queryClient = useQueryClient();
 
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const tolerance = nearSize && (canUseTolerance(debouncedSearch, searchField) || sizes.debounced.some(Boolean))
+  // Every die is already in the browser, so the search filters them here —
+  // results follow each key, with no trip to the server. Deferred, so typing
+  // never waits on redrawing the table.
+  const typed      = useDeferredValue(search);
+  const typedSizes = useDeferredValue(sizes.size);
+  const tolerance = nearSize && (canUseTolerance(typed, searchField) || typedSizes.some((s) => s.trim()))
     ? SIZE_TOLERANCE_MM : 0;
 
-  const diesQuery = useQuery({
-    // Key + fetch live in lib/listQueries so the menu can warm this up.
-    ...dieListQuery({
-      search: debouncedSearch, field: searchField, tolerance, sizeA: sizes.debounced[0], sizeB: sizes.debounced[1],
-    }),
-    placeholderData: keepPreviousData,
-  });
-  const dies    = diesQuery.data ?? EMPTY_DIES;
-  const loading = diesQuery.isLoading;
+  // Key + fetch live in lib/listQueries so the menu can warm this up.
+  const diesQuery = useQuery(dieListQuery());
+  const allDies   = diesQuery.data ?? EMPTY_DIES;
+  const loading   = diesQuery.isLoading;
+  const dies = useMemo(() => {
+    const matches = dieRowTest(ROTO_DIE_SEARCH, { search: typed, field: searchField, tolerance, sizeA: typedSizes[0], sizeB: typedSizes[1] });
+    return allDies.filter(matches);
+  }, [allDies, typed, searchField, tolerance, typedSizes]);
 
   const sortedDies = useMemo(
     () => sortDies(dies, sortField, sortDir),
@@ -200,7 +200,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
   // a thousand dies as cards and again as table rows froze slower machines.
   // A new search or sort starts again from the top.
   const [visibleCount, setVisibleCount] = useState(SHOW_STEP);
-  useEffect(() => { setVisibleCount(SHOW_STEP); }, [debouncedSearch, searchField, tolerance, sizes.debounced, sortField, sortDir]);
+  useEffect(() => { setVisibleCount(SHOW_STEP); }, [typed, searchField, tolerance, typedSizes, sortField, sortDir]);
   const visibleDies = useMemo(() => sortedDies.slice(0, visibleCount), [sortedDies, visibleCount]);
   const hiddenCount = sortedDies.length - visibleDies.length;
   const isDesk = useIsDesk();

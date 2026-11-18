@@ -4,7 +4,45 @@
 // millimetre, whether the stored value or the search carries decimals.
 
 import { describe, expect, it } from 'vitest';
-import { containsPattern, nameMatches, orContains, orMatch, orSizePair, sizePatterns, startsFirst } from './search';
+import { containsPattern, exactFieldPattern, nameMatches, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms, sizePatterns, startsFirst } from './search';
+
+describe('searchTerms', () => {
+  it('squashes case, spaces and punctuation, phrase and words alike', () => {
+    expect(searchTerms('UPL - 03')).toEqual({ phrase: 'upl03', words: ['upl', '03'] });
+    expect(searchTerms('  PM-203232 ')).toEqual({ phrase: 'pm203232', words: ['pm203232'] });
+    expect(searchTerms('riverline riverline 2032')?.words).toEqual(['riverline', '2032']);
+  });
+  it('nothing searchable left → null (caller falls back)', () => {
+    expect(searchTerms('%')).toBeNull();
+    expect(searchTerms(' - ')).toBeNull();
+  });
+});
+
+describe('onSearchText', () => {
+  const rec = () => { const calls: string[][] = []; const q = { ilike(c: string, p: string) { calls.push([c, p]); return q; } }; return { q, calls }; };
+  it('a phrase is one pattern; words are one pattern each, ANDed', () => {
+    const t = searchTerms('riverline 2032')!;
+    const a = rec(); onSearchText(a.q, t, true);
+    expect(a.calls).toEqual([['search_text', '%riverline2032%']]);
+    const b = rec(); onSearchText(b.q, t, false);
+    expect(b.calls).toEqual([['search_text', '%riverline%'], ['search_text', '%2032%']]);
+  });
+  it('exact field match is fenced by the | separators', () => {
+    expect(exactFieldPattern(searchTerms('203232')!)).toBe('%|203232|%');
+  });
+});
+
+describe('parseSizePair', () => {
+  it('reads a size typed as L x W, any separator and spacing', () => {
+    expect(parseSizePair('210x60')).toEqual(['210', '60']);
+    expect(parseSizePair(' 210 X 60.5 ')).toEqual(['210', '60.5']);
+    expect(parseSizePair('210×60')).toEqual(['210', '60']);
+    expect(parseSizePair('210*60')).toEqual(['210', '60']);
+  });
+  it('leaves anything else alone', () => {
+    for (const q of ['210', 'PM-203232', 'x60', '210x', 'box 60', '210 60']) expect(parseSizePair(q)).toBeNull();
+  });
+});
 
 describe('nameMatches', () => {
   it('finds a party by any part of its name, ignoring spaces and dashes', () => {

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useFitToViewport } from '@/hooks/useFitToViewport';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, keepPreviousData, type QueryFunctionContext } from '@tanstack/react-query';
 import { cn, sortJobs, type JobSortOption } from '@/lib/utils';
 import { compareValues, type SortDir, type SortKind } from '@/lib/sort';
 import { JOBS_CHANGED_EVENT, JOBS_FILTER_EVENT, type JobsFilterDetail } from '@/lib/constants/events';
@@ -22,6 +22,7 @@ import { Search, SearchX, SlidersHorizontal } from 'lucide-react';
 import {
   istToday, needsAttention, dueThisWeek, attentionCompare, type JobView,
 } from '@/lib/jobViews';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 type Props = {
   initialJobs: Job[];
@@ -119,11 +120,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
   const queryClient = useQueryClient();
 
   // Debounced only while typing — status/urgent filters apply immediately.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const debouncedSearch = useDebouncedSearch(search);
 
   // Which tab is open. null until the stored choice is read after mount;
   // until then (and when nothing is stored) Needs attention leads whenever
@@ -142,13 +139,14 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
   // 70 = main's 24px bottom padding + the 46px count footer under the table.
   const fitRef = useFitToViewport<HTMLDivElement>(70, 0.72);
 
-  const fetchJobs = (closed: boolean) => async () => {
+  // The signal cancels a search the next keystroke has made outdated.
+  const fetchJobs = (closed: boolean) => async ({ signal }: QueryFunctionContext) => {
       const params = new URLSearchParams();
       if (debouncedSearch) params.set('search', debouncedSearch);
       if (statusFilter)    params.set('status', statusFilter);
       if (urgentOnly)      params.set('urgent', 'true');
       if (closed)          params.set('closed', 'true');
-      const res  = await fetch(`/api/jobs?${params.toString()}`);
+      const res  = await fetch(`/api/jobs?${params.toString()}`, { signal });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed to load jobs');
       return data.jobs as Job[];
@@ -163,6 +161,9 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
     // exact key — a second visit within the session uses its own cache
     // (kept fresh by onJobUpdated/onJobDeleted below) instead of this prop.
     initialData: !debouncedSearch && !statusFilter && !urgentOnly ? initialJobs : undefined,
+    // The last results stay on screen while a new search loads (the loading
+    // bar shows it's working) instead of blanking to a skeleton.
+    placeholderData: keepPreviousData,
   });
   const activeJobs = jobsQuery.data ?? EMPTY_JOBS;
 
@@ -180,6 +181,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
     queryKey: ['jobs', debouncedSearch, statusFilter, urgentOnly, true],
     queryFn:  fetchJobs(true),
     enabled:  view === 'closed',
+    placeholderData: keepPreviousData,
   });
 
   const jobs    = view === 'closed' ? (closedQuery.data ?? EMPTY_JOBS) : activeJobs;

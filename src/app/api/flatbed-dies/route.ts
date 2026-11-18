@@ -15,6 +15,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { containsPattern, orMatch, orSizePair } from '@/lib/search';
+import { FLATBED_DIE_SEARCH } from '@/lib/dieSearch';
 import { deptKeyOf } from '@/lib/identity';
 
 // Optional free text: blank means "not recorded", not an empty string.
@@ -32,19 +33,8 @@ function integer(value: unknown): number | null {
 // Field-scoped search: a whitelist, not a raw column name from the query
 // string. Integer columns match on the exact number — see /api/dies for
 // why .ilike() can't be used on them.
-type FlatbedDieSearchField = { column: string; type: 'text' | 'size' | 'int' };
-
-const FLATBED_DIE_SEARCH_FIELDS: Record<string, FlatbedDieSearchField> = {
-  serial_no: { column: 'serial_no', type: 'int' },
-  shape:     { column: 'shape',     type: 'text' },
-  corner:    { column: 'corner',    type: 'text' },
-  location:  { column: 'location',  type: 'text' },
-  // One "Size" option: a number can be read off either side of the die.
-  size:      { column: 'size',      type: 'size' },
-  repeat_length: { column: 'repeat_length', type: 'text' },
-  gap:       { column: 'gap',       type: 'text' },
-  ups:       { column: 'ups',       type: 'int' },
-};
+// The fields live in src/lib/dieSearch.ts, shared with the Flatbed Dies page.
+const FLATBED_DIE_SEARCH_FIELDS = FLATBED_DIE_SEARCH.fields;
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -82,7 +72,7 @@ export async function GET(request: NextRequest) {
     } else {
       // "All fields" — shape, corner and location match loosely; length and
       // width match on the whole millimetre, as above.
-      query = query.or(orMatch(['shape', 'corner', 'location'], ['length', 'width'], search, tol));
+      query = query.or(orMatch(FLATBED_DIE_SEARCH.allText, ['length', 'width'], search, tol));
     }
   }
   if (sizeA || sizeB) query = query.or(orSizePair(['length', 'width'], sizeA, sizeB, tol));

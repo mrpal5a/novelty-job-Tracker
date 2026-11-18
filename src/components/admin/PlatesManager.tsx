@@ -25,6 +25,7 @@ import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import SizePairSearch, { useSizePair } from './SizePairSearch';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddPlateModal = dynamic(() => import('./AddPlateModal'), { ssr: false });
@@ -110,9 +111,10 @@ const PLATE_EXPORT_COLUMNS: CsvColumn<Plate>[] = [
 
 export default function PlatesManager({ canManage }: { canManage: boolean }) {
   const [search,      setSearch]      = useState('');
-  useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
   const sizes = useSizePair();
+  // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
+  useUrlSearch(setSearch, undefined, sizes.setSize);
   const [adding,      setAdding]      = useState(false);
   const [editing,     setEditing]     = useState<Plate | null>(null);
   const [viewing,     setViewing]     = useState<Plate | null>(null);
@@ -135,11 +137,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
 
   const queryClient = useQueryClient();
 
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const debouncedSearch = useDebouncedSearch(search);
 
   // The server sorts and sends one page (lib note in api/plates/route.ts):
   // the whole table is ~4,000 plates. "Show more" grows the page; a new

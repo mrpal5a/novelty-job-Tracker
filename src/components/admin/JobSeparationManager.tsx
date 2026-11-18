@@ -39,6 +39,7 @@ import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import PartySuggestInput from './PartySuggestInput';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddJobSeparationModal = dynamic(() => import('./AddJobSeparationModal'), { ssr: false });
@@ -214,12 +215,13 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
     ? JOB_SEPARATION_EXPORT_COLUMNS
     : JOB_SEPARATION_EXPORT_COLUMNS.filter((c) => c.header !== 'Dispatched');
   const [search,      setSearch]      = useState('');
-  // Opened with ?q= (the jobs table's "Look in Job Separation", Ctrl K): pre-fill the search.
-  useUrlSearch(setSearch);
   const [searchField, setSearchField] = useState('all');
   // The Party box: this party's jobs, ANDed with the search box.
   const [party,       setParty]       = useState('');
   const [range,       setRange]       = useState<DateRangeOption>('month');
+  // Opened with ?q= (the jobs table's "Look in Job Separation", Ctrl K): pre-fill
+  // the search over all dates — the line looked for may be older than this month.
+  useUrlSearch(setSearch, () => setRange('all'));
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('desc');
 
@@ -267,16 +269,8 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   const isDesk = useIsDesk();
 
   // Debounced only while typing — range/field changes apply immediately.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
-  const [debouncedParty, setDebouncedParty] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedParty(party.trim()), party ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [party]);
+  const debouncedSearch = useDebouncedSearch(search);
+  const debouncedParty = useDebouncedSearch(party.trim());
 
   // A new search/field/range starts back at page one — the limit a previous
   // "Load more" click reached doesn't carry over to an unrelated query.

@@ -26,7 +26,7 @@ describe('list warm-up from the menu', () => {
   it('default keys are the pages’ opening state', () => {
     expect(jobSeparationListQuery().queryKey).toEqual(['job-separations', '', 'all', 'month', '', 100]);
     expect(plateListQuery().queryKey).toEqual(['plates', '', 'all', 'created_at', 'desc', '', '', 100]);
-    expect(dieListQuery().queryKey).toEqual(['dies', '', 'all', 0, '', '']);
+    expect(dieListQuery().queryKey).toEqual(['dies']);
     expect(shadeCardListQuery().queryKey).toEqual(['shade-cards', '', 'all', 'all', null, 1, 'shade_card_number', 'asc']);
   });
 });

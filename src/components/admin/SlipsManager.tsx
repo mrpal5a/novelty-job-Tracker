@@ -73,6 +73,7 @@ import { searchSources, type SlipSource } from '@/lib/slipSource';
 import { useBranding } from '@/components/brand/BrandingProvider';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { WithExample } from '@/components/ui/FieldAffix';
+import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
 
 /**
  * The five artworks this page can put on a sheet.
@@ -431,7 +432,7 @@ export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
       } finally {
         if (!stale) setSearching(false);
       }
-    }, 250);
+    }, SEARCH_DEBOUNCE_MS);
     return () => { stale = true; clearTimeout(t); };
   }, [search]);
 

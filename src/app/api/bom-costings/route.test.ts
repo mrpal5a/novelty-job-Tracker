@@ -15,12 +15,23 @@ describe('GET /api/bom-costings', () => {
     expect((await search('x')).status).toBe(403);
   });
 
-  it('keeps commas, brackets and % in the search as typed', async () => {
+  it('searches like Job Separation: the phrase first, then each word', async () => {
     signIn('Admin');
+    // No line holds the phrase (nothing is answered), so it goes word by word.
     const res = await search('Glypho (500 ml), 41% SL');
     expect(res.status).toBe(200);
+    const [list, probe] = queries('job_separations');
+    expect(probe.filters).toContainEqual(['ilike', 'search_text', '%glypho500ml41sl%']);
+    for (const w of ['glypho', '500', 'ml', '41', 'sl']) {
+      expect(list.filters).toContainEqual(['ilike', 'search_text', `%${w}%`]);
+    }
+  });
+
+  it('only punctuation typed: matched as typed, quoted so it cannot break the filter', async () => {
+    signIn('Admin');
+    await search('%');
     expect(queries('job_separations')[0].filters).toContainEqual(
-      ['or', orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], 'Glypho (500 ml), 41% SL')],
+      ['or', orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], '%')],
     );
   });
 

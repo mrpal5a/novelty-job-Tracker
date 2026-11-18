@@ -11,8 +11,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageJobSeparation, canDeptSeeDispatchedQty, canDeptSeeMoneyTotals } from '@/lib/constants/departments';
-import { parseDateRange, rangeOrClause, parseLimit, type DateRange } from '@/lib/jobSeparationQuery';
-import { containsPattern, orContains } from '@/lib/search';
+import { parseDateRange, rangeOrClause, parseLimit, searchAsPhrase, type DateRange } from '@/lib/jobSeparationQuery';
+import { containsPattern, orContains, onSearchText, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 import { dispatchedByLine } from '@/lib/dispatchLedger';
@@ -93,6 +93,10 @@ export async function GET(request: NextRequest) {
   // answer is "no matches" rather than a query error.
   if (intSearch !== null && !Number.isFinite(intSearch)) return NextResponse.json({ job_separations: [] });
 
+  // "All fields" reads search_text; see searchAsPhrase for phrase vs words.
+  const terms = search && !config ? searchTerms(search) : null;
+  let asPhrase = true;
+
   // The same range + search on any query over the table: the page of rows,
   // and the order-value total when there are more rows than the page holds.
   type Filterable<Q> = { or: (f: string) => Q; eq: (c: string, v: number) => Q; ilike: (c: string, p: string) => Q };
@@ -108,7 +112,20 @@ export async function GET(request: NextRequest) {
     if (config) return q.ilike(config.column, containsPattern(search));
     // "All fields" — the shop looks this up by whatever they can read off a
     // PO: the sr. no, the party, the PO no, the PM code, or the material name.
+    if (terms) return onSearchText(q, terms, asPhrase);
+    // Only punctuation typed ("%"): matched as typed, as before.
     return q.or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search));
+  }
+
+  if (terms) {
+    try {
+      asPhrase = await searchAsPhrase(terms, async () => {
+        const { data, error } = await applyFilters(supabase.from('job_separations').select('*').order('id')).limit(1);
+        return { data, error };
+      });
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
   }
 
   // Dispatched figures and money totals are Admin-granted features. The

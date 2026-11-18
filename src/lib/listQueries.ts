@@ -82,30 +82,23 @@ export function plateListQuery({
 }
 
 // ── Dies ───────────────────────────────────────────────────────
-export function dieListQuery({ search = '', field = 'all', tolerance = 0, sizeA = '', sizeB = '' }: {
-  search?: string; field?: string; tolerance?: number; sizeA?: string; sizeB?: string;
-} = {}) {
+// Every roto die (~1,000). The Dies page, a plate's matching dies and the
+// add-die duplicate check all share this one download; the page searches
+// it in the browser (src/lib/dieSearch.ts).
+export function dieListQuery() {
   return {
-    queryKey: ['dies', search, field, tolerance, sizeA, sizeB] as const,
+    queryKey: ['dies'] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<Die[]> => {
-      const params = new URLSearchParams();
-      if (search) {
-        params.set('search', search);
-        if (field !== 'all') params.set('field', field);
-      }
-      setSizePair(params, sizeA, sizeB);
-      if (tolerance) params.set('tol', String(tolerance));
-      const data = await getJson(`/api/dies?${params}`, signal, 'Failed to load dies');
+      const data = await getJson('/api/dies', signal, 'Failed to load dies');
       return (data.dies ?? []) as Die[];
     },
   };
 }
 
-// The whole flatbed library (~70 dies) — key matches FlatbedDiesManager's
-// unsearched list so the two share one cache entry.
+// The whole flatbed library (~70 dies), searched the same way.
 export function flatbedDieListQuery() {
   return {
-    queryKey: ['flatbed-dies', '', 'all', 0, '', ''] as const,
+    queryKey: ['flatbed-dies'] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<FlatbedDie[]> => {
       const data = await getJson('/api/flatbed-dies', signal, 'Failed to load flatbed dies');
       return (data.flatbed_dies ?? []) as FlatbedDie[];

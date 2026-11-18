@@ -23,8 +23,8 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptUseBOM, canDeptSeeMaterialRates } from '@/lib/constants/departments';
-import { parseDateRange, rangeOrClause, parseLimit } from '@/lib/jobSeparationQuery';
-import { orContains } from '@/lib/search';
+import { parseDateRange, rangeOrClause, parseLimit, searchAsPhrase } from '@/lib/jobSeparationQuery';
+import { orContains, onSearchText, searchTerms } from '@/lib/search';
 import { materialExpense, withoutRates } from '@/lib/bom';
 import { stockUsage } from '@/lib/paperStock';
 import type { BomCostingRow, BomCosting, BomMaterialRequest } from '@/lib/types';
@@ -104,7 +104,8 @@ export async function GET(request: NextRequest) {
   // Access was checked just above; rates are blanked below for anyone
   // who may not see them.
   const seeRates = canDeptSeeMaterialRates(perms);
-  let query = createAdminClient()
+  const admin = createAdminClient();
+  let query = admin
     .from('job_separations')
     .select(
       'id, sr_no, party, po_no, po_date, pm_code, material_name, quantity, order_value, created_at, ' +
@@ -125,8 +126,22 @@ export async function GET(request: NextRequest) {
 
   const rangeClause = rangeOrClause(range);
   if (rangeClause) query = query.or(rangeClause);
-  // Same columns and quoting as the Job Separation search (lib/search.ts).
-  if (search) query = query.or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search));
+  // The Job Separation search, line for line (searchAsPhrase).
+  const terms = search ? searchTerms(search) : null;
+  if (terms) {
+    let probe = admin.from('job_separations').select('id').is('cancelled_at', null);
+    if (rangeClause) probe = probe.or(rangeClause);
+    let asPhrase: boolean;
+    try {
+      asPhrase = await searchAsPhrase(terms, () => onSearchText(probe, terms, true).limit(1));
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+    query = onSearchText(query, terms, asPhrase);
+  } else if (search) {
+    // Only punctuation typed ("%"): matched as typed, as before.
+    query = query.or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], search));
+  }
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -5,54 +5,39 @@
 // saved as typed. Only typing searches — a value filled in by the form
 // (e.g. from a PM code) doesn't pop the list open.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Party } from '@/lib/types';
 import { useListKeys } from '@/hooks/useListKeys';
+import { useParties } from '@/hooks/useReferenceData';
+import { findParties } from '@/lib/search';
+
+const NO_PARTIES: Party[] = [];
 
 export default function PartySuggestInput({
   value, onChange, className, ariaLabel = 'Party', placeholder,
 }: { value: string; onChange: (v: string) => void; className?: string; ariaLabel?: string; placeholder?: string }) {
-  const [suggestions, setSuggestions] = useState<Party[]>([]);
+  // The party list is cached in the browser, so suggestions follow each key.
+  const { data: parties = NO_PARTIES, isSuccess } = useParties();
+  const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout>>();
-  // Bumped on every keystroke or outside change: a slow answer to an older
-  // search must not open the list over what is in the field now.
-  const latest = useRef(0);
+  const suggestions = useMemo(() => findParties(parties, query), [parties, query]);
   const typed = useRef(value);
-  useEffect(() => () => clearTimeout(timer.current), []);
 
-  // Filled in by the form, not typed: drop any pending search and close.
+  // Filled in by the form, not typed: close the list.
   useEffect(() => {
     if (value === typed.current) return;
     typed.current = value;
-    latest.current++;
-    clearTimeout(timer.current);
     setOpen(false);
   }, [value]);
 
   function search(q: string) {
     typed.current = q;
-    const id = ++latest.current;
-    clearTimeout(timer.current);
-    if (!q.trim()) { setSuggestions([]); setOpen(false); return; }
-    timer.current = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/parties?search=${encodeURIComponent(q.trim())}`);
-        if (!res.ok) return;
-        const parties = (await res.json()).parties ?? [];
-        if (id !== latest.current) return;
-        setSuggestions(parties);
-        setOpen(true);
-      } catch {
-        // Best-effort — the field still takes a typed name.
-      }
-    }, 250);
+    setQuery(q);
+    setOpen(Boolean(q.trim()));
   }
 
   function pick(p: Party) {
-    clearTimeout(timer.current);
-    latest.current++;
     typed.current = p.name;
     onChange(p.name);
     setOpen(false);
@@ -72,7 +57,7 @@ export default function PartySuggestInput({
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         className={className}
       />
-      {open && (
+      {open && (suggestions.length > 0 || isSuccess) && (
         <div {...keys.listProps} className="absolute z-20 top-full left-0 right-0 mt-1 glass-strong glass rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
           {suggestions.length > 0 ? (
             suggestions.map((p, i) => (

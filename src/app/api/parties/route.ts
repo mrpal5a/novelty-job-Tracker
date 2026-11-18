@@ -11,7 +11,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageJobSeparation } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
-import { nameMatches, startsFirst } from '@/lib/search';
+import { findParties } from '@/lib/search';
 
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
@@ -28,8 +28,7 @@ export async function GET(request: NextRequest) {
   // Any part of the name, spaces and dashes ignored — "53" or "PL 53" finds
   // "UPL - 53"; names starting with the text come first.
   // ponytail: filters the whole list in code (~50 rows); move to SQL if it grows into the thousands.
-  const hits = (data ?? []).filter((p) => nameMatches(p.name, search));
-  return NextResponse.json({ parties: startsFirst(hits, search).slice(0, 8) });
+  return NextResponse.json({ parties: findParties(data ?? [], search) });
 }
 
 export async function POST(request: NextRequest) {

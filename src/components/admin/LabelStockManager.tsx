@@ -26,6 +26,7 @@ import CsvExportButton from './CsvExportButton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { StateChip } from '@/components/ui/StateChip';
 import { stockForTab, stockTotals, type StockTab } from '@/lib/stockViews';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const ManualStockModal   = dynamic(() => import('./ManualStockModal'), { ssr: false });
@@ -119,11 +120,7 @@ export default function LabelStockManager({
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['stock'] });
 
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const debouncedSearch = useDebouncedSearch(search);
 
   const showHistory = tab === 'history';
   const stockQuery = useQuery({

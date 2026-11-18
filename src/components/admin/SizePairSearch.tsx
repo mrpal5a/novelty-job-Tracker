@@ -6,15 +6,16 @@
 
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
 
 export type SizePair = [string, string];
 
-/** The boxes' values, and the same values 300 ms after typing stops. */
+/** The boxes' values, and the same values once typing pauses. */
 export function useSizePair() {
   const [size, setSize] = useState<SizePair>(['', '']);
   const [debounced, setDebounced] = useState<SizePair>(['', '']);
   useEffect(() => {
-    const timer = setTimeout(() => setDebounced([size[0].trim(), size[1].trim()]), 300);
+    const timer = setTimeout(() => setDebounced([size[0].trim(), size[1].trim()]), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [size]);
   return { size, setSize, debounced, active: Boolean(size[0].trim() || size[1].trim()) };

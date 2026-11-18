@@ -10,11 +10,13 @@
 // Structure mirrors DiesManager.tsx, minus the columns that don't apply.
 
 import dynamic from 'next/dynamic';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useDeferredValue } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
 import SizeToleranceToggle, { canUseTolerance, SIZE_TOLERANCE_MM } from './SizeToleranceToggle';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { flatbedDieListQuery } from '@/lib/listQueries';
+import { dieRowTest, FLATBED_DIE_SEARCH } from '@/lib/dieSearch';
 import { Search, Plus, Pencil, Trash2, Scissors, ArrowUp, ArrowDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
@@ -90,9 +92,9 @@ function sortFlatbedDies(dies: FlatbedDie[], field: SortField, dir: SortDir): Fl
   return sorted;
 }
 
-// Mirrors FLATBED_DIE_SEARCH_FIELDS in src/app/api/flatbed-dies/route.ts —
-// the value sent as ?field=. "All fields" (value 'all') skips the param,
-// falling back to the server's multi-column OR search.
+// The search box's field picker: values are the keys of FLATBED_DIE_SEARCH
+// in src/lib/dieSearch.ts. "All fields" ('all') looks in every text field
+// and the sizes.
 const FLATBED_DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[] = [
   { value: 'all',       label: 'All fields', placeholder: 'Search length, width, shape, corner or location' },
   { value: 'shape',     label: 'Shape',      placeholder: 'Search by shape' },
@@ -133,7 +135,6 @@ function buildFlatbedDieExportColumns(srNoMap: Map<string, number>): CsvColumn<F
 
 export default function FlatbedDiesManager({ canManage }: { canManage: boolean }) {
   const [search,      setSearch]      = useState('');
-  useUrlSearch(setSearch);
   // ?field=size — a plate's "matching die" link opens on a size search.
   const urlField = useSearchParams().get('field');
   const [searchField, setSearchField] = useState(
@@ -141,6 +142,8 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
   );
   const [nearSize,    setNearSize]    = useState(false);
   const sizes = useSizePair();
+  // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
+  useUrlSearch(setSearch, undefined, sizes.setSize);
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');
   const [adding,      setAdding]      = useState(false);
@@ -161,35 +164,20 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
 
   const queryClient = useQueryClient();
 
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  const tolerance = nearSize && (canUseTolerance(debouncedSearch, searchField) || sizes.debounced.some(Boolean))
+  // The whole library is already in the browser: the search filters it
+  // here, so results follow each key. Deferred, so typing never waits.
+  const typed      = useDeferredValue(search);
+  const typedSizes = useDeferredValue(sizes.size);
+  const tolerance = nearSize && (canUseTolerance(typed, searchField) || typedSizes.some((s) => s.trim()))
     ? SIZE_TOLERANCE_MM : 0;
 
-  const flatbedDiesQuery = useQuery({
-    queryKey: ['flatbed-dies', debouncedSearch, searchField, tolerance, ...sizes.debounced],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (debouncedSearch) {
-        params.set('search', debouncedSearch);
-        if (searchField !== 'all') params.set('field', searchField);
-      }
-      if (sizes.debounced[0]) params.set('size_a', sizes.debounced[0]);
-      if (sizes.debounced[1]) params.set('size_b', sizes.debounced[1]);
-      if (tolerance) params.set('tol', String(tolerance));
-      const res  = await fetch(`/api/flatbed-dies?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed to load flatbed dies');
-      return (data.flatbed_dies ?? []) as FlatbedDie[];
-    },
-    placeholderData: keepPreviousData,
-  });
-  const flatbedDies = flatbedDiesQuery.data ?? EMPTY_FLATBED_DIES;
-  const loading     = flatbedDiesQuery.isLoading;
+  const flatbedDiesQuery = useQuery(flatbedDieListQuery());
+  const allFlatbedDies   = flatbedDiesQuery.data ?? EMPTY_FLATBED_DIES;
+  const loading          = flatbedDiesQuery.isLoading;
+  const flatbedDies = useMemo(() => {
+    const matches = dieRowTest(FLATBED_DIE_SEARCH, { search: typed, field: searchField, tolerance, sizeA: typedSizes[0], sizeB: typedSizes[1] });
+    return allFlatbedDies.filter(matches);
+  }, [allFlatbedDies, typed, searchField, tolerance, typedSizes]);
 
   const sortedFlatbedDies = useMemo(
     () => sortFlatbedDies(flatbedDies, sortField, sortDir),

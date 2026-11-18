@@ -50,6 +50,7 @@ import { PromptModal } from './modals';
 import { useRefreshStock } from './PaperStockModals';
 import CsvExportButton from './CsvExportButton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Mirrors DEFAULT_LIMIT in src/lib/jobSeparationQuery.ts.
 const PAGE_SIZE = 500;
@@ -163,11 +164,7 @@ export default function BomCostingTable({ canDecide, canSeeTotals, canSeeRates }
   const refreshStock = useRefreshStock();
 
   // Debounced only while typing — range changes apply immediately.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const debouncedSearch = useDebouncedSearch(search);
 
   useEffect(() => {
     setLimit(PAGE_SIZE);

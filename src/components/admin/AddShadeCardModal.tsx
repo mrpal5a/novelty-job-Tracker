@@ -12,6 +12,8 @@
 // either way, and the DB trigger records every change in the status trail.
 
 import React, { useState, useEffect, useId, useRef } from 'react';
+import { useParties } from '@/hooks/useReferenceData';
+import { findParties } from '@/lib/search';
 import Link from 'next/link';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -148,6 +150,7 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
   // A value comparison rather than a one-shot flag: dev StrictMode runs the
   // effect twice on mount, which would consume a flag and open the list.
   const chosenParty = useRef(card?.party ?? '');
+  const parties = useParties().data;
 
   useEffect(() => {
     const q = party.trim();
@@ -160,21 +163,12 @@ export default function AddShadeCardModal({ mode, card, onClose, onSaved }: Prop
       setShowPartySuggestions(false);
       return;
     }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const res  = await fetch(`/api/parties?search=${encodeURIComponent(q)}`);
-        const data = await res.json();
-        if (!cancelled && res.ok) {
-          setPartySuggestions(data.parties ?? []);
-          setShowPartySuggestions(true);
-        }
-      } catch {
-        // Best-effort — the field still takes a typed name without it.
-      }
-    }, 250);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [party]);
+    // The list is cached in the browser, so suggestions follow each key.
+    // Still loading: this runs again when it arrives.
+    if (!parties) return;
+    setPartySuggestions(findParties(parties, q));
+    setShowPartySuggestions(true);
+  }, [party, parties]);
 
   function selectParty(p: Party) {
     chosenParty.current = p.name;

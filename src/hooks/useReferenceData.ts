@@ -14,6 +14,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { MentionOption } from '@/lib/mentionInput';
+import type { Party } from '@/lib/types';
 
 const REFERENCE_STALE_MS = 5 * 60_000;
 
@@ -43,6 +44,19 @@ export function usePrintingUnits<T>(opts: { enabled?: boolean } = {}) {
     queryFn:  () => getJson('/api/printing-units', (b) => (b.units ?? []) as T[]),
     staleTime: REFERENCE_STALE_MS,
     enabled:  opts.enabled ?? true,
+  });
+}
+
+export const PARTIES_KEY = ['parties'] as const;
+
+/** The party list (~55 names), for suggesting as people type: matched in the
+ *  browser (findParties), so suggestions follow each key. Default staleTime,
+ *  not the long one above: a party Prepress has just added must show up the
+ *  next time a form opens. Managing parties refreshes it (ManagePartiesModal). */
+export function useParties() {
+  return useQuery({
+    queryKey: PARTIES_KEY,
+    queryFn:  () => getJson('/api/parties', (b) => (b.parties ?? []) as Party[]),
   });
 }
 

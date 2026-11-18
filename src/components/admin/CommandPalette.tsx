@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/CommandPalette.tsx
-// Ctrl K — search everything. One box over jobs, plates, dies, label stock
-// and parties, plus the sections of the app itself ("slips" → Go to Slips).
+// Ctrl K — search everything. One box over jobs, Job Separation lines, shade
+// cards, plates, dies (by size too: "210x60"), label stock and parties, plus the sections of the app itself ("slips" → Go to Slips).
 //
 // Picking a job opens its page. Picking a plate, die or stock entry opens
 // that section with its own search already filled (?q=, see useUrlSearch),
@@ -14,18 +14,31 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, FileText, Disc, Scissors, Package, Building2, CornerDownLeft, type LucideIcon } from 'lucide-react';
+import { Search, FileText, Disc, Scissors, Package, Building2, CornerDownLeft, SplitSquareHorizontal, Palette, type LucideIcon } from 'lucide-react';
 import { cn, formatQty, formatNumericDate } from '@/lib/utils';
 import { STAGE_DOT } from '@/lib/constants/statusColors';
+import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
 import type { Stage } from '@/lib/constants/stages';
 
 export type PaletteSection = { href: string; label: string; icon: LucideIcon };
 
-type Filter = 'all' | 'jobs' | 'tooling' | 'stock' | 'parties';
+/** Wakes the search route — an empty query is answered right after the
+ *  sign-in check — so the first real search doesn't pay the ~1 s cold start
+ *  of a server that has been idle. Called on open and when the pointer
+ *  reaches the search button; at most once a minute. */
+let warmedAt = 0;
+export function warmSearch() {
+  if (Date.now() - warmedAt < 60_000) return;
+  warmedAt = Date.now();
+  fetch('/api/search?q=').catch(() => { /* best effort */ });
+}
+
+type Filter = 'all' | 'jobs' | 'shade' | 'tooling' | 'stock' | 'parties';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all',     label: 'All' },
   { id: 'jobs',    label: 'Jobs' },
+  { id: 'shade',   label: 'Shade cards' },
   { id: 'tooling', label: 'Plates & dies' },
   { id: 'stock',   label: 'Stock' },
   { id: 'parties', label: 'Parties' },
@@ -33,7 +46,9 @@ const FILTERS: { id: Filter; label: string }[] = [
 
 type SearchResponse = {
   jobs:    { id: string; job_card_number: string | null; po_number: string; party: string; job_name: string | null; pm_code: string | null; status: Stage; delivery_date: string | null; is_closed: boolean }[];
-  plates:  { id: string; plate_id: string | null; party: string; pm_code: string | null; item_name: string | null; cylinder: number | null; location: string | null }[];
+  separations: { id: string; sr_no: string | null; party: string; po_no: string | null; pm_code: string | null; material_name: string | null; quantity: number | null; cancelled_at: string | null }[];
+  shadeCards:  { id: string; shade_card_number: string | null; party: string | null; product_name: string | null; pm_code: string | null; status: string | null }[];
+  plates:  { id: string; plate_id: string | null; party: string; pm_code: string | null; item_name: string | null; cylinder: number | null; location: string | null; across_size: string | null; around_size: string | null }[];
   dies:    { id: string; serial_no: string | null; job_name: string; length: string | null; width: string | null; status: string; location: string | null }[];
   flatbed: { id: string; serial_no: number; length: string | null; width: string | null; shape: string | null; location: string | null }[];
   stock:   { id: string; kind: string; party: string; job_name: string | null; pm_code: string | null; job_card_number: string | null; qty: number; location: string | null }[];
@@ -94,6 +109,7 @@ export default function CommandPalette({
   // Fresh each time it opens; focus goes back where it was on close.
   useEffect(() => {
     if (!open) return;
+    warmSearch();
     const prev = document.activeElement as HTMLElement | null;
     setQ(''); setFilter('all'); setData(null); setActive(0); setFailed(false);
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -120,7 +136,7 @@ export default function CommandPalette({
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);
       }
-    }, 180);
+    }, SEARCH_DEBOUNCE_MS);
     return () => { clearTimeout(timer); ctrl.abort(); };
   }, [q, open]);
 
@@ -143,10 +159,29 @@ export default function CommandPalette({
           </span>
         ),
       });
+      for (const s of data.separations) out.push({
+        key: `sep-${s.id}`, group: 'Job Separation', filter: 'jobs', icon: SplitSquareHorizontal,
+        // Its own Sr No, so the page lands on this line (and widens to all dates).
+        href: `/admin/job-separation?q=${s.sr_no ? encodeURIComponent(s.sr_no) : enc}`,
+        title: <>{s.sr_no && <span className="font-mono">{hl(s.sr_no, term)} · </span>}{hl(s.party, term)}</>,
+        sub: sep(hl(s.material_name, term), s.po_no && <>PO <span className="font-mono">{hl(s.po_no, term)}</span></>,
+                 s.pm_code && <>PM <span className="font-mono">{hl(s.pm_code, term)}</span></>),
+        aside: s.cancelled_at
+          ? <span className="text-[13px] text-brand-muted">Cancelled</span>
+          : s.quantity != null && <span className="font-mono text-[13px] text-brand-muted">{formatQty(s.quantity)} pcs</span>,
+      });
+      for (const c of data.shadeCards) out.push({
+        key: `shade-${c.id}`, group: 'Shade cards', filter: 'shade', href: `/admin/shade-cards/${c.id}`, icon: Palette,
+        title: <>Shade card {c.shade_card_number && <span className="font-mono">{hl(c.shade_card_number, term)}</span>}{c.party && <> · {hl(c.party, term)}</>}</>,
+        sub: sep(hl(c.product_name, term), c.pm_code && <>PM <span className="font-mono">{hl(c.pm_code, term)}</span></>),
+        aside: c.status && <span className="text-[13px] text-brand-muted">{c.status}</span>,
+      });
       for (const p of data.plates) out.push({
         key: `plate-${p.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/plates?q=${enc}`, icon: Disc,
         title: <>Plate {p.plate_id ? <span className="font-mono">{hl(p.plate_id, term)}</span> : <span className="text-brand-muted">without an ID</span>}</>,
-        sub: sep(hl(p.party, term), p.pm_code && <>PM <span className="font-mono">{hl(p.pm_code, term)}</span></>, hl(p.item_name, term), p.cylinder != null && <span className="font-mono">{p.cylinder}T</span>),
+        sub: sep(hl(p.party, term), p.pm_code && <>PM <span className="font-mono">{hl(p.pm_code, term)}</span></>, hl(p.item_name, term),
+                 (p.across_size || p.around_size) && <span className="font-mono">{[p.across_size, p.around_size].filter(Boolean).join(' × ')}</span>,
+                 p.cylinder != null && <span className="font-mono">{p.cylinder}T</span>),
         aside: p.location && <span className="font-mono text-[13px] text-brand-muted">Rack {p.location}</span>,
       });
       for (const d of data.dies) out.push({
@@ -225,12 +260,12 @@ export default function CommandPalette({
       >
         <label className="flex items-center gap-3 border-b border-brand-border px-5">
           <Search className="h-5 w-5 shrink-0 text-brand-primary" aria-hidden="true" />
-          <span className="sr-only">Search jobs, plates, dies, stock and parties</span>
+          <span className="sr-only">Search jobs, Job Separation, shade cards, plates, dies, stock and parties</span>
           <input
             ref={inputRef}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search jobs, plates, dies, stock and parties"
+            placeholder="Job card, PO, PM code, party, or a size like 210x60"
             role="combobox"
             aria-expanded="true"
             aria-controls="palette-results"

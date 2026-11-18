@@ -33,6 +33,7 @@ import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { Kpi } from '@/components/ui/Kpi';
+import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddShadeCardModal = dynamic(() => import('./AddShadeCardModal'), { ssr: false });
@@ -122,13 +123,9 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
     },
   });
 
-  // The list asks the server 300 ms after typing stops — it used to ask on
+  // The list asks the server once typing pauses — it used to ask on
   // every keystroke, each one a full search + count. Clearing is immediate.
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  useEffect(() => {
-    const timer = setTimeout(() => setDebouncedSearch(search), search ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [search]);
+  const debouncedSearch = useDebouncedSearch(search);
 
   // "Last 7 days" filters on the exact cutoff the summary counted, so the
   // list is the same set as the number on the card (see the summary route).
