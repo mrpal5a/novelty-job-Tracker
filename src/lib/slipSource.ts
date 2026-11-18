@@ -60,6 +60,9 @@ export function separationsToOffer(rows: JobSeparation[], jobIds: ReadonlySet<st
 
 export type SourceMatches = { jobs: SlipSource[]; separations: SlipSource[] };
 
+/** Orders listed for one full PM code; the most any code has today is 23. */
+const PM_ORDERS_LIMIT = 100;
+
 /**
  * Jobs and Job Separation rows matching `term` (card / Sr no, PO, party, PM
  * code or job name), every date — the order being packed or dispatched may
@@ -74,10 +77,20 @@ export async function searchSources(term: string): Promise<SourceMatches> {
       return res.ok ? ((await res.json())[key] ?? []) : [];
     } catch { return []; }
   };
-  const [jobs, seps] = await Promise.all([
+  const [jobs, firstSeps] = await Promise.all([
     get<Job>(`/api/jobs?search=${q}`, 'jobs'),
     get<JobSeparation>(`/api/job-separations?search=${q}&range=all&limit=8`, 'job_separations'),
   ]);
+  // A full PM code: re-orders share it (one has 23 orders), so the newest 8
+  // would hide the order being packed. List every order under that code.
+  let seps = firstSeps;
+  const isCode = (r: JobSeparation) => r.pm_code?.trim().toLowerCase() === term.trim().toLowerCase();
+  if (firstSeps.some(isCode)) {
+    const all = (await get<JobSeparation>(
+      `/api/job-separations?search=${q}&field=pm_code&range=all&limit=${PM_ORDERS_LIMIT}`, 'job_separations',
+    )).filter(isCode);
+    if (all.length) seps = all;
+  }
   const shown = jobs.slice(0, 8);
   return {
     jobs:        shown.map(slipSourceFromJob),

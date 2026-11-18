@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
   if (search) {
     // job_card_number first: prepress reads a number off a printed card
     // and searches for it, so it is the most common lookup on the floor.
-    query = query.or(orContains(['job_card_number', 'po_number', 'party', 'job_name'], search));
+    // pm_code: the slip page searches by PM code (src/lib/slipSource.ts).
+    query = query.or(orContains(['job_card_number', 'po_number', 'party', 'job_name', 'pm_code'], search));
   }
 
   const { data, error } = await query;

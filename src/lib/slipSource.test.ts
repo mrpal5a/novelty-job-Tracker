@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { slipSourceFromSeparation, separationsToOffer } from './slipSource';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { slipSourceFromSeparation, separationsToOffer, searchSources } from './slipSource';
 import type { JobSeparation } from './types';
 
 const row = (over: Partial<JobSeparation>): JobSeparation => ({
@@ -31,5 +31,34 @@ describe('separationsToOffer', () => {
       row({ id: 'linked-elsewhere', linked_job_id: 'job-2' }),
     ];
     expect(separationsToOffer(rows, new Set(['job-1'])).map((r) => r.id)).toEqual(['keep', 'linked-elsewhere']);
+  });
+});
+
+describe('searchSources', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const reply = (body: object) => Promise.resolve(new Response(JSON.stringify(body)));
+
+  it('lists every order under a full PM code, not just the newest 8', async () => {
+    const orders = Array.from({ length: 23 }, (_, i) => row({ id: `o${i}`, pm_code: '203232' }));
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      urls.push(url);
+      if (url.startsWith('/api/jobs')) return reply({ jobs: [] });
+      if (url.includes('field=pm_code')) return reply({ job_separations: [...orders, row({ id: 'other', pm_code: '1203232' })] });
+      return reply({ job_separations: orders.slice(0, 8) });
+    });
+    const { separations } = await searchSources('203232');
+    expect(separations).toHaveLength(23);
+    expect(separations.map((s) => s.id)).not.toContain('other');
+  });
+
+  it('keeps the 8-row list for a partial code', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', (url: string) => {
+      urls.push(url);
+      return reply(url.startsWith('/api/jobs') ? { jobs: [] } : { job_separations: [row({ pm_code: '203232' })] });
+    });
+    await searchSources('2032');
+    expect(urls.some((u) => u.includes('field=pm_code'))).toBe(false);
   });
 });

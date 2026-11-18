@@ -419,15 +419,20 @@ export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
       setResults({ jobs: [], separations: [] });
       return;
     }
+    // A slow answer for an earlier term (e.g. "2303" while typing 2303393)
+    // must not land over the newer one — that showed other PM codes' jobs
+    // for the code actually typed. Same guard as AddCustomDispatchModal.
+    let stale = false;
     const t = setTimeout(async () => {
       setSearching(true);
       try {
-        setResults(await searchSources(term));
+        const found = await searchSources(term);
+        if (!stale) setResults(found);
       } finally {
-        setSearching(false);
+        if (!stale) setSearching(false);
       }
     }, 250);
-    return () => clearTimeout(t);
+    return () => { stale = true; clearTimeout(t); };
   }, [search]);
 
   function selectJob(j: SlipSource) {
