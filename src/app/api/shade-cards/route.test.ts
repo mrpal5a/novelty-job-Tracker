@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import { signIn, respond, json, queries } from '@/test/api';
 import { GET } from './route';
-import { orContains } from '@/lib/search';
+import { orContains, termFilter } from '@/lib/search';
 import { SHADE_CARD_SEARCH_COLUMNS } from '@/lib/constants/shadeCards';
 
 const search = (qs: Record<string, string>) =>
@@ -38,10 +38,19 @@ describe('GET /api/shade-cards', () => {
     expect(await res.json()).toEqual({ cards: [], total: 50, page: 3, pageSize: 25 });
   });
 
-  it('"all fields" keeps commas and brackets in the search as typed', async () => {
+  it('"all fields": the phrase first, then word by word; punctuation never breaks it', async () => {
     signIn('QC');
+    // No card holds the phrase (nothing is answered), so it goes word by word.
     await search({ search: 'Labels (Pvt), Ltd' });
-    expect(filters()).toContainEqual(['or', orContains(SHADE_CARD_SEARCH_COLUMNS, 'Labels (Pvt), Ltd')]);
+    const [probe, list] = queries('shade_cards');
+    expect(probe.filters).toContainEqual(['or', termFilter('labelspvtltd')]);
+    for (const w of ['labels', 'pvt', 'ltd']) expect(list.filters).toContainEqual(['or', termFilter(w)]);
+  });
+
+  it('"all fields" with only punctuation is matched as typed', async () => {
+    signIn('QC');
+    await search({ search: '%' });
+    expect(filters()).toContainEqual(['or', orContains(SHADE_CARD_SEARCH_COLUMNS, '%')]);
   });
 
   it('a single field keeps them too', async () => {

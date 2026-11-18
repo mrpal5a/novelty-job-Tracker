@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import { signIn, json, queries } from '@/test/api';
 import { GET } from './route';
-import { orContains } from '@/lib/search';
+import { orContains, termFilter } from '@/lib/search';
 
 const search = (q: string) => GET(json(`/api/bom-costings?${new URLSearchParams({ search: q })}`, 'GET'));
 
@@ -21,9 +21,9 @@ describe('GET /api/bom-costings', () => {
     const res = await search('Glypho (500 ml), 41% SL');
     expect(res.status).toBe(200);
     const [list, probe] = queries('job_separations');
-    expect(probe.filters).toContainEqual(['ilike', 'search_text', '%glypho500ml41sl%']);
+    expect(probe.filters).toContainEqual(['or', termFilter('glypho500ml41sl')]);
     for (const w of ['glypho', '500', 'ml', '41', 'sl']) {
-      expect(list.filters).toContainEqual(['ilike', 'search_text', `%${w}%`]);
+      expect(list.filters).toContainEqual(['or', termFilter(w)]);
     }
   });
 

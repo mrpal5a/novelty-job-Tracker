@@ -144,12 +144,17 @@ export function matchSizePair([c1, c2]: readonly [string, string], a: string, b:
 }
 
 // ── search_text: one forgiving search over a row's key fields ───────
-// A table with a search_text column (migration 098 onwards) holds each key
-// field lowercased with only letters and digits kept, the fields joined by
-// "|": "|aug261|upl03|5000485|203232|marinepollutant10x10cm|". Typed text is
-// squashed the same way, so "upl 03", "UPL-03" and "upl03" are one search.
+// A table with a search_text column (migrations 098–099) holds its key
+// fields lowercased, each run of anything but letters and digits turned into
+// one space, the fields fenced by "|": "|aug26 1|upl 03|5000485|203232|".
+// Typed text is squashed to letters and digits only, and a term matches
+//   - inside one word, as the old search did ("48569" in a PO), or
+//   - from the start of a word, skipping the spaces: "upl03", "UPL-03" and
+//     "upl 03" all find UPL - 03.
+// A match may not start mid-word and run on into the next word, so "r4"
+// doesn't find "SUPER 456CS" (squashing alone would: "super456cs").
 
-/** Lowercase, letters and digits only — exactly what search_text holds. */
+/** Lowercase, letters and digits only — the form typed terms are matched in. */
 export function squashAscii(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
@@ -170,22 +175,49 @@ export function searchTerms(q: string): SearchTerms | null {
   return { phrase, words };
 }
 
-type Ilikeable<Q> = { ilike: (column: string, pattern: string) => Q };
+/** The term's letters with an optional space between each: "u ?p ?l ?0 ?3".
+ *  Terms are letters and digits only, so nothing needs regex escaping. */
+const spaced = (t: string) => t.split('').join(' ?');
 
-/**
- * Filters on search_text. As a phrase, the whole text must sit inside one
- * field ("|" can't be typed, so a match never spans two): "UPL - 03" finds
- * party UPL - 03, not UPL - 13 with an 03 in its PO. As words, every word
- * must be somewhere in the row: "riverline 2032" finds that party's PM code.
- * Squashed text is only letters and digits, so it needs no LIKE escaping.
- */
-export function onSearchText<Q extends Ilikeable<Q>>(q: Q, t: SearchTerms, asPhrase: boolean): Q {
-  if (asPhrase || t.words.length < 2) return q.ilike('search_text', `%${t.phrase}%`);
-  return t.words.reduce((acc, w) => acc.ilike('search_text', `%${w}%`), q);
+/** search_text matches the term (see above), for `.or(...)`. */
+export function termFilter(t: string): string {
+  return `search_text.like.${quote(`%${t}%`)},search_text.match.${quote(`(^|[ |])${spaced(t)}`)}`;
 }
 
-/** search_text pattern for a field equal to the whole text — the "exact
- *  match" listed first: "203232" is that PM code, not 2032321. */
-export function exactFieldPattern(t: SearchTerms): string {
-  return `%|${t.phrase}|%`;
+/** Regex for a field that IS the term, spaces aside — the "exact match"
+ *  listed first: "203232" is that PM code, not 2032321. Use with
+ *  `.filter('search_text', 'match', …)`. */
+export function exactFieldRegex(t: SearchTerms): string {
+  return `\\|${spaced(t.phrase)}\\|`;
+}
+
+type Orable<Q> = { or: (filters: string) => Q };
+
+/**
+ * Filters on search_text. As a phrase, the whole text must match within one
+ * field ("|" can't be typed, so a match never spans two): "UPL - 03" finds
+ * party UPL - 03, not UPL - 13 with an 03 in its PO. As words, every word
+ * must match somewhere in the row: "riverline 2032" finds that party's PM
+ * code. Each .or() is ANDed with the others.
+ */
+export function onSearchText<Q extends Orable<Q>>(q: Q, t: SearchTerms, asPhrase: boolean): Q {
+  if (asPhrase || t.words.length < 2) return q.or(termFilter(t.phrase));
+  return t.words.reduce((acc, w) => acc.or(termFilter(w)), q);
+}
+
+/**
+ * Whether a multi-word search runs as one phrase: yes when the phrase finds
+ * something in the caller's scope (`probe` runs the phrase filter there and
+ * returns any one row), else word by word. One word is always a phrase.
+ * "UPL - 03" is that party, not every UPL line with an 03 in its PO; but
+ * "riverline 2032" (party + PM code) still finds the line.
+ */
+export async function searchAsPhrase(
+  t: SearchTerms,
+  probe: () => PromiseLike<{ data: unknown[] | null; error: unknown }>,
+): Promise<boolean> {
+  if (t.words.length < 2) return true;
+  const { data, error } = await probe();
+  if (error) throw error;
+  return Boolean(data?.length);
 }

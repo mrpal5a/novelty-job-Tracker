@@ -14,10 +14,11 @@
 // enforces that again).
 
 import { NextRequest, NextResponse } from 'next/server';
+import type { PostgrestError } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { getDeptPermissions, canDeptViewStock } from '@/lib/constants/departments';
-import { containsPattern, exactFieldPattern, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms } from '@/lib/search';
+import { containsPattern, exactFieldRegex, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms } from '@/lib/search';
 import { SHADE_CARD_SEARCH_COLUMNS } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -45,53 +46,73 @@ export async function GET(request: NextRequest) {
   const dieMatch = (contains: string[]) =>
     pair ? orSizePair(['length', 'width'], pair[0], pair[1]) : orMatch(contains, ['length', 'width'], q);
 
-  // Job Separation lines on search_text (migration 098), best first: a
-  // field that IS the text ("203232" is that PM code), then the text inside
-  // a field, then — for several words — each word somewhere in the line.
-  // Within each, live lines then the newest. No money columns: not every
-  // dept may see them.
+  // Jobs, Job Separation lines, shade cards, plates and label stock are
+  // searched on search_text (migrations 098–099), best first: a field that
+  // IS the text ("203232" is that PM code), then the text within a field,
+  // then — for several words — each word somewhere in the row. Each list's
+  // own order applies within each.
   const terms = searchTerms(q);
-  const separations = () => supabase
-    .from('job_separations')
-    .select('id, sr_no, party, po_no, pm_code, material_name, quantity, cancelled_at')
-    .order('cancelled_at', { ascending: false, nullsFirst: true })
-    .order('created_at', { ascending: false })
-    .limit(LIMIT);
-  async function searchSeparations() {
-    if (!terms) return separations().or(orContains(['sr_no', 'party', 'po_no', 'pm_code', 'material_name'], q));
-    const tiers = await Promise.all([
-      separations().ilike('search_text', exactFieldPattern(terms)),
-      onSearchText(separations(), terms, true),
-      terms.words.length > 1 ? onSearchText(separations(), terms, false) : null,
-    ]);
-    return bestFirst(tiers);
+  type Searchable<Q> = { or: (f: string) => Q; filter: (c: string, op: string, v: string) => Q };
+  function bestOf<Q extends Searchable<Q>>(make: () => Q, columns: readonly string[]): Q[] {
+    // Only punctuation typed ("%"): matched as typed.
+    if (!terms) return [make().or(orContains(columns, q))];
+    return [
+      make().filter('search_text', 'match', exactFieldRegex(terms)),
+      onSearchText(make(), terms, true),
+      ...(terms.words.length > 1 ? [onSearchText(make(), terms, false)] : []),
+    ];
   }
+  const ranked = <Q extends Searchable<Q> & PromiseLike<{ data: { id: string }[] | null; error: PostgrestError | null }>>(
+    make: () => Q, columns: readonly string[],
+  ) => Promise.all(bestOf(make, columns)).then(bestFirst);
 
   const [jobs, separationRows, shadeCards, plates, dies, flatbed, stock, parties] = await Promise.all([
-    supabase
-      .from('jobs')
-      .select('id, job_card_number, po_number, party, job_name, pm_code, status, delivery_date, is_closed')
-      .or(orContains(['job_card_number', 'po_number', 'party', 'job_name', 'pm_code'], q))
-      // Open jobs first, then the newest — a repeat order beats last year's.
-      .order('is_closed', { ascending: true })
-      .order('created_at', { ascending: false })
-      .limit(LIMIT),
-    // Job Separation lines — the most searched list in the app.
-    searchSeparations(),
+    ranked(
+      () => supabase
+        .from('jobs')
+        .select('id, job_card_number, po_number, party, job_name, pm_code, status, delivery_date, is_closed')
+        // Open jobs first, then the newest — a repeat order beats last year's.
+        .order('is_closed', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(LIMIT),
+      ['job_card_number', 'po_number', 'party', 'job_name', 'pm_code'],
+    ),
+    // Job Separation lines — the most searched list in the app. Live lines
+    // first, then the newest. No money columns: not every dept may see them.
+    ranked(
+      () => supabase
+        .from('job_separations')
+        .select('id, sr_no, party, po_no, pm_code, material_name, quantity, cancelled_at')
+        .order('cancelled_at', { ascending: false, nullsFirst: true })
+        .order('created_at', { ascending: false })
+        .limit(LIMIT),
+      ['sr_no', 'party', 'po_no', 'pm_code', 'material_name'],
+    ),
     // Shade cards: the live version of each card only, as on its page.
-    supabase
-      .from('shade_cards')
-      .select('id, shade_card_number, party, product_name, pm_code, status')
-      .eq('is_current', true)
-      .or(orContains(SHADE_CARD_SEARCH_COLUMNS, q))
-      .order('updated_at', { ascending: false })
-      .limit(LIMIT),
-    supabase
-      .from('plates')
-      .select('id, plate_id, party, pm_code, item_name, cylinder, location, across_size, around_size')
-      .or(pair ? orSizePair(['across_size', 'around_size'], pair[0], pair[1]) : orContains(['party', 'pm_code', 'item_name', 'plate_id'], q))
-      .order('created_at', { ascending: false })
-      .limit(LIMIT),
+    ranked(
+      () => supabase
+        .from('shade_cards')
+        .select('id, shade_card_number, party, product_name, pm_code, status')
+        .eq('is_current', true)
+        .order('updated_at', { ascending: false })
+        .limit(LIMIT),
+      SHADE_CARD_SEARCH_COLUMNS,
+    ),
+    pair
+      ? supabase
+          .from('plates')
+          .select('id, plate_id, party, pm_code, item_name, cylinder, location, across_size, around_size')
+          .or(orSizePair(['across_size', 'around_size'], pair[0], pair[1]))
+          .order('created_at', { ascending: false })
+          .limit(LIMIT)
+      : ranked(
+          () => supabase
+            .from('plates')
+            .select('id, plate_id, party, pm_code, item_name, cylinder, location, across_size, around_size')
+            .order('created_at', { ascending: false })
+            .limit(LIMIT),
+          ['party', 'pm_code', 'item_name', 'plate_id'],
+        ),
     supabase
       .from('dies')
       .select('id, serial_no, job_name, length, width, status, location')
@@ -105,13 +126,15 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(LIMIT),
     canSeeStock
-      ? supabase
-          .from('label_stock')
-          .select('id, kind, party, job_name, pm_code, job_card_number, qty, location')
-          .eq('is_dispatched', false)
-          .or(orContains(['job_card_number', 'po_number', 'pm_code', 'party', 'job_name', 'location'], q))
-          .order('created_at', { ascending: false })
-          .limit(LIMIT)
+      ? ranked(
+          () => supabase
+            .from('label_stock')
+            .select('id, kind, party, job_name, pm_code, job_card_number, qty, location')
+            .eq('is_dispatched', false)
+            .order('created_at', { ascending: false })
+            .limit(LIMIT),
+          ['job_card_number', 'po_number', 'pm_code', 'party', 'job_name', 'location'],
+        )
       : Promise.resolve({ data: [], error: null }),
     supabase
       .from('parties')

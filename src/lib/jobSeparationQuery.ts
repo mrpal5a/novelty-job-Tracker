@@ -13,8 +13,6 @@
 // means "this month's Sr. No. series", not "entered this month". A PO
 // dated 31 Aug added a few days into September must still show up under
 // August, matching its AUG26 number.
-import type { SearchTerms } from './search';
-
 export type DateRange = 'month' | '3months' | 'all';
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -72,21 +70,3 @@ export function parseLimit(raw: string | null): number {
   return Math.min(Math.trunc(n), MAX_LIMIT);
 }
 
-/**
- * "All fields" search on Job Separation lines, shared with Bill of Material
- * so both find the same rows. It reads search_text (migration 098): case,
- * spaces and dashes don't matter. Several words are first tried as one
- * phrase inside one field ("UPL - 03" is that party, not every UPL line with
- * an 03 in its PO); only if that finds nothing in the caller's scope must
- * each word be somewhere in the line ("riverline 2032": party + PM code).
- * `probe` runs the phrase filter over that scope and returns any one row.
- */
-export async function searchAsPhrase(
-  t: SearchTerms,
-  probe: () => PromiseLike<{ data: unknown[] | null; error: unknown }>,
-): Promise<boolean> {
-  if (t.words.length < 2) return true;
-  const { data, error } = await probe();
-  if (error) throw error;
-  return Boolean(data?.length);
-}

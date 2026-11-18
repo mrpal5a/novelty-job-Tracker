@@ -4,7 +4,7 @@
 // millimetre, whether the stored value or the search carries decimals.
 
 import { describe, expect, it } from 'vitest';
-import { containsPattern, exactFieldPattern, nameMatches, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms, sizePatterns, startsFirst } from './search';
+import { containsPattern, exactFieldRegex, nameMatches, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms, sizePatterns, startsFirst } from './search';
 
 describe('searchTerms', () => {
   it('squashes case, spaces and punctuation, phrase and words alike', () => {
@@ -19,16 +19,29 @@ describe('searchTerms', () => {
 });
 
 describe('onSearchText', () => {
-  const rec = () => { const calls: string[][] = []; const q = { ilike(c: string, p: string) { calls.push([c, p]); return q; } }; return { q, calls }; };
-  it('a phrase is one pattern; words are one pattern each, ANDed', () => {
+  const rec = () => { const calls: string[] = []; const q = { or(f: string) { calls.push(f); return q; } }; return { q, calls }; };
+  it('a term matches inside a word, or from a word start skipping spaces', () => {
+    const a = rec(); onSearchText(a.q, searchTerms('UPL-03')!, true);
+    expect(a.calls).toEqual(['search_text.like."%upl03%",search_text.match."(^|[ |])u ?p ?l ?0 ?3"']);
+  });
+  it('several words: one ANDed .or() per word, unless run as a phrase', () => {
     const t = searchTerms('riverline 2032')!;
     const a = rec(); onSearchText(a.q, t, true);
-    expect(a.calls).toEqual([['search_text', '%riverline2032%']]);
+    expect(a.calls).toHaveLength(1);
     const b = rec(); onSearchText(b.q, t, false);
-    expect(b.calls).toEqual([['search_text', '%riverline%'], ['search_text', '%2032%']]);
+    expect(b.calls).toEqual([
+      'search_text.like."%riverline%",search_text.match."(^|[ |])r ?i ?v ?e ?r ?l ?i ?n ?e"',
+      'search_text.like."%2032%",search_text.match."(^|[ |])2 ?0 ?3 ?2"',
+    ]);
+  });
+  it('the word-start rule keeps "r4" out of "super 456cs" (checked as Postgres reads it)', () => {
+    const re = (t: string) => new RegExp(`(^|[ |])${t.split('').join(' ?')}`);
+    expect(re('r4').test('|super 456cs 5l label|')).toBe(false);
+    expect(re('upl03').test('|x|upl 03|')).toBe(true);
+    expect(re('aug261').test('|aug26 10|')).toBe(true);
   });
   it('exact field match is fenced by the | separators', () => {
-    expect(exactFieldPattern(searchTerms('203232')!)).toBe('%|203232|%');
+    expect(exactFieldRegex(searchTerms('20-3232')!)).toBe('\\|2 ?0 ?3 ?2 ?3 ?2\\|');
   });
 });
 

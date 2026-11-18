@@ -11,7 +11,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions } from '@/lib/constants/departments';
 import { createJobRecord } from '@/lib/jobs/createJob';
 import type { AddJobFormData } from '@/lib/types';
-import { orContains } from '@/lib/search';
+import { onSearchText, orContains, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 
 // ── GET ───────────────────────────────────────────────────────
@@ -30,20 +30,37 @@ export async function GET(request: NextRequest) {
   const search    = searchParams.get('search');
   const closed    = searchParams.get('closed') === 'true';
 
+  // job_card_number first: prepress reads a number off a printed card and
+  // searches for it, so it is the most common lookup on the floor. pm_code:
+  // the slip page searches by PM code (src/lib/slipSource.ts). Matched on
+  // search_text (migration 099) — see searchAsPhrase for phrase vs words.
+  const terms = search ? searchTerms(search) : null;
+  let asPhrase = true;
+  if (terms) {
+    try {
+      // The phrase, over the same view (open or closed, status, urgent).
+      asPhrase = await searchAsPhrase(terms, async () => {
+        let probe = supabase.from('jobs').select('*').eq('is_closed', closed);
+        if (status) probe = probe.eq('status', status);
+        if (urgent === 'true') probe = probe.eq('urgent', true);
+        const { data, error } = await onSearchText(probe, terms, true).limit(1);
+        return { data, error };
+      });
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+  }
+
   let query = supabase
     .from('jobs')
     .select('*, job_stage_timestamps(stage), printing_units(id, name, printing_method), job_separations(rate, unit, material_name)')
     .eq('is_closed', closed)
     .order('delivery_date', { ascending: true, nullsFirst: false });
-
-  if (status)  query = query.eq('status', status);
-  if (urgent === 'true')  query = query.eq('urgent', true);
-  if (search) {
-    // job_card_number first: prepress reads a number off a printed card
-    // and searches for it, so it is the most common lookup on the floor.
-    // pm_code: the slip page searches by PM code (src/lib/slipSource.ts).
-    query = query.or(orContains(['job_card_number', 'po_number', 'party', 'job_name', 'pm_code'], search));
-  }
+  if (status) query = query.eq('status', status);
+  if (urgent === 'true') query = query.eq('urgent', true);
+  if (terms) query = onSearchText(query, terms, asPhrase);
+  // Only punctuation typed ("%"): matched as typed.
+  else if (search) query = query.or(orContains(['job_card_number', 'po_number', 'party', 'job_name', 'pm_code'], search));
 
   const { data, error } = await query;
 

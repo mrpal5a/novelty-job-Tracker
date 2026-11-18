@@ -9,7 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageStock, canDeptViewStock } from '@/lib/constants/departments';
-import { orContains } from '@/lib/search';
+import { onSearchText, orContains, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 
 // ── GET ───────────────────────────────────────────────────────
@@ -39,7 +39,23 @@ export async function GET(request: NextRequest) {
 
   // Someone at the shelf has a label in hand: they search by whatever is
   // printed on it — card number, PO, PM code, party or job name.
-  if (search) {
+  // Matched on search_text (migration 099); see searchAsPhrase.
+  const terms = search ? searchTerms(search) : null;
+  if (terms) {
+    let asPhrase: boolean;
+    try {
+      asPhrase = await searchAsPhrase(terms, async () => {
+        let probe = supabase.from('label_stock').select('*');
+        if (!includeDispatched) probe = probe.eq('is_dispatched', false);
+        const { data, error } = await onSearchText(probe, terms, true).limit(1);
+        return { data, error };
+      });
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+    query = onSearchText(query, terms, asPhrase);
+  } else if (search) {
+    // Only punctuation typed ("%"): matched as typed.
     query = query.or(orContains(
       ['job_card_number', 'po_number', 'pm_code', 'party', 'job_name', 'location'], search,
     ));

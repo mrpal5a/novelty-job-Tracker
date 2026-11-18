@@ -21,7 +21,7 @@ import {
   isMakingStatus,
 } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
-import { containsPattern, orContains } from '@/lib/search';
+import { containsPattern, onSearchText, orContains, searchAsPhrase, searchTerms } from '@/lib/search';
 import { isIsoDate } from '@/lib/jobViews';
 
 /** Most cards one CSV export returns. */
@@ -84,6 +84,10 @@ export async function GET(request: NextRequest) {
   const page = Math.max(1, Number.parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const offset = (page - 1) * SHADE_CARD_PAGE_SIZE;
 
+  // "All fields" reads search_text (migration 099); see searchAsPhrase.
+  const terms = search && !searchColumnFor(field) ? searchTerms(search) : null;
+  let asPhrase = true;
+
   // Superseded rows are history: the list only ever shows the live version of
   // each card. The older versions stay reachable from the card's own page.
   // Built fresh per request so the export below can page through it.
@@ -101,9 +105,10 @@ export async function GET(request: NextRequest) {
       // and brackets used to be swapped for spaces, so "Labels (Pvt), Ltd"
       // typed as written found nothing.
       const column = searchColumnFor(field);
-      query = column
-        ? query.ilike(column, containsPattern(search))
-        : query.or(orContains(SHADE_CARD_SEARCH_COLUMNS, search));
+      if (column) query = query.ilike(column, containsPattern(search));
+      else if (terms) query = onSearchText(query, terms, asPhrase);
+      // Only punctuation typed ("%"): matched as typed.
+      else query = query.or(orContains(SHADE_CARD_SEARCH_COLUMNS, search));
     }
     // Validated against the same lists the UI offers, so an unknown value
     // narrows to nothing rather than being passed through to Postgres.
@@ -114,6 +119,15 @@ export async function GET(request: NextRequest) {
     if (createdFrom) query = query.gte('created_at', createdFrom);
     return query.order(sort, { ascending, nullsFirst: false });
   };
+
+  // The phrase over the same filters, one row.
+  if (terms) {
+    try {
+      asPhrase = await searchAsPhrase(terms, () => filtered(false).range(0, 0));
+    } catch (err) {
+      return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+    }
+  }
 
   // ?export=1 — every card matching the filters, not one screen's page, for
   // the CSV download. Same filters and order; id last so paging never skips

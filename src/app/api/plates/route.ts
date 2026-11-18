@@ -9,7 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
-import { containsPattern, orContains, orMatch, orSizePair } from '@/lib/search';
+import { containsPattern, onSearchText, orContains, orMatch, orSizePair, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 
@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ plates: [] });
   }
 
+  // "All fields" reads search_text (migration 099); see searchAsPhrase.
+  const terms = search && !config ? searchTerms(search) : null;
+  let asPhrase = true;
+
   // Thousands of plates since the Plates.xlsx import: page past PostgREST's
   // 1000-row cap. id breaks created_at ties so pages never overlap.
   // One page at a time, sorted here: the whole table is ~4,000 plates and
@@ -90,6 +94,8 @@ export async function GET(request: NextRequest) {
       // and 60.5, not 160 or 600.
       else if (config?.type === 'size') query = query.or(orMatch([], ['across_size', 'around_size'], search));
       else if (config) query = query.ilike(config.column, containsPattern(search));
+      else if (terms) query = onSearchText(query, terms, asPhrase);
+      // Only punctuation typed ("%"): matched as typed.
       else query = query.or(orContains(['party', 'pm_code', 'item_name', 'plate_id'], search));
     }
     if (sizeA || sizeB) query = query.or(orSizePair(['across_size', 'around_size'], sizeA, sizeB));
@@ -97,6 +103,8 @@ export async function GET(request: NextRequest) {
   };
 
   try {
+    // The phrase over the same filters (size boxes too), one row.
+    if (terms) asPhrase = await searchAsPhrase(terms, () => sorted(0, 0));
     if (searchParams.get('all') === '1') {
       return NextResponse.json({ plates: await allPages((from, to) => sorted(from, to)) });
     }
