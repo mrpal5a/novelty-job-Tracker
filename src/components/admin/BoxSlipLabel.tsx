@@ -26,6 +26,7 @@
 'use client';
 import type { CSSProperties } from 'react';
 import { useBranding } from '@/components/brand/BrandingProvider';
+import FitText from './FitText';
 
 /** Physical label dimensions. The die-cut stock loaded in the P210. */
 export const BOX_SLIP_WIDTH_MM = 152.4;
@@ -241,22 +242,9 @@ export default function BoxSlipLabel({ data }: { data: BoxSlipLabelData }) {
           boxSizing: 'border-box',
         }}
       >
-        <span
-          style={{
-            fontSize: '5.6mm',
-            fontWeight: 700,
-            textAlign: 'center',
-            lineHeight: 1.15,
-            // Two lines maximum; a longer material name clips rather than
-            // overflowing the box and shunting the rows below it.
-            display: '-webkit-box',
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: 'vertical',
-            overflow: 'hidden',
-          }}
-        >
-          {materialName}
-        </span>
+        {/* The whole name: a long one shrinks (onto more lines if need be)
+            inside the fixed box, so the rows below never move. */}
+        <FitText text={materialName} maxMm={5.6} minMm={3} center style={{ fontWeight: 700, lineHeight: 1.15 }} />
       </div>
 
       {/* ── The four data rows ── */}

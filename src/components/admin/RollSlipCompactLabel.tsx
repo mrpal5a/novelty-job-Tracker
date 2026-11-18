@@ -54,6 +54,7 @@
 'use client';
 import type { CSSProperties } from 'react';
 import { useBranding } from '@/components/brand/BrandingProvider';
+import FitText from './FitText';
 
 /** Which of the two compact slips to print. */
 export type CompactSlipVariant = 'small' | 'mini';
@@ -232,7 +233,9 @@ export default function RollSlipCompactLabel({
             <span style={line(v.fs.label)}>PRODUCT</span>
           </div>
           <div style={metaCell}>
-            <span style={line(v.fs.value)}>{product}</span>
+            {/* The whole name, smaller when long (two lines if that's bigger)
+                — not cut off like the one-line cells. */}
+            <FitText text={product} maxMm={v.fs.value} minMm={1.5} style={{ fontWeight: 700, lineHeight: 1.05 }} />
           </div>
         </div>
 

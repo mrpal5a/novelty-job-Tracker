@@ -32,6 +32,7 @@ import type { CSSProperties } from 'react';
 import qrcode from 'qrcode-generator';
 import { productionNameLines } from '@/lib/branding-utils';
 import { useBranding } from '@/components/brand/BrandingProvider';
+import FitText from './FitText';
 
 /**
  * Physical slip dimensions — one sixth of the 6" x 4" sheet, with the height
@@ -204,6 +205,7 @@ const FS_VALUE = 3.0;          // PM code, quantity
 const FS_PRODUCT = 3.2;
 const FS_META = 2.7;           // Direction / Operator — the longest strings
 const FS_HOUSE = 4.8;          // Production house name, two lines inside ROW1
+const FS_NAME_MIN = 1.5;       // Smallest a long product name shrinks to (FitText)
 
 const RULE = `${BORDER_MM}mm solid #000`;
 
@@ -293,17 +295,8 @@ export default function RollSlipLabel({ data }: { data: RollSlipLabelData }) {
             <span style={{ fontSize: `${FS_LABEL}mm`, fontWeight: 700 }}>PRODUCT</span>
           </div>
           <div style={cell({ flex: '1 1 auto', minWidth: 0, justifyContent: 'flex-start' })}>
-            <span
-              style={{
-                fontSize: `${FS_PRODUCT}mm`,
-                fontWeight: 700,
-                ...nowrap,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >
-              {product}
-            </span>
+            {/* The whole name, smaller when long (two lines if that's bigger). */}
+            <FitText text={product} maxMm={FS_PRODUCT} minMm={FS_NAME_MIN} style={{ fontWeight: 700, lineHeight: 1.05 }} />
           </div>
         </div>
 
