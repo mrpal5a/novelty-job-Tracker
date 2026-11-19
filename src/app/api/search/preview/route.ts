@@ -34,7 +34,7 @@ const KINDS = {
   },
   separation: {
     table: 'job_separations',
-    columns: 'id, sr_no, party, po_no, po_date, pm_code, material_name, quantity, unit, job_status, jc_status, aw_send_to, linked_job_card_number, cancelled_at, cancel_reason',
+    columns: 'id, sr_no, party, po_no, po_date, pm_code, material_name, quantity, unit, job_status, jc_status, aw_send_to, linked_job_id, linked_job_card_number, cancelled_at, cancel_reason',
   },
   shade: {
     table: 'shade_cards',

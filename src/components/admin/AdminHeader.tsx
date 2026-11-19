@@ -26,6 +26,8 @@ import {
   canDeptManageDispatchNotifications,
   canDeptExportData,
   canDeptViewStock,
+  canDeptPrintRollSlips,
+  canDeptPrintBoxSlips,
   type DeptPermissions,
 } from '@/lib/constants/departments';
 import { NOTES_OPEN_EVENT, NOTES_UNREAD_EVENT } from '@/lib/constants/events';
@@ -445,6 +447,9 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         sections={allLinks.map(({ href, label, icon }) => ({ href, label, icon }))}
+        // The slip this department may print (roll first), or none: decides
+        // whether the preview offers "Print slip". The Slips page checks again.
+        slipKind={canDeptPrintRollSlips(dept) ? 'roll' : canDeptPrintBoxSlips(dept) ? 'box' : null}
       />
     </header>
   );

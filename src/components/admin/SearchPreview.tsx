@@ -6,11 +6,16 @@
 // it — so it works the same for keyboard and mouse, and doesn't flicker the
 // way a hover card does. Wide screens only; on a phone a tap opens the page.
 //
+// Jobs and Job Separation lines get "Print slip" when the department may
+// print one (slipKind, from its permissions): it opens the Slips page with
+// that job picked, since a slip still needs the roll or box counts typed in.
+// The Slips page checks the permission again before printing.
+//
 // Loads one row at a time (GET /api/search/preview), a moment after the
 // highlight settles, and remembers it while the palette is open.
 
 import { useEffect, useRef, useState } from 'react';
-import { CornerDownLeft, type LucideIcon } from 'lucide-react';
+import { CornerDownLeft, Printer, type LucideIcon } from 'lucide-react';
 import { formatQty, formatNumericDate } from '@/lib/utils';
 import { STAGE_DOT } from '@/lib/constants/statusColors';
 
@@ -22,12 +27,14 @@ type Field = [label: string, value: React.ReactNode, mono?: boolean];
 const SETTLE_MS = 150;
 
 export default function SearchPreview({
-  target, title, icon: Icon, onOpen,
+  target, title, icon: Icon, onOpen, slipKind, onGo,
 }: {
-  target: PreviewTarget | undefined;
-  title:  React.ReactNode;
-  icon:   LucideIcon;
-  onOpen: () => void;
+  target:   PreviewTarget | undefined;
+  title:    React.ReactNode;
+  icon:     LucideIcon;
+  onOpen:   () => void;
+  slipKind: 'roll' | 'box' | null;
+  onGo:     (href: string) => void;
 }) {
   const cache = useRef(new Map<string, Data>());
   const key = target && `${target.kind}:${target.id}`;
@@ -56,6 +63,7 @@ export default function SearchPreview({
   }, [key]);
 
   const data = row && row.key === key ? row.data : null;
+  const slipHref = target && data && slipKind ? slipLink(target.kind, data, slipKind) : null;
   const fields = target && data ? fieldsFor(target.kind, data).filter(([, v]) => v != null && v !== '' && v !== false) : [];
 
   return (
@@ -88,17 +96,41 @@ export default function SearchPreview({
         )}
       </div>
 
-      <button
-        type="button"
-        tabIndex={-1}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={onOpen}
-        className="m-3 mt-0 flex min-h-11 items-center justify-center gap-2 rounded-xl bg-brand-ink text-sm font-semibold text-white hover:bg-brand-primary"
-      >
-        Open <CornerDownLeft className="h-4 w-4" aria-hidden="true" />
-      </button>
+      <div className="m-3 mt-0 flex gap-2">
+        {slipHref && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onGo(slipHref)}
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-brand-border bg-white text-sm font-semibold text-brand-ink hover:bg-brand-surface-alt"
+          >
+            <Printer className="h-4 w-4" aria-hidden="true" /> Print slip
+          </button>
+        )}
+        <button
+          type="button"
+          tabIndex={-1}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onOpen}
+          className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-ink text-sm font-semibold text-white hover:bg-brand-primary"
+        >
+          Open <CornerDownLeft className="h-4 w-4" aria-hidden="true" />
+        </button>
+      </div>
     </aside>
   );
+}
+
+/** The Slips page with this job (or not-yet-job line) picked; none for a
+ *  cancelled line or anything that isn't an order. */
+function slipLink(kind: PreviewTarget['kind'], d: Data, slip: 'roll' | 'box'): string | null {
+  if (kind === 'job') return `/admin/slips?kind=${slip}&job=${d.id}`;
+  if (kind !== 'separation' || d.cancelled_at) return null;
+  // A line that became a job prints as that job.
+  return d.linked_job_id
+    ? `/admin/slips?kind=${slip}&job=${d.linked_job_id}`
+    : `/admin/slips?kind=${slip}&separation=${d.id}`;
 }
 
 const str  = (v: unknown) => (v == null || v === '' ? null : String(v));

@@ -37,6 +37,7 @@
 // block that `break-after: page` can act on, which is all this needs.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import toast from 'react-hot-toast';
 import { Printer, Search } from 'lucide-react';
@@ -69,7 +70,8 @@ import AddressSlipLabel, {
   type BlockOffset,
   type AddressSlipLabelData,
 } from './AddressSlipLabel';
-import { searchSources, type SlipSource } from '@/lib/slipSource';
+import { searchSources, slipSourceFromJob, slipSourceFromSeparation, type SlipSource } from '@/lib/slipSource';
+import type { Job, JobSeparation } from '@/lib/types';
 import { useBranding } from '@/components/brand/BrandingProvider';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { WithExample } from '@/components/ui/FieldAffix';
@@ -435,6 +437,27 @@ export default function SlipsManager({ canPrintBox, canPrintRoll }: Props) {
     }, SEARCH_DEBOUNCE_MS);
     return () => { stale = true; clearTimeout(t); };
   }, [search]);
+
+  // Opened from Ctrl K's "Print slip": ?job= or ?separation= picks that
+  // order and ?kind= the slip. Printing is still gated by canPrint below.
+  const params = useSearchParams();
+  const linkedFrom = params.get('job') ? 'job' : 'separation';
+  const linkedId = params.get('job') ?? params.get('separation');
+  const linkedKind = params.get('kind');
+  useEffect(() => {
+    if (TABS.some((t) => t.kind === linkedKind)) setKind(linkedKind as SlipKind);
+    if (!linkedId) return;
+    let stale = false;
+    (async () => {
+      const res = await fetch(`/api/search/preview?kind=${linkedFrom}&id=${encodeURIComponent(linkedId)}`);
+      if (!res.ok || stale) return;
+      // The preview row carries every field the slip reads (see slipSource).
+      const { row } = await res.json();
+      selectJob(linkedFrom === 'job' ? slipSourceFromJob(row as Job) : slipSourceFromSeparation(row as JobSeparation));
+    })();
+    return () => { stale = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to the URL only
+  }, [linkedId, linkedFrom, linkedKind]);
 
   function selectJob(j: SlipSource) {
     setJob(j);

@@ -95,11 +95,13 @@ function sep(...xs: (React.ReactNode | null | undefined | false)[]): React.React
 }
 
 export default function CommandPalette({
-  open, onClose, sections,
+  open, onClose, sections, slipKind,
 }: {
   open:     boolean;
   onClose:  () => void;
   sections: PaletteSection[];
+  /** Slip the user's department may print, or null (no "Print slip"). */
+  slipKind: 'roll' | 'box' | null;
 }) {
   const router   = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -240,9 +242,11 @@ export default function CommandPalette({
   if (!open) return null;
 
   function go(row: Row | undefined) {
-    if (!row) return;
+    if (row) goTo(row.href);
+  }
+  function goTo(href: string) {
     onClose();
-    router.push(row.href);
+    router.push(href);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -365,7 +369,7 @@ export default function CommandPalette({
           )}
         </div>
         {rows[active] && (
-          <SearchPreview target={rows[active].preview} title={rows[active].title} icon={rows[active].icon} onOpen={() => go(rows[active])} />
+          <SearchPreview target={rows[active].preview} title={rows[active].title} icon={rows[active].icon} onOpen={() => go(rows[active])} slipKind={slipKind} onGo={goTo} />
         )}
         </div>
 
