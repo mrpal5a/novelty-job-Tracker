@@ -412,10 +412,12 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
                     'hover:bg-black/[0.03]',
                   )}
                 >
-                  <td className="px-4 py-3">
+                  {/* On a touch screen the whole Party cell opens the card: a short
+                      name ("UPL") alone is far under the 44px tap target. */}
+                  <td className="relative px-4 py-3">
                     <Link
                       href={`/admin/shade-cards/${c.id}`}
-                      className="font-medium text-[var(--glass-ink)] hover:underline underline-offset-2"
+                      className="font-medium text-[var(--glass-ink)] hover:underline underline-offset-2 [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:inset-0 [@media(pointer:coarse)]:after:content-['']"
                     >
                       {c.party}
                     </Link>
