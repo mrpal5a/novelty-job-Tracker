@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/CommandPalette.tsx
 // Ctrl K — search everything. One box over jobs, Job Separation lines, shade
-// cards, plates, dies (by size too: "210x60"), label stock and parties, plus the sections of the app itself ("slips" → Go to Slips).
+// cards, plates, dies (by rack and size too: "437", "210x60"), label stock and parties, plus the sections of the app itself ("slips" → Go to Slips).
 //
 // Picking a job opens its page. Picking a plate, die or stock entry opens
 // that section with its own search already filled (?q=, see useUrlSearch),
@@ -17,6 +17,8 @@ import { useRouter } from 'next/navigation';
 import { Search, FileText, Disc, Scissors, Package, Building2, CornerDownLeft, SplitSquareHorizontal, Palette, type LucideIcon } from 'lucide-react';
 import { cn, formatQty, formatNumericDate } from '@/lib/utils';
 import { STAGE_DOT } from '@/lib/constants/statusColors';
+import { matchRow } from '@/lib/search';
+import SearchPreview, { type PreviewTarget } from './SearchPreview';
 import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
 import type { Stage } from '@/lib/constants/stages';
 
@@ -33,13 +35,14 @@ export function warmSearch() {
   fetch('/api/search?q=').catch(() => { /* best effort */ });
 }
 
-type Filter = 'all' | 'jobs' | 'shade' | 'tooling' | 'stock' | 'parties';
+type Filter = 'all' | 'jobs' | 'shade' | 'plates' | 'dies' | 'stock' | 'parties';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all',     label: 'All' },
   { id: 'jobs',    label: 'Jobs' },
   { id: 'shade',   label: 'Shade cards' },
-  { id: 'tooling', label: 'Plates & dies' },
+  { id: 'plates',  label: 'Plates' },
+  { id: 'dies',    label: 'Dies' },
   { id: 'stock',   label: 'Stock' },
   { id: 'parties', label: 'Parties' },
 ];
@@ -64,6 +67,8 @@ type Row = {
   title:  React.ReactNode;
   sub?:   React.ReactNode;
   aside?: React.ReactNode;
+  /** Shown in full in the preview panel (wide screens). */
+  preview?: PreviewTarget;
 };
 
 /** Wraps each case-insensitive occurrence of `q` in <mark>. */
@@ -143,14 +148,18 @@ export default function CommandPalette({
   const rows = useMemo<Row[]>(() => {
     const term = q.trim();
     const enc  = encodeURIComponent(term);
-    // Typed a rack number: open the plate/die page searching that rack.
-    const toolQ = (location: string | null) =>
-      location?.toLowerCase() === term.toLowerCase() ? `q=${enc}&field=location` : `q=${enc}`;
+    // Open the plate/die page on the field that matched: the rack, else a
+    // size (2–4 digits, as the search route reads it), else All fields.
+    const sizeLike = /^\d{2,4}(\.\d+)?$/.test(term);
+    const toolQ = (row: { location: string | null }, sizes: readonly string[]) =>
+      row.location?.toLowerCase() === term.toLowerCase() ? `q=${enc}&field=location`
+      : sizeLike && matchRow([], sizes, term)(row) ? `q=${enc}&field=size`
+      : `q=${enc}`;
     const out: Row[] = [];
 
     if (data) {
       for (const j of data.jobs) out.push({
-        key: `job-${j.id}`, group: 'Jobs', filter: 'jobs', href: `/admin/jobs/${j.id}`, icon: FileText,
+        key: `job-${j.id}`, preview: { kind: 'job', id: j.id }, group: 'Jobs', filter: 'jobs', href: `/admin/jobs/${j.id}`, icon: FileText,
         title: <>{j.job_card_number && <span className="font-mono">{hl(j.job_card_number.toUpperCase(), term)} · </span>}{hl(j.party, term)}</>,
         sub: sep(hl(j.job_name, term), <>PO <span className="font-mono">{hl(j.po_number, term)}</span></>,
                  j.pm_code && <>PM <span className="font-mono">{hl(j.pm_code, term)}</span></>,
@@ -163,7 +172,7 @@ export default function CommandPalette({
         ),
       });
       for (const s of data.separations) out.push({
-        key: `sep-${s.id}`, group: 'Job Separation', filter: 'jobs', icon: SplitSquareHorizontal,
+        key: `sep-${s.id}`, preview: { kind: 'separation', id: s.id }, group: 'Job Separation', filter: 'jobs', icon: SplitSquareHorizontal,
         // Its own Sr No, so the page lands on this line (and widens to all dates).
         href: `/admin/job-separation?q=${s.sr_no ? encodeURIComponent(s.sr_no) : enc}`,
         title: <>{s.sr_no && <span className="font-mono">{hl(s.sr_no, term)} · </span>}{hl(s.party, term)}</>,
@@ -174,33 +183,33 @@ export default function CommandPalette({
           : s.quantity != null && <span className="font-mono text-[13px] text-brand-muted">{formatQty(s.quantity)} pcs</span>,
       });
       for (const c of data.shadeCards) out.push({
-        key: `shade-${c.id}`, group: 'Shade cards', filter: 'shade', href: `/admin/shade-cards/${c.id}`, icon: Palette,
+        key: `shade-${c.id}`, preview: { kind: 'shade', id: c.id }, group: 'Shade cards', filter: 'shade', href: `/admin/shade-cards/${c.id}`, icon: Palette,
         title: <>Shade card {c.shade_card_number && <span className="font-mono">{hl(c.shade_card_number, term)}</span>}{c.party && <> · {hl(c.party, term)}</>}</>,
         sub: sep(hl(c.product_name, term), c.pm_code && <>PM <span className="font-mono">{hl(c.pm_code, term)}</span></>),
         aside: c.status && <span className="text-[13px] text-brand-muted">{c.status}</span>,
       });
       for (const p of data.plates) out.push({
-        key: `plate-${p.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/plates?${toolQ(p.location)}`, icon: Disc,
+        key: `plate-${p.id}`, preview: { kind: 'plate', id: p.id }, group: 'Plates', filter: 'plates', href: `/admin/plates?${toolQ(p, ['across_size', 'around_size'])}`, icon: Disc,
         title: <>Plate {p.plate_id ? <span className="font-mono">{hl(p.plate_id, term)}</span> : <span className="text-brand-muted">without an ID</span>}</>,
         sub: sep(hl(p.party, term), p.pm_code && <>PM <span className="font-mono">{hl(p.pm_code, term)}</span></>, hl(p.item_name, term),
-                 (p.across_size || p.around_size) && <span className="font-mono">{[p.across_size, p.around_size].filter(Boolean).join(' × ')}</span>,
+                 (p.across_size || p.around_size) && <span className="font-mono">{hl([p.across_size, p.around_size].filter(Boolean).join(' × '), term)}</span>,
                  p.cylinder != null && <span className="font-mono">{p.cylinder}T</span>),
         aside: p.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(p.location, term)}</span>,
       });
       for (const d of data.dies) out.push({
-        key: `die-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?${toolQ(d.location)}`, icon: Scissors,
+        key: `die-${d.id}`, preview: { kind: 'die', id: d.id }, group: 'Dies', filter: 'dies', href: `/admin/dies?${toolQ(d, ['length', 'width'])}`, icon: Scissors,
         title: <>Roto die {d.serial_no && <span className="font-mono">{hl(d.serial_no, term)}</span>}</>,
-        sub: sep(hl(d.job_name, term), (d.length || d.width) && <span className="font-mono">{[d.length, d.width].filter(Boolean).join(' × ')}</span>),
+        sub: sep(hl(d.job_name, term), (d.length || d.width) && <span className="font-mono">{hl([d.length, d.width].filter(Boolean).join(' × '), term)}</span>),
         aside: d.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(d.location, term)}</span>,
       });
       for (const d of data.flatbed) out.push({
-        key: `flat-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?tab=flatbed&${toolQ(d.location)}`, icon: Scissors,
+        key: `flat-${d.id}`, preview: { kind: 'flatbed', id: d.id }, group: 'Dies', filter: 'dies', href: `/admin/dies?tab=flatbed&${toolQ(d, ['length', 'width'])}`, icon: Scissors,
         title: <>Flatbed die <span className="font-mono">#{d.serial_no}</span></>,
-        sub: sep(hl(d.shape, term), (d.length || d.width) && <span className="font-mono">{[d.length, d.width].filter(Boolean).join(' × ')}</span>),
+        sub: sep(hl(d.shape, term), (d.length || d.width) && <span className="font-mono">{hl([d.length, d.width].filter(Boolean).join(' × '), term)}</span>),
         aside: d.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(d.location, term)}</span>,
       });
       for (const s of data.stock) out.push({
-        key: `stock-${s.id}`, group: 'Label stock', filter: 'stock', href: `/admin/stock?q=${enc}`, icon: Package,
+        key: `stock-${s.id}`, preview: { kind: 'stock', id: s.id }, group: 'Label stock', filter: 'stock', href: `/admin/stock?q=${enc}`, icon: Package,
         title: <><span className="font-mono">{formatQty(s.qty)}</span> labels on the shelf</>,
         sub: sep(s.kind, hl(s.party, term), s.pm_code && <>PM <span className="font-mono">{hl(s.pm_code, term)}</span></>, s.job_card_number && <span className="font-mono">{hl(s.job_card_number.toUpperCase(), term)}</span>),
         aside: s.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(s.location, term)}</span>,
@@ -259,9 +268,10 @@ export default function CommandPalette({
         role="dialog"
         aria-modal="true"
         aria-label="Search everything"
-        className="relative flex max-h-[76vh] w-full max-w-[680px] flex-col overflow-hidden rounded-2xl border border-brand-border bg-white shadow-[0_24px_64px_rgba(12,42,32,0.24)]"
+        className="relative flex max-h-[76vh] w-full max-w-[680px] flex-col lg:max-w-[1000px] overflow-hidden rounded-2xl border border-brand-border bg-white shadow-[0_24px_64px_rgba(12,42,32,0.24)]"
       >
-        <label className="flex items-center gap-3 border-b border-brand-border px-5">
+        {/* shrink-0: a long result list scrolls; the box and filters never squeeze. */}
+        <label className="flex shrink-0 items-center gap-3 border-b border-brand-border px-5">
           <Search className="h-5 w-5 shrink-0 text-brand-primary" aria-hidden="true" />
           <span className="sr-only">Search jobs, Job Separation, shade cards, plates, dies, stock and parties</span>
           <input
@@ -281,7 +291,7 @@ export default function CommandPalette({
           </button>
         </label>
 
-        <div role="group" aria-label="Filter results" className="flex gap-2 overflow-x-auto border-b border-brand-line-soft px-5 py-2.5">
+        <div role="group" aria-label="Filter results" className="flex shrink-0 gap-2 overflow-x-auto border-b border-brand-line-soft px-5 py-2.5">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -302,6 +312,7 @@ export default function CommandPalette({
           ))}
         </div>
 
+        <div className="flex min-h-0 flex-1">
         <div ref={listRef} id="palette-results" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto py-2">
           {rows.map((r, i) => {
             const head = r.group !== lastGroup;
@@ -352,6 +363,10 @@ export default function CommandPalette({
                : <>Nothing matches <strong className="text-brand-ink">“{term}”</strong>{filter !== 'all' && ' in this filter'}.</>}
             </p>
           )}
+        </div>
+        {rows[active] && (
+          <SearchPreview target={rows[active].preview} title={rows[active].title} icon={rows[active].icon} onOpen={() => go(rows[active])} />
+        )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-brand-line-soft bg-brand-surface-alt px-5 py-2.5 text-xs text-brand-muted">

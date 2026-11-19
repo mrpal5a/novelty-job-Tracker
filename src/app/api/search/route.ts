@@ -62,15 +62,23 @@ export async function GET(request: NextRequest) {
       ...(terms.words.length > 1 ? [onSearchText(make(), terms, false)] : []),
     ];
   }
-  // A rack number ("437") is where a plate or die lives: everything AT that
-  // rack comes first, before codes and sizes that merely contain the digits.
+  // Plates and dies, best first: the rack ("437" is where it lives), then —
+  // for plates — a field that IS the number (a PM code), then a size on the
+  // whole millimetre, then the number anywhere. Racks and sizes are 2–4
+  // digits; a longer number is a code, so it skips the size step.
+  const sizeLike = /^\d{2,4}(\.\d+)?$/.test(q);
   const atRack = <Q extends Searchable<Q>>(make: () => Q) => make().ilike('location', escapeLike(q));
+  const bySize = <Q extends Searchable<Q>>(make: () => Q, sizes: readonly string[]) =>
+    sizeLike ? [make().or(orMatch([], sizes, q))] : [];
   type Runnable<Q> = Searchable<Q> & PromiseLike<{ data: { id: string }[] | null; error: PostgrestError | null }>;
-  const ranked = <Q extends Runnable<Q>>(make: () => Q, columns: readonly string[], rackFirst = false) =>
-    Promise.all([...(rackFirst ? [atRack(make)] : []), ...bestOf(make, columns)]).then(bestFirst);
-  // Dies: the rack, then the die pages' own match (sizes included).
-  const rackThenMatch = <Q extends Runnable<Q>>(make: () => Q, match: string) =>
-    Promise.all([atRack(make), make().or(match)]).then(bestFirst);
+  const ranked = <Q extends Runnable<Q>>(make: () => Q, columns: readonly string[], sizes?: readonly string[]) => {
+    if (!sizes) return Promise.all(bestOf(make, columns)).then(bestFirst);
+    const [exact, ...rest] = bestOf(make, columns);
+    return Promise.all([atRack(make), exact, ...bySize(make, sizes), ...rest]).then(bestFirst);
+  };
+  // Dies: the rack, the size, then the die pages' own match.
+  const toolTiers = <Q extends Runnable<Q>>(make: () => Q, match: string) =>
+    Promise.all([atRack(make), ...bySize(make, ['length', 'width']), make().or(match)]).then(bestFirst);
 
   const [jobs, separationRows, shadeCards, plates, dies, flatbed, stock, parties] = await Promise.all([
     ranked(
@@ -118,9 +126,9 @@ export async function GET(request: NextRequest) {
             .order('created_at', { ascending: false })
             .limit(LIMIT),
           ['party', 'pm_code', 'item_name', 'plate_id'],
-          true,
+          ['across_size', 'around_size'],
         ),
-    rackThenMatch(
+    toolTiers(
       () => supabase
         .from('dies')
         .select('id, serial_no, job_name, length, width, status, location')
@@ -128,7 +136,7 @@ export async function GET(request: NextRequest) {
         .limit(LIMIT),
       dieMatch(['job_name', 'serial_no', 'location']),
     ),
-    rackThenMatch(
+    toolTiers(
       () => supabase
         .from('flatbed_dies')
         .select('id, serial_no, length, width, shape, location')
