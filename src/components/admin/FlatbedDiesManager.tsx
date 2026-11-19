@@ -27,6 +27,7 @@ import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import SizePairSearch, { useSizePair } from './SizePairSearch';
+import { useIsDesk } from '@/hooks/useIsDesk';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddFlatbedDieModal = dynamic(() => import('./AddFlatbedDieModal'), { ssr: false });
@@ -142,6 +143,8 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
   );
   const [nearSize,    setNearSize]    = useState(false);
   const sizes = useSizePair();
+  // Build only the layout that fits — both, with one hidden, drew every die twice.
+  const isDesk = useIsDesk();
   // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
   useUrlSearch(setSearch, undefined, sizes.setSize, setSearchField);
   const [sortField,   setSortField]   = useState<SortField>('created_at');
@@ -340,7 +343,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
       ) : (
         <>
           {/* Phone: card list */}
-          <ul className="sm:hidden space-y-3">
+          {!isDesk && <ul className="space-y-3">
             {sortedFlatbedDies.map((die) => (
               <li key={die.id} className="glass rounded-xl p-4">
                 <div className="flex flex-col sm:flex-row sm:items-start gap-4">
@@ -417,10 +420,10 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
                 </div>
               </li>
             ))}
-          </ul>
+          </ul>}
 
           {/* Desk: table with a fixed header, scrolling through the rows. */}
-          <div className="hidden sm:block rounded-xl glass overflow-hidden">
+          {isDesk && <div className="rounded-xl glass overflow-hidden">
             <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
               <table className="w-full min-w-[1000px] border-collapse text-sm text-center [&_td+td]:border-l [&_th+th]:border-l [&_td+td]:border-[var(--glass-border)] [&_th+th]:border-[var(--glass-border)]">
                 <thead>
@@ -523,7 +526,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </>
       )}
 
