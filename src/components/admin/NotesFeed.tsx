@@ -20,8 +20,12 @@
 // that tag you or your department, and replies to your notes.
 //
 // Read state is per user, synced across devices (POST /api/notes/read, see
-// migration 017_note_reads). Each note's eye count is its read receipts:
-// tap it for who has marked it read, and who on the team hasn't yet. The old single localStorage "last seen"
+// migration 017_note_reads). A note is read once it has been on screen in
+// the open drawer with the page in front — no button, as in WhatsApp. Notes
+// read this visit keep their place under a "new notes" divider (and in the
+// Unread tab) until the drawer is opened again, so nothing jumps while you
+// read. Each note's eye count is its read receipts: tap it for who has seen
+// it, and who on the team hasn't yet. The old single localStorage "last seen"
 // timestamp is migrated into real read receipts on first load (see the
 // backfill in `poll`) and then discarded.
 //
@@ -47,6 +51,10 @@ import { DesktopNotificationsToggle } from '@/components/ui/DesktopNotifications
 import type { NoteFeedItem } from '@/lib/types';
 
 const POLL_MS  = 60_000;
+/** Seen notes are saved as read together, this long after the first. */
+const READ_BATCH_MS = 500;
+/** POST /api/notes/read takes at most this many ids per call. */
+const READ_MAX_IDS  = 100;
 const FEED_URL = '/api/notes/feed?limit=50';
 
 /** A job the composer can file a note on — a /api/search job row. */
@@ -100,6 +108,8 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
   const [error,          setError]          = useState(false);
   // Ids marked read locally but not yet confirmed by the next poll.
   const [optimisticRead, setOptimisticRead] = useState<Set<string>>(new Set());
+  // Read since the drawer last opened: still shown as new until it reopens.
+  const [readThisVisit, setReadThisVisit] = useState<Set<string>>(new Set());
   // Composer
   const [job,     setJob]     = useState<PickedJob | null>(null);
   const [jobQuery, setJobQuery] = useState('');
@@ -228,24 +238,41 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
     }
   }, [userEmail]);
 
-  /** The unread divider's "Mark all read": every unread note from someone else, at once. */
-  const handleMarkAllRead = useCallback(async (list: NoteFeedItem[]) => {
-    const ids = list.map((n) => n.id);
+  // Notes seen on screen are marked read in small batches (READ_BATCH_MS
+  // after the first), only while the page is in front. If saving fails the
+  // note goes back to unread, and is marked again next time it's seen.
+  const pendingReadRef = useRef<Set<string>>(new Set());
+  const readTimerRef   = useRef<number | undefined>(undefined);
+  const flushReads = useCallback(() => {
+    readTimerRef.current = undefined;
+    if (document.visibilityState !== 'visible') return; // flushed again on return
+    const ids = Array.from(pendingReadRef.current);
+    pendingReadRef.current.clear();
     if (ids.length === 0) return;
     setOptimisticRead((prev) => new Set([...Array.from(prev), ...ids]));
+    setReadThisVisit((prev) => new Set([...Array.from(prev), ...ids]));
     setUnread((u) => Math.max(0, u - ids.length));
-    try {
-      await markNotesRead(ids);
-    } catch {
-      toast.error('Could not mark as read — try again');
-      setOptimisticRead((prev) => {
-        const next = new Set(prev);
-        for (const id of ids) next.delete(id);
-        return next;
+    for (let i = 0; i < ids.length; i += READ_MAX_IDS) {
+      const chunk = ids.slice(i, i + READ_MAX_IDS);
+      markNotesRead(chunk).catch(() => {
+        setOptimisticRead((prev) => {
+          const next = new Set(prev);
+          for (const id of chunk) next.delete(id);
+          return next;
+        });
+        setUnread((u) => u + chunk.length);
       });
-      setUnread((u) => u + ids.length);
     }
   }, []);
+  const queueRead = useCallback((id: string) => {
+    pendingReadRef.current.add(id);
+    readTimerRef.current ??= window.setTimeout(flushReads, READ_BATCH_MS);
+  }, [flushReads]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') flushReads(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { document.removeEventListener('visibilitychange', onVisible); window.clearTimeout(readTimerRef.current); };
+  }, [flushReads]);
 
   // Poll while the tab is visible; catch up immediately on refocus. A tab
   // opened in the background (middle-click, restored session) loads once and
@@ -304,6 +331,7 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
 
   function handleOpen() {
     pinnedRef.current = true; // open at the newest note, like a chat
+    setReadThisVisit(new Set()); // last visit's notes stop counting as new
     requestOpen('notes');
     setOpen(true);
     poll(); // fetch fresh on open
@@ -323,13 +351,15 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
   }, [unread]);
 
   const isRead  = useCallback((n: NoteFeedItem) => n.read || optimisticRead.has(n.id), [optimisticRead]);
+  // What the list shows: read this visit still counts as new until reopened.
+  const seenBefore = useCallback((n: NoteFeedItem) => isRead(n) && !readThisVisit.has(n.id), [isRead, readThisVisit]);
   // A note tags me when it names my username or my department.
   const myNames = useMemo(() => [deptName, deptKey, username], [deptName, deptKey, username]);
   // While searching, the server's matches stand in for the feed.
   const source = searchHits ?? notes;
   const visible = useMemo(
-    () => filterNotes(source, tab, { isRead, me: userEmail, myNames }),
-    [source, tab, isRead, userEmail, myNames],
+    () => filterNotes(source, tab, { isRead: seenBefore, me: userEmail, myNames }),
+    [source, tab, seenBefore, userEmail, myNames],
   );
 
   useEffect(() => {
@@ -478,6 +508,20 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
     setFlashId(id);
   }
 
+  // Mark someone else's unread note read once most of it is on screen.
+  useEffect(() => {
+    const root = listRef.current;
+    if (!open || !root) return;
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        const id = (e.target as HTMLElement).dataset.unreadId;
+        if (e.isIntersecting && id) { queueRead(id); io.unobserve(e.target); }
+      }
+    }, { root, threshold: 0.6 });
+    root.querySelectorAll('[data-unread-id]').forEach((el) => io.observe(el));
+    return () => io.disconnect();
+  }, [open, visible, optimisticRead, queueRead]);
+
   // Keep the newest note in view while pinned to the bottom: on open, on a
   // tab switch, and when a note arrives. Before paint, so it never flickers.
   useLayoutEffect(() => {
@@ -508,7 +552,7 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
   // The feed arrives newest first; a chat reads oldest first.
   const groups = groupByDay([...visible].reverse());
   // Someone else's unread notes: the divider sits above the first of them.
-  const unreadList = visible.filter((n) => !isRead(n) && n.created_by_email !== userEmail);
+  const unreadList = visible.filter((n) => !seenBefore(n) && n.created_by_email !== userEmail);
   const firstUnreadId = unreadList.length && !searchHits ? unreadList[unreadList.length - 1].id : null;
 
   return (
@@ -623,19 +667,12 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
                     <li key={note.id} className="flex flex-col">
                       {note.id === firstUnreadId && (
                         <div className="my-2 flex items-center justify-center gap-2 bg-brand-surface-hover py-1.5 text-xs font-medium text-brand-ink">
-                          <span><span className="font-mono">{unreadList.length}</span> unread {unreadList.length === 1 ? 'note' : 'notes'}</span>
-                          <span aria-hidden="true" className="text-brand-muted">·</span>
-                          <button
-                            type="button"
-                            onClick={() => handleMarkAllRead(unreadList)}
-                            className="min-h-8 rounded-md px-1.5 font-semibold text-brand-primary underline-offset-2 hover:underline"
-                          >
-                            Mark all read
-                          </button>
+                          <span><span className="font-mono">{unreadList.length}</span> new {unreadList.length === 1 ? 'note' : 'notes'}</span>
                         </div>
                       )}
                       <div
                         id={`note-${note.id}`}
+                        data-unread-id={!mine && !isRead(note) ? note.id : undefined}
                         className={cn(
                           'flex items-start gap-1.5 px-3 transition-colors duration-500',
                           first ? 'mt-2' : 'mt-0.5',

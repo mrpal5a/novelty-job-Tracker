@@ -5,7 +5,7 @@
 //   re-click (double network request, stale UI) is a harmless no-op
 //   rather than a duplicate-key error.
 //
-// Called by: src/components/admin/NotesFeed.tsx ("Mark as read").
+// Called by: src/components/admin/NotesFeed.tsx, as notes come on screen.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
