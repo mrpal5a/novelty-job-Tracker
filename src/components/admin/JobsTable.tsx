@@ -396,7 +396,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
             aria-expanded={showFilters}
             aria-controls="jobs-filters"
             className={cn(
-              'inline-flex h-10 min-h-10 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium transition-colors',
+              'inline-flex h-10 min-h-10 [@media(pointer:coarse)]:h-11 shrink-0 items-center gap-1.5 rounded-[10px] border px-3 text-[13px] font-medium transition-colors',
               showFilters
                 ? 'border-brand-primary text-brand-primary'
                 : 'border-brand-border text-brand-ink hover:bg-brand-bg',

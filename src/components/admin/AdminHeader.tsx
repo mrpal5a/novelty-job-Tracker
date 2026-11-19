@@ -146,7 +146,8 @@ function MenuLink({ item, pathname, onPick }: { item: NavLink; pathname: string;
 }
 
 const tabCls = (active: boolean) => cn(
-  'inline-flex h-10 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2.5 text-sm xl:px-3 transition-colors',
+  // 40px for a mouse, 44px on a touch screen (PRODUCT.md's tap target).
+  'inline-flex h-10 [@media(pointer:coarse)]:h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-2.5 text-sm xl:px-3 transition-colors',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-mint/70',
   active ? 'bg-white/[0.16] font-semibold text-white' : 'font-medium text-white/80 hover:bg-white/10 hover:text-white',
 );

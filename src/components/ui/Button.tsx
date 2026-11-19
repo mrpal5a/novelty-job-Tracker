@@ -59,9 +59,11 @@ const INTENT: Record<ButtonIntent, string> = {
 
 // Two densities only. `sm` is the in-row action (JobRow's More/Edit/Del),
 // `md` is everything standalone and every control on JobCard, which
-// PRODUCT.md holds to a 44px tap target.
+// PRODUCT.md holds to a 44px tap target. `sm` is 32px for a mouse and grows
+// to 44px on a touch screen (pointer: coarse) — icon-only ones too, since
+// their w-8 gives way to the min-width.
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'min-h-8 gap-1.5 px-2.5 py-1.5 text-xs rounded-lg',
+  sm: 'min-h-8 gap-1.5 px-2.5 py-1.5 text-xs rounded-lg [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11',
   md: 'min-h-11 gap-1.5 px-4 text-sm rounded-lg',
 };
 

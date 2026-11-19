@@ -84,7 +84,7 @@ function JobRow({
             href={`/admin/jobs/${job.id}`}
             aria-label={`Open job ${cardNo ?? job.po_number} in detail`}
             className={cn(
-              'group/open flex h-full flex-col gap-0.5 px-3 py-2 focus:outline-none',
+              'group/open flex h-full [@media(pointer:coarse)]:min-h-11 flex-col gap-0.5 px-3 py-2 focus:outline-none',
               'focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-primary',
             )}
           >
