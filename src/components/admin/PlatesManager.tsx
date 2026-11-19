@@ -114,7 +114,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
   const [searchField, setSearchField] = useState('all');
   const sizes = useSizePair();
   // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
-  useUrlSearch(setSearch, undefined, sizes.setSize);
+  useUrlSearch(setSearch, undefined, sizes.setSize, setSearchField);
   const [adding,      setAdding]      = useState(false);
   const [editing,     setEditing]     = useState<Plate | null>(null);
   const [viewing,     setViewing]     = useState<Plate | null>(null);

@@ -18,7 +18,7 @@ import type { PostgrestError } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { getDeptPermissions, canDeptViewStock } from '@/lib/constants/departments';
-import { containsPattern, exactFieldRegex, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms } from '@/lib/search';
+import { containsPattern, escapeLike, exactFieldRegex, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms } from '@/lib/search';
 import { SHADE_CARD_SEARCH_COLUMNS } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
   // then — for several words — each word somewhere in the row. Each list's
   // own order applies within each.
   const terms = searchTerms(q);
-  type Searchable<Q> = { or: (f: string) => Q; filter: (c: string, op: string, v: string) => Q };
+  type Searchable<Q> = { or: (f: string) => Q; filter: (c: string, op: string, v: string) => Q; ilike: (c: string, p: string) => Q };
   function bestOf<Q extends Searchable<Q>>(make: () => Q, columns: readonly string[]): Q[] {
     // Only punctuation typed ("%"): matched as typed.
     if (!terms) return [make().or(orContains(columns, q))];
@@ -62,9 +62,15 @@ export async function GET(request: NextRequest) {
       ...(terms.words.length > 1 ? [onSearchText(make(), terms, false)] : []),
     ];
   }
-  const ranked = <Q extends Searchable<Q> & PromiseLike<{ data: { id: string }[] | null; error: PostgrestError | null }>>(
-    make: () => Q, columns: readonly string[],
-  ) => Promise.all(bestOf(make, columns)).then(bestFirst);
+  // A rack number ("437") is where a plate or die lives: everything AT that
+  // rack comes first, before codes and sizes that merely contain the digits.
+  const atRack = <Q extends Searchable<Q>>(make: () => Q) => make().ilike('location', escapeLike(q));
+  type Runnable<Q> = Searchable<Q> & PromiseLike<{ data: { id: string }[] | null; error: PostgrestError | null }>;
+  const ranked = <Q extends Runnable<Q>>(make: () => Q, columns: readonly string[], rackFirst = false) =>
+    Promise.all([...(rackFirst ? [atRack(make)] : []), ...bestOf(make, columns)]).then(bestFirst);
+  // Dies: the rack, then the die pages' own match (sizes included).
+  const rackThenMatch = <Q extends Runnable<Q>>(make: () => Q, match: string) =>
+    Promise.all([atRack(make), make().or(match)]).then(bestFirst);
 
   const [jobs, separationRows, shadeCards, plates, dies, flatbed, stock, parties] = await Promise.all([
     ranked(
@@ -112,19 +118,24 @@ export async function GET(request: NextRequest) {
             .order('created_at', { ascending: false })
             .limit(LIMIT),
           ['party', 'pm_code', 'item_name', 'plate_id'],
+          true,
         ),
-    supabase
-      .from('dies')
-      .select('id, serial_no, job_name, length, width, status, location')
-      .or(dieMatch(['job_name', 'serial_no', 'location']))
-      .order('created_at', { ascending: false })
-      .limit(LIMIT),
-    supabase
-      .from('flatbed_dies')
-      .select('id, serial_no, length, width, shape, location')
-      .or(dieMatch(['location', 'shape']))
-      .order('created_at', { ascending: false })
-      .limit(LIMIT),
+    rackThenMatch(
+      () => supabase
+        .from('dies')
+        .select('id, serial_no, job_name, length, width, status, location')
+        .order('created_at', { ascending: false })
+        .limit(LIMIT),
+      dieMatch(['job_name', 'serial_no', 'location']),
+    ),
+    rackThenMatch(
+      () => supabase
+        .from('flatbed_dies')
+        .select('id, serial_no, length, width, shape, location')
+        .order('created_at', { ascending: false })
+        .limit(LIMIT),
+      dieMatch(['location', 'shape']),
+    ),
     canSeeStock
       ? ranked(
           () => supabase

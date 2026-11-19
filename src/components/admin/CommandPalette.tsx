@@ -143,6 +143,9 @@ export default function CommandPalette({
   const rows = useMemo<Row[]>(() => {
     const term = q.trim();
     const enc  = encodeURIComponent(term);
+    // Typed a rack number: open the plate/die page searching that rack.
+    const toolQ = (location: string | null) =>
+      location?.toLowerCase() === term.toLowerCase() ? `q=${enc}&field=location` : `q=${enc}`;
     const out: Row[] = [];
 
     if (data) {
@@ -177,21 +180,21 @@ export default function CommandPalette({
         aside: c.status && <span className="text-[13px] text-brand-muted">{c.status}</span>,
       });
       for (const p of data.plates) out.push({
-        key: `plate-${p.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/plates?q=${enc}`, icon: Disc,
+        key: `plate-${p.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/plates?${toolQ(p.location)}`, icon: Disc,
         title: <>Plate {p.plate_id ? <span className="font-mono">{hl(p.plate_id, term)}</span> : <span className="text-brand-muted">without an ID</span>}</>,
         sub: sep(hl(p.party, term), p.pm_code && <>PM <span className="font-mono">{hl(p.pm_code, term)}</span></>, hl(p.item_name, term),
                  (p.across_size || p.around_size) && <span className="font-mono">{[p.across_size, p.around_size].filter(Boolean).join(' × ')}</span>,
                  p.cylinder != null && <span className="font-mono">{p.cylinder}T</span>),
-        aside: p.location && <span className="font-mono text-[13px] text-brand-muted">Rack {p.location}</span>,
+        aside: p.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(p.location, term)}</span>,
       });
       for (const d of data.dies) out.push({
-        key: `die-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?q=${enc}`, icon: Scissors,
+        key: `die-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?${toolQ(d.location)}`, icon: Scissors,
         title: <>Roto die {d.serial_no && <span className="font-mono">{hl(d.serial_no, term)}</span>}</>,
         sub: sep(hl(d.job_name, term), (d.length || d.width) && <span className="font-mono">{[d.length, d.width].filter(Boolean).join(' × ')}</span>),
         aside: d.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(d.location, term)}</span>,
       });
       for (const d of data.flatbed) out.push({
-        key: `flat-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?tab=flatbed&q=${enc}`, icon: Scissors,
+        key: `flat-${d.id}`, group: 'Plates & dies', filter: 'tooling', href: `/admin/dies?tab=flatbed&${toolQ(d.location)}`, icon: Scissors,
         title: <>Flatbed die <span className="font-mono">#{d.serial_no}</span></>,
         sub: sep(hl(d.shape, term), (d.length || d.width) && <span className="font-mono">{[d.length, d.width].filter(Boolean).join(' × ')}</span>),
         aside: d.location && <span className="font-mono text-[13px] text-brand-muted">Rack {hl(d.location, term)}</span>,

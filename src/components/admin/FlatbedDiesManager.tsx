@@ -143,7 +143,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
   const [nearSize,    setNearSize]    = useState(false);
   const sizes = useSizePair();
   // Opened from Ctrl K with ?q=: a size ("210x60") fills the size boxes.
-  useUrlSearch(setSearch, undefined, sizes.setSize);
+  useUrlSearch(setSearch, undefined, sizes.setSize, setSearchField);
   const [sortField,   setSortField]   = useState<SortField>('created_at');
   const [sortDir,     setSortDir]     = useState<SortDir>('asc');
   const [adding,      setAdding]      = useState(false);
