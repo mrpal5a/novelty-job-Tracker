@@ -30,7 +30,8 @@ export default async function TrackLayout({ children }: { children: React.ReactN
             <Link href="/track" className="inline-flex h-8 items-center [&_img]:h-8 [&_img]:w-auto" aria-label={`${branding.shortName} — order tracking home`}>
               <Logo onDark width={132} height={34} priority />
             </Link>
-            <span className="text-white/40 text-xs">Order Tracking</span>
+            {/* /70, not /40: 12px text needs 4.5:1 on the header green (WCAG AA). */}
+            <span className="text-white/70 text-xs">Order Tracking</span>
           </div>
         </header>
 
