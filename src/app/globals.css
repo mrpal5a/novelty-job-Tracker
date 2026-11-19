@@ -37,6 +37,14 @@ html {
   -webkit-text-size-adjust: 100%;
 }
 
+/* Admin pages keep the scrollbar's space even before a list makes the page
+   tall enough to scroll, so the whole page doesn't jump sideways when rows
+   arrive (or when a dialog locks scrolling). Admin only: the strip would show
+   the light page colour beside the dark /track and /display screens. */
+html:has(.admin-light) {
+  scrollbar-gutter: stable;
+}
+
 body {
   background-color: var(--color-bg);
   color: var(--color-accent);
