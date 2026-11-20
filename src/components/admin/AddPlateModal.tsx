@@ -17,7 +17,7 @@ import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import PartySuggestInput from './PartySuggestInput';
-import { dieUpsFor, widthGapMm, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
+import { colorBoxes, dieUpsFor, widthGapMm, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 
 const COLOR_COUNTS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -49,6 +49,9 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
   const [location,      setLocation]      = useState(editing?.location ?? '');
   const [totalColors,   setTotalColors]   = useState(editing?.total_colors?.toString() ?? '');
+  // All 12 boxes live here; Total colours decides how many show and save.
+  const [colors,        setColors]        = useState(() => colorBoxes(editing?.colors));
+  const colorCount = Number(totalColors) || 0;
   const [dieId,         setDieId]         = useState(editing?.die_id ?? '');
   const [layout,        setLayout]        = useState<LayoutState>(() => layoutState(editing));
   const [saving,        setSaving]        = useState(false);
@@ -155,6 +158,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
           label_per_round: labelPerRound,
           location:        location.trim(),
           total_colors:    totalColors,
+          colors:          colorCount ? colors.slice(0, colorCount) : null,
           die_id:          dieId,
           ...layout,
         }),
@@ -259,6 +263,32 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
               </select>
             </label>
           </div>
+
+          {/* One box per colour, numbered in station order. */}
+          {colorCount > 0 && (
+            <fieldset>
+              <legend className="sr-only">Colours, in station order</legend>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {colors.slice(0, colorCount).map((color, i) => (
+                  <div key={i} className="relative">
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-y-0 left-3 flex items-center font-mono text-[11px] font-semibold text-[var(--glass-muted)]"
+                    >
+                      {i + 1}
+                    </span>
+                    <input
+                      aria-label={`Colour ${i + 1}`}
+                      value={color}
+                      onChange={(e) => setColors((all) => all.map((c, j) => (j === i ? e.target.value : c)))}
+                      autoComplete="off"
+                      className={cn(inputCls, 'pl-8')}
+                    />
+                  </div>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <LayoutFields
             value={layout}

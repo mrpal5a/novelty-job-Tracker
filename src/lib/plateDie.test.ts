@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dieUpsFor, commonValues, flatbedDiesFor, layoutFrom, widthGapMm, metresFromPlates } from './plateDie';
+import { dieUpsFor, commonValues, flatbedDiesFor, layoutFrom, widthGapMm, metresFromPlates, colorBoxes, colorsFrom } from './plateDie';
 import type { Die, FlatbedDie, Plate } from '@/lib/types';
 
 const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
@@ -89,5 +89,22 @@ describe('metres for a Job Separation line, from its plates', () => {
     expect(metresFromPlates([plate('X1', null, 4), plate('X1', 95, null)], 'X1', 1000)).toEqual({ found: 2, options: [] });
     expect(metresFromPlates([plate('X1', 95, 4)], '', 1000)).toEqual({ found: 0, options: [] });
     expect(metresFromPlates([plate('N/A', 95, 4)], 'n/a', 1000)).toEqual({ found: 0, options: [] });
+  });
+});
+
+describe('plate colours', () => {
+  it('starts a new list as CYAN, MAGENTA, YELLOW, BLACK, the rest blank, 12 boxes', () => {
+    const boxes = colorBoxes(null);
+    expect(boxes).toHaveLength(12);
+    expect(boxes.slice(0, 5)).toEqual(['CYAN', 'MAGENTA', 'YELLOW', 'BLACK', '']);
+  });
+  it('keeps a saved list as saved, blanks included, without adding defaults', () => {
+    expect(colorBoxes(['WHITE', null, 'PANTONE 485']).slice(0, 4)).toEqual(['WHITE', '', 'PANTONE 485', '']);
+  });
+  it('stores trimmed names, blanks as null, at most 12; anything else is null', () => {
+    expect(colorsFrom([' CYAN ', '', 'RED', 7])).toEqual(['CYAN', null, 'RED', null]);
+    expect(colorsFrom(Array(20).fill('X'))).toHaveLength(12);
+    expect(colorsFrom([])).toBeNull();
+    expect(colorsFrom('CYAN')).toBeNull();
   });
 });

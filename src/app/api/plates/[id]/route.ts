@@ -11,7 +11,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
-import { layoutFrom } from '@/lib/plateDie';
+import { colorsFrom, layoutFrom } from '@/lib/plateDie';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -83,6 +83,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     updates.die_id = typeof body.die_id === 'string' ? body.die_id.trim() || null : null;
   }
   Object.assign(updates, layoutFrom(body));
+  if ('colors' in body) updates.colors = colorsFrom(body.colors);
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });

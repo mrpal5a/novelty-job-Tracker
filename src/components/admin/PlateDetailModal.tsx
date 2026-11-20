@@ -96,6 +96,13 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
             <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
             <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
             <Detail label="Total colours" value={plate.total_colors?.toString()} mono />
+            {plate.colors && (
+              <Detail
+                wide
+                label="Colours"
+                value={plate.colors.map((c, i) => `${i + 1} ${c ?? '—'}`).join(' · ')}
+              />
+            )}
             <Detail label="Roto die" value={plate.die_id ? 'Linked' : 'Not linked'} />
             <Detail label="Width" value={layoutPair(plate.around_ups, plate.around_gap)} mono />
             <Detail label="Height" value={layoutPair(plate.across_ups, plate.across_gap)} mono />
@@ -175,9 +182,9 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
   );
 }
 
-function Detail({ label, value, mono }: { label: string; value?: string | null; mono?: boolean }) {
+function Detail({ label, value, mono, wide }: { label: string; value?: string | null; mono?: boolean; wide?: boolean }) {
   return (
-    <div className="min-w-0">
+    <div className={cn('min-w-0', wide && 'col-span-2')}>
       <dt className="text-xs font-medium text-[var(--glass-muted)]">{label}</dt>
       <dd className={cn('text-sm font-semibold text-[var(--glass-ink)] mt-0.5 break-words', mono && 'font-mono')}>
         {value || '—'}

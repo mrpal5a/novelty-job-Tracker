@@ -198,6 +198,7 @@ export interface Plate extends DieLayout {
   id: string;
   die_id: string | null;          // the roto die this plate runs with
   total_colors: number | null;    // 1–12, one plate per colour
+  colors: (string | null)[] | null; // colour names in station order (migration 103)
   party: string;                  // PARTY
   pm_code: string | null;         // PM CODE
   item_name: string | null;       // ITEM NAME

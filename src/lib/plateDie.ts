@@ -111,3 +111,24 @@ export function metresFromPlates(plates: Plate[], pmCode: string, qty: number):
   }
   return { found: same.length, options: Array.from(byPair.values()).sort((a, b) => b.plates.length - a.plates.length) };
 }
+
+// ── Plate colours (migration 103) ───────────────────────────────
+// One entry per colour, in station order. A new list starts as process
+// colours — the first four boxes CYAN, MAGENTA, YELLOW, BLACK — and the
+// rest are typed (spot colours, white, varnish…).
+export const MAX_COLORS = 12;
+export const DEFAULT_COLORS = ['CYAN', 'MAGENTA', 'YELLOW', 'BLACK'] as const;
+
+/** The form's boxes (all 12, so switching 8 → 5 → 8 keeps what was typed):
+ *  a saved list as saved, otherwise the CMYK defaults. */
+export function colorBoxes(saved: (string | null)[] | null | undefined): string[] {
+  return Array.from({ length: MAX_COLORS }, (_, i) =>
+    saved ? saved[i] ?? '' : DEFAULT_COLORS[i] ?? '');
+}
+
+/** Request body value → the column: trimmed, blank entries null, at most 12;
+ *  null when it isn't a non-empty list. */
+export function colorsFrom(raw: unknown): (string | null)[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  return raw.slice(0, MAX_COLORS).map((c) => (typeof c === 'string' ? c.trim() || null : null));
+}
