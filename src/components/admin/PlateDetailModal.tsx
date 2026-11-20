@@ -92,13 +92,13 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
           <dl className="grid grid-cols-2 gap-x-6 gap-y-3">
             <Detail label="PM code" value={plate.pm_code} mono />
             <Detail label="Location" value={plate.location} />
-            <Detail label="Size (across × around)" value={size} mono />
+            <Detail label="Size (height × width)" value={size} mono />
             <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
             <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
             <Detail label="Total colours" value={plate.total_colors?.toString()} mono />
             <Detail label="Roto die" value={plate.die_id ? 'Linked' : 'Not linked'} />
-            <Detail label="Around" value={layoutPair(plate.around_ups, plate.around_gap)} mono />
-            <Detail label="Across" value={layoutPair(plate.across_ups, plate.across_gap)} mono />
+            <Detail label="Width" value={layoutPair(plate.around_ups, plate.around_gap)} mono />
+            <Detail label="Height" value={layoutPair(plate.across_ups, plate.across_gap)} mono />
             <Detail label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />
             <Detail label="Added" value={formatAdminDate(plate.created_at)} mono />
             <Detail label="Added by" value={plate.created_by} />

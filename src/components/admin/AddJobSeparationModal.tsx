@@ -21,7 +21,9 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
-import type { JobSeparation, Party } from '@/lib/types';
+import type { JobSeparation, Party, Plate } from '@/lib/types';
+import { isPlaceholderPm, metresFromPlates } from '@/lib/plateDie';
+import { formatNum } from '@/lib/meterCalculator';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import { useListKeys } from '@/hooks/useListKeys';
@@ -131,6 +133,27 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
     quantity.trim() && rate.trim() && Number.isFinite(qtyNum) && Number.isFinite(rateNum)
       ? qtyNum * rateNum
       : null;
+
+  // Required metres: the Meter calculator's sum, with the cylinder and ups
+  // (label per round) of the plates carrying this exact PM code. Worked out
+  // here, never stored, so it follows the plates as they're corrected.
+  const [pmPlates, setPmPlates] = useState<Plate[] | null>(null);
+  useEffect(() => {
+    const code = pmCode.trim();
+    if (!code || isPlaceholderPm(code)) { setPmPlates(null); return; }
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ field: 'pm_code_exact', search: code, limit: '200' });
+        const res = await fetch(`/api/plates?${params.toString()}`);
+        if (res.ok && !cancelled) setPmPlates((await res.json()).plates ?? []);
+      } catch {
+        // Best-effort: the line saves the same without it.
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [pmCode]);
+  const meter = pmPlates && quantity.trim() && qtyNum > 0 ? metresFromPlates(pmPlates, pmCode, qtyNum) : null;
 
   // Party typeahead — searches the master list as soon as the first
   // letter is typed (min length 1, unlike the PM-code lookup's min of 2,
@@ -392,6 +415,8 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
             </div>
           </div>
 
+          <RequiredMetres pmCode={pmCode.trim()} qty={quantity.trim()} meter={meter} loading={!!pmCode.trim() && !isPlaceholderPm(pmCode) && pmPlates === null} />
+
           <div>
             <JsLabel>Artwork Status</JsLabel>
             <input
@@ -453,5 +478,58 @@ function JsLabel({ children, required }: { children: React.ReactNode; required?:
       {children}
       {required && <span className="text-red-300 ml-0.5" aria-hidden="true">*</span>}
     </span>
+  );
+}
+
+// Read-only, like Order Value: what the line needs, and where the numbers
+// came from so anyone can check it against the Meter calculator.
+function RequiredMetres({ pmCode, qty, meter, loading }: {
+  pmCode: string;
+  qty: string;
+  meter: ReturnType<typeof metresFromPlates> | null;
+  loading: boolean;
+}) {
+  const muted = 'text-[11px] text-[var(--glass-muted)] mt-1';
+  const plateNames = (o: { plates: Plate[] }) =>
+    o.plates.map((p) => p.plate_id?.split('\n')[0]).filter(Boolean).slice(0, 2).join(', ');
+  let body: React.ReactNode;
+  if (!pmCode || !qty) body = <p className={muted}>Enter the PM code and quantity to work it out from the plate.</p>;
+  else if (isPlaceholderPm(pmCode)) body = <p className={muted}>&ldquo;{pmCode}&rdquo; isn&apos;t a PM code, so the plate can&apos;t be found.</p>;
+  else if (loading || !meter) body = <p className={muted}>Looking for the plate…</p>;
+  else if (meter.found === 0) body = <p className={muted}>No plate with PM code {pmCode}, so the cylinder and ups aren&apos;t known.</p>;
+  else if (meter.options.length === 0) body = <p className={muted}>The plate for {pmCode} has no cylinder or label per round recorded.</p>;
+  else if (meter.options.length === 1) {
+    const o = meter.options[0];
+    body = (
+      <>
+        <p className="text-lg font-semibold font-mono text-[var(--glass-ink)]">{formatNum(o.metres)} m</p>
+        <p className={muted}>
+          {o.cylinder} × 3.175 × {formatNum(Number(qty), 0)} ÷ {o.ups} ups ÷ 1000
+          {plateNames(o) && <>, from plate {plateNames(o)}</>}.
+        </p>
+      </>
+    );
+  } else {
+    body = (
+      <>
+        <p className={muted}>Plates with PM code {pmCode} disagree. Each one gives:</p>
+        <ul className="mt-1 divide-y divide-black/[0.06] rounded-lg border border-black/[0.08]">
+          {meter.options.map((o) => (
+            <li key={`${o.cylinder}/${o.ups}`} className="flex items-baseline justify-between gap-3 px-3 py-1.5 text-sm">
+              <span className="text-[var(--glass-muted)]">
+                Cylinder {o.cylinder}, {o.ups} ups · {o.plates.length} plate{o.plates.length === 1 ? '' : 's'}
+              </span>
+              <span className="font-mono font-semibold text-[var(--glass-ink)]">{formatNum(o.metres)} m</span>
+            </li>
+          ))}
+        </ul>
+      </>
+    );
+  }
+  return (
+    <div aria-live="polite">
+      <JsLabel>Required metres</JsLabel>
+      {body}
+    </div>
   );
 }

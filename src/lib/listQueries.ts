@@ -22,10 +22,10 @@ export const JOB_SEPARATION_PAGE_SIZE = 100;
 export type JobSeparationList = { rows: JobSeparation[]; hasMore: boolean; totalOrderValue: number | null };
 
 export function jobSeparationListQuery({
-  search = '', field = 'all', range = 'month', party = '', limit = JOB_SEPARATION_PAGE_SIZE,
-}: { search?: string; field?: string; range?: string; party?: string; limit?: number } = {}) {
+  search = '', field = 'all', range = 'month', party = '', unit = '', limit = JOB_SEPARATION_PAGE_SIZE,
+}: { search?: string; field?: string; range?: string; party?: string; unit?: string; limit?: number } = {}) {
   return {
-    queryKey: ['job-separations', search, field, range, party, limit] as const,
+    queryKey: ['job-separations', search, field, range, party, unit, limit] as const,
     queryFn: async ({ signal }: QueryFunctionContext): Promise<JobSeparationList> => {
       const params = new URLSearchParams({ range, limit: String(limit) });
       if (search) {
@@ -33,6 +33,7 @@ export function jobSeparationListQuery({
         if (field !== 'all') params.set('field', field);
       }
       if (party) params.set('party', party);
+      if (unit) params.set('unit', unit);
       const data = await getJson(`/api/job-separations?${params}`, signal, 'Failed to load job separation rows');
       return {
         rows:    (data.job_separations ?? []) as JobSeparation[],

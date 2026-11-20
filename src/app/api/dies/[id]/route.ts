@@ -20,7 +20,7 @@ import { layoutFrom } from '@/lib/plateDie';
 type Params = { params: Promise<{ id: string }> };
 
 const TEXT_FIELDS = [
-  'length', 'width', 'material', 'gap', 'corner', 'serial_no', 'die_received_on', 'location',
+  'length', 'width', 'material', 'shape', 'corner', 'serial_no', 'die_received_on', 'location',
 ] as const;
 
 const INT_FIELDS = ['cylinder', 'ups'] as const;

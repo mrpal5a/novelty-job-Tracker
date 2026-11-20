@@ -74,3 +74,18 @@ describe('findParties', () => {
     expect(findParties(parties, '  ')).toEqual([]);
   });
 });
+
+describe('roto die height gap and shape', () => {
+  it('height gap matches the exact number, decimals included', () => {
+    const d = die({ across_gap: 8.5 });
+    expect(roto('8.5', { field: 'height_gap' })(d)).toBe(true);
+    expect(roto('8', { field: 'height_gap' })(d)).toBe(false);
+    expect(roto('abc', { field: 'height_gap' })(d)).toBe(false);
+    expect(roto('0', { field: 'height_gap' })(die({ across_gap: null }))).toBe(false);
+  });
+  it('shape is found by its own field and by All fields', () => {
+    const d = die({ shape: 'OVAL' });
+    expect(roto('oval', { field: 'shape' })(d)).toBe(true);
+    expect(roto('oval')(d)).toBe(true);
+  });
+});

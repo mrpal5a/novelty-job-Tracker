@@ -5,13 +5,26 @@
 // die carry exactly its ups. Sizes compare on the whole millimetre, the
 // same as the die search.
 
-import type { Die, DieLayout, FlatbedDie } from '@/lib/types';
+import type { Die, DieLayout, FlatbedDie, Plate } from '@/lib/types';
+import { repeatLengthMm } from '@/lib/cylinders';
+import { METER, ceilWhole } from '@/lib/meterCalculator';
 
 export const LAYOUT_KEYS = ['around_ups', 'around_gap', 'across_ups', 'across_gap'] as const;
 
 // "4 ups · 3.5 mm" for one direction of a layout; null when neither is recorded.
 export function layoutPair(ups: number | null, gap: number | null): string | null {
   return ups == null && gap == null ? null : `${ups ?? '—'} ups · ${gap ?? '—'} mm`;
+}
+
+// Width (around) gap on a plate, worked out from the cylinder as the team
+// does it: cylinder × 3.175 ÷ width ups − width size — the repeat shared by
+// the labels around the cylinder, less each label's width. Null until all three are
+// numbers, or when the labels wouldn't fit the repeat. Two decimals, as stored.
+export function widthGapMm(cylinder: string, widthUps: string, widthSize: string): number | null {
+  const teeth = parseFloat(cylinder), ups = parseFloat(widthUps), size = parseFloat(widthSize);
+  if (!(teeth > 0 && ups > 0 && size > 0)) return null;
+  const gap = repeatLengthMm(teeth) / ups - size;
+  return gap >= 0 ? Math.round(gap * 100) / 100 : null;
 }
 
 // Request body → layout columns, for the keys the body carries. Blank or
@@ -62,11 +75,39 @@ export function flatbedDiesFor(dies: FlatbedDie[], sizeA: string, sizeB: string)
 
 // Pick-list for a free-text die column: the spellings already in use, most
 // common first. One-offs are left out so typos ("SQAURE") aren't offered back.
-export function commonValues(dies: Die[], key: 'material' | 'corner' | 'gap', min = 2): string[] {
+export function commonValues(dies: Die[], key: 'material' | 'corner' | 'shape', min = 2): string[] {
   const counts = new Map<string, number>();
   for (const d of dies) {
     const v = d[key]?.trim();
     if (v) counts.set(v, (counts.get(v) ?? 0) + 1);
   }
   return Array.from(counts).filter(([, n]) => n >= min).sort((a, b) => b[1] - a[1]).map(([v]) => v);
+}
+
+// Metres of material a Job Separation line needs, from the plates with its
+// PM code: the Meter calculator's sum (cylinder × 3.175 × qty ÷ ups ÷ 1000,
+// never rounded down), with ups = the plate's label per round. Plates of one
+// code normally agree; when they don't (placeholder codes like "001"), each
+// cylinder/ups pair is its own option, most plates first, instead of a guess.
+// "N/A", "NA", "NIL", "-": typed when a line has no PM code. Shared by many
+// unrelated plates, so it never picks a plate.
+export const isPlaceholderPm = (code: string) => /^(n\/?a|nil|none|-+)$/i.test(code.trim());
+
+export type MeterOption = { cylinder: number; ups: number; metres: number; plates: Plate[] };
+
+export function metresFromPlates(plates: Plate[], pmCode: string, qty: number):
+  { found: number; options: MeterOption[] } {
+  const want = pmCode.trim().toLowerCase();
+  const same = want && !isPlaceholderPm(want) ? plates.filter((p) => p.pm_code?.trim().toLowerCase() === want) : [];
+  const byPair = new Map<string, MeterOption>();
+  for (const p of same) {
+    const cylinder = p.cylinder ?? 0, ups = p.label_per_round ?? 0;
+    if (!(cylinder > 0 && ups > 0 && qty > 0)) continue;
+    const key = `${cylinder}/${ups}`;
+    const hit = byPair.get(key);
+    if (hit) { hit.plates.push(p); continue; }
+    const solved = METER.solve({ qty, cyl: cylinder, ups }, 'metres');
+    if ('value' in solved) byPair.set(key, { cylinder, ups, metres: ceilWhole(solved.value), plates: [p] });
+  }
+  return { found: same.length, options: Array.from(byPair.values()).sort((a, b) => b.plates.length - a.plates.length) };
 }

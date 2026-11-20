@@ -26,7 +26,7 @@ const KINDS = {
   },
   die: {
     table: 'dies',
-    columns: 'id, serial_no, job_name, length, width, cylinder, material, ups, gap, corner, location, status, die_received_on, damage_reason',
+    columns: 'id, serial_no, job_name, length, width, cylinder, material, ups, across_gap, shape, corner, location, status, die_received_on, damage_reason',
   },
   flatbed: {
     table: 'flatbed_dies',

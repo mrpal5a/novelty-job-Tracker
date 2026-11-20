@@ -219,6 +219,8 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   // The Party box: this party's jobs, ANDed with the search box.
   const [party,       setParty]       = useState('');
   const [range,       setRange]       = useState<DateRangeOption>('month');
+  // Unit filter: '' is every unit; '1' / '2' include the shared '1&2' lines.
+  const [unit,        setUnit]        = useState<'' | '1' | '2'>('');
   // Opened with ?q= (the jobs table's "Look in Job Separation", Ctrl K): pre-fill
   // the search over all dates — the line looked for may be older than this month.
   useUrlSearch(setSearch, () => setRange('all'));
@@ -276,14 +278,14 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
   // "Load more" click reached doesn't carry over to an unrelated query.
   useEffect(() => {
     setLimit(PAGE_SIZE);
-  }, [debouncedSearch, searchField, debouncedParty, range]);
+  }, [debouncedSearch, searchField, debouncedParty, range, unit]);
 
   // "Load more" just grows `limit` and re-fetches the whole 0..limit range
   // (the API has no real cursor), so it's one more dimension of the query
   // key rather than a separate pagination mechanism.
   const rowsQuery = useQuery({
     // Key + fetch live in lib/listQueries so the menu can warm this up.
-    ...jobSeparationListQuery({ search: debouncedSearch, field: searchField, range, party: debouncedParty, limit }),
+    ...jobSeparationListQuery({ search: debouncedSearch, field: searchField, range, party: debouncedParty, unit, limit }),
     placeholderData: keepPreviousData,
   });
   // A row someone else just added shows up without a manual refresh: every
@@ -462,6 +464,26 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
             <option key={r.value} value={r.value}>{r.label}</option>
           ))}
         </select>
+
+        {/* One tap per unit, the current one filled. "1&2" lines are shared
+            work, so they show under Unit 1 and Unit 2 alike. */}
+        <div role="group" aria-label="Unit" className="flex shrink-0 rounded-xl border border-brand-border bg-white p-0.5">
+          {([['', 'All'], ['1', 'Unit 1'], ['2', 'Unit 2']] as const).map(([value, label]) => (
+            <button
+              key={label}
+              type="button"
+              aria-pressed={unit === value}
+              onClick={() => setUnit(value)}
+              title={value ? `Unit ${value} lines, plus those shared by both units` : 'Every unit'}
+              className={cn(
+                'min-h-10 [@media(pointer:coarse)]:min-h-11 whitespace-nowrap rounded-[10px] px-3 text-sm font-medium transition-colors',
+                unit === value ? 'bg-brand-ink text-white' : 'text-brand-ink hover:bg-brand-surface-alt',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         <select
           value={searchField}

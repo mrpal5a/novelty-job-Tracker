@@ -71,10 +71,10 @@ export default function DieDetailModal({ die, srNo, onClose, onEdit }: Props) {
             <Detail label="Cylinder" value={die.cylinder?.toString()} mono />
             <Detail label="Corner" value={die.corner} />
             <Detail label="Material" value={die.material} />
-            <Detail label="Gap across" value={die.gap} />
+            <Detail label="Shape" value={die.shape} />
             <Detail label="Ups / repeat" value={die.ups?.toString()} mono />
-            <Detail label="Around" value={layoutPair(die.around_ups, die.around_gap)} mono />
-            <Detail label="Across" value={layoutPair(die.across_ups, die.across_gap)} mono />
+            <Detail label="Width" value={layoutPair(die.around_ups, die.around_gap)} mono />
+            <Detail label="Height" value={layoutPair(die.across_ups, die.across_gap)} mono />
             <Detail label="First used" value={formatNumericDate(die.die_received_on)} mono />
             <Detail label="Added" value={formatAdminDate(die.created_at)} mono />
           </dl>

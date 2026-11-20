@@ -1,7 +1,7 @@
 'use client';
 // src/components/admin/LayoutFields.tsx
-// The label layout as a small grid: one row Across, one row Around, columns
-// Size · Ups · Gap. Ups and gaps are shared between a plate and its roto die
+// The label layout as a small grid: one row Height (across), one row Width
+// (around), columns Size · Ups · Gap. Ups and gaps are shared between a plate and its roto die
 // (migration 101 keeps the two in step). Both forms pass their sizes in for
 // the first column: the plate its across/around sizes, the die its length
 // (across) and width (around). Units sit in the column headers, which keeps three
@@ -22,9 +22,12 @@ export function layoutState(from?: Partial<DieLayout> | null): LayoutState {
 }
 
 type Side = 'across' | 'around';
+// Height first, as everywhere else (height × width). The plate's width gap
+// is worked out from the width row's size and ups (and the cylinder above
+// the grid), so the box it fills is the last one.
 const SIDES: { side: Side; label: string }[] = [
-  { side: 'across', label: 'Across' },
-  { side: 'around', label: 'Around' },
+  { side: 'across', label: 'Height' },
+  { side: 'around', label: 'Width' },
 ];
 
 type Props = {
@@ -33,18 +36,20 @@ type Props = {
   inputClassName: string;
   /** The record's own sizes, as the first column. */
   sizes?: Record<Side, string> & { required?: boolean; onChange: (side: Side, value: string) => void };
+  /** Boxes currently holding a worked-out value: tinted and tagged "auto". */
+  auto?: Partial<Record<keyof DieLayout, boolean>>;
   note?: React.ReactNode;
 };
 
 const headCls = 'text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--glass-muted)]';
 
-export default function LayoutFields({ value, onChange, inputClassName, sizes, note }: Props) {
+export default function LayoutFields({ value, onChange, inputClassName, sizes, auto, note }: Props) {
   const box = cn(inputClassName, 'font-mono min-w-0');
   const set = (key: keyof DieLayout, v: string) => onChange({ ...value, [key]: v });
 
   return (
     <fieldset>
-      <legend className="sr-only">Label layout: size, ups and gap, across and around</legend>
+      <legend className="sr-only">Label layout: size, ups and gap, by height and width</legend>
       <div className={cn('grid items-center gap-x-2 gap-y-2', sizes ? 'grid-cols-[auto_1fr_1fr_1fr]' : 'grid-cols-[auto_1fr_1fr]')}>
         <span aria-hidden="true" />
         {sizes && (
@@ -60,7 +65,7 @@ export default function LayoutFields({ value, onChange, inputClassName, sizes, n
             <span className={cn(headCls, 'pr-1')}>{label}</span>
             {sizes && (
               <input
-                aria-label={`${label} size in mm`}
+                aria-label={`${label} in mm`}
                 aria-required={sizes.required || undefined}
                 inputMode="decimal"
                 value={sizes[side]}
@@ -78,16 +83,26 @@ export default function LayoutFields({ value, onChange, inputClassName, sizes, n
               onChange={(e) => set(`${side}_ups`, e.target.value)}
               className={box}
             />
-            <input
-              aria-label={`${label} gap in mm`}
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step={0.01}
-              value={value[`${side}_gap`]}
-              onChange={(e) => set(`${side}_gap`, e.target.value)}
-              className={box}
-            />
+            <div className="relative min-w-0">
+              <input
+                aria-label={`${label} gap in mm${auto?.[`${side}_gap`] ? ', worked out' : ''}`}
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step={0.01}
+                value={value[`${side}_gap`]}
+                onChange={(e) => set(`${side}_gap`, e.target.value)}
+                className={cn(box, auto?.[`${side}_gap`] && 'pr-10 !bg-[var(--glass-bg-strong)]')}
+              />
+              {auto?.[`${side}_gap`] && (
+                <span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-[10px] font-semibold uppercase tracking-[0.06em] text-emerald-700"
+                >
+                  auto
+                </span>
+              )}
+            </div>
           </React.Fragment>
         ))}
       </div>

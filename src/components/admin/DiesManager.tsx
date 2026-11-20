@@ -34,7 +34,7 @@ const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
 // <td>s rendered below.
 const DIE_COLUMNS = [
   'Sr No', 'Serial No', 'Job Name', 'Corner', 'Size', 'Cylinder', 'Material',
-  'Location', 'Gap across', 'Ups / repeat', 'First Used', 'Actions',
+  'Location', 'Height gap', 'Ups / repeat', 'First Used', 'Actions',
 ] as const;
 const DIE_COLS = DIE_COLUMNS.length;
 
@@ -48,7 +48,7 @@ const SHOW_STEP = 100;
 // by the more useful of its two source fields.
 type SortField =
   | 'status' | 'serial_no' | 'job_name' | 'corner' | 'length' | 'cylinder'
-  | 'material' | 'location' | 'gap' | 'ups' | 'die_received_on' | 'damage_date' | 'created_at';
+  | 'material' | 'location' | 'across_gap' | 'ups' | 'die_received_on' | 'damage_date' | 'created_at';
 type SortDir = 'asc' | 'desc';
 
 const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>> = {
@@ -60,14 +60,14 @@ const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>>
   'Cylinder':      'cylinder',
   'Material':      'material',
   'Location':      'location',
-  'Gap across':    'gap',
+  'Height gap':    'across_gap',
   'Ups / repeat':  'ups',
   'First Used':    'die_received_on',
 };
 
 const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
   status: 'text', serial_no: 'text', job_name: 'text', corner: 'text', length: 'text',
-  cylinder: 'number', material: 'text', location: 'text', gap: 'text', ups: 'number',
+  cylinder: 'number', material: 'text', location: 'text', across_gap: 'number', ups: 'number',
   die_received_on: 'date', damage_date: 'date', created_at: 'date',
 };
 
@@ -108,7 +108,8 @@ const DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[]
   { value: 'location',  label: 'Location',      placeholder: 'Search by location' },
   { value: 'size',      label: 'Size',          placeholder: 'Search by length or width' },
   { value: 'cylinder',  label: 'Cylinder',      placeholder: 'Search by cylinder' },
-  { value: 'gap',       label: 'Gap across',    placeholder: 'Search by gap across' },
+  { value: 'shape',     label: 'Shape',         placeholder: 'Search by shape' },
+  { value: 'height_gap', label: 'Height gap',   placeholder: 'Search by height gap (mm)' },
   { value: 'ups',       label: 'Ups / repeat',  placeholder: 'Search by ups / repeat' },
 ];
 
@@ -135,7 +136,8 @@ function buildDieExportColumns(srNoMap: Map<string, number>): CsvColumn<Die>[] {
   { header: 'Cylinder',         value: (d) => d.cylinder },
   { header: 'Material',         value: (d) => d.material },
   { header: 'Ups',              value: (d) => d.ups },
-  { header: 'Gap',              value: (d) => d.gap },
+  { header: 'Height Gap',       value: (d) => d.across_gap },
+  { header: 'Shape',            value: (d) => d.shape },
   { header: 'Location',         value: (d) => d.location },
   { header: 'Die Received On',  value: (d) => csvDate(d.die_received_on) },
   { header: 'Damage Date',      value: (d) => csvDate(d.damage_date) },
@@ -405,7 +407,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                       <SpecField label="Cylinder" value={die.cylinder?.toString()} mono />
                       <SpecField label="Material" value={die.material} />
                       <SpecField label="Location" value={die.location} />
-                      <SpecField label="Gap across" value={die.gap} />
+                      <SpecField label="Height gap" value={die.across_gap != null ? `${die.across_gap} mm` : null} />
                       <SpecField label="Ups / repeat" value={die.ups?.toString()} mono />
                       <SpecField label="First used" value={formatNumericDate(die.die_received_on)} mono />
                     </div>
@@ -482,7 +484,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         col === 'Job Name' && 'min-w-[220px]',
                         // Short values under long labels: let the label wrap so the
                         // table fits a 1366 px screen without a sideways scroll.
-                        ['Corner', 'Material', 'Gap across', 'Ups / repeat', 'First Used'].includes(col) && 'whitespace-normal',
+                        ['Corner', 'Material', 'Height gap', 'Ups / repeat', 'First Used'].includes(col) && 'whitespace-normal',
                         // Sr No is the team's floor reference number — keep it pinned to the
                         // left edge through both scroll axes so it's always visible. z-20
                         // (above the plain top-sticky headers at z-10) so it stays on top at
@@ -535,7 +537,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
                         <td className="px-3 py-1.5 min-w-[100px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
                         <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap">{die.gap || '—'}</td>
+                        <td className="px-3 py-1.5 whitespace-nowrap font-mono">{die.across_gap ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>
                         <td className="px-3 py-1.5 font-mono whitespace-nowrap">{formatNumericDate(die.die_received_on) || '—'}</td>
                         <td className="px-3 py-1.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>

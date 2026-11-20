@@ -140,7 +140,8 @@ export interface Die extends DieLayout {
   cylinder: number | null;        // CYLINDER
   material: string | null;        // MATERIAL
   ups: number | null;             // Ups — labels per revolution
-  gap: string | null;             // Gap — e.g. "5 MM"
+  gap: string | null;             // retired "Gap across" (migration 102): use across_gap
+  shape: string | null;           // SHAPE — optional, as on flatbed dies
   corner: string | null;          // CORNER — e.g. "SPECIAL", "ROUND"
   serial_no: string | null;       // SERIAL No. — identifier etched on the die
   die_received_on: string | null; // Die Rec. on — ISO date string

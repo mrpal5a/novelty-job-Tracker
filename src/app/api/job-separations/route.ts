@@ -68,6 +68,9 @@ export async function GET(request: NextRequest) {
   // The Party box beside the search — ANDed with it ("this party's jobs").
   const party  = searchParams.get('party')?.trim();
   const range: DateRange = parseDateRange(searchParams.get('range'));
+  // The Unit filter: '1' or '2'. A '1&2' line is shared, so it shows under both.
+  const unitParam = searchParams.get('unit');
+  const unit = unitParam === '1' || unitParam === '2' ? unitParam : null;
   const limit = parseLimit(searchParams.get('limit'));
 
   // ?sr_nos=AUG26-1,AUG26-7 — exact rows by Sr No, whatever their date: how
@@ -99,13 +102,14 @@ export async function GET(request: NextRequest) {
 
   // The same range + search on any query over the table: the page of rows,
   // and the order-value total when there are more rows than the page holds.
-  type Filterable<Q> = { or: (f: string) => Q; eq: (c: string, v: number) => Q; ilike: (c: string, p: string) => Q };
+  type Filterable<Q> = { or: (f: string) => Q; eq: (c: string, v: number) => Q; ilike: (c: string, p: string) => Q; in: (c: string, v: string[]) => Q };
   function applyFilters<Q extends Filterable<Q>>(q: Q): Q {
     // Scoped exactly the way Bill of Material scopes the same rows — see
     // src/lib/jobSeparationQuery.ts for the po_date/created_at bucketing.
     const rangeClause = rangeOrClause(range);
     if (rangeClause) q = q.or(rangeClause);
     if (party) q = q.ilike('party', containsPattern(party));
+    if (unit) q = q.in('unit', [unit, '1&2']);
     if (!search) return q;
     if (config && intSearch !== null) return q.eq(config.column, Math.trunc(intSearch));
     // Picked a specific text field — search just that column.

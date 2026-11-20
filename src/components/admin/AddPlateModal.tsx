@@ -17,7 +17,7 @@ import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import PartySuggestInput from './PartySuggestInput';
-import { dieUpsFor, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
+import { dieUpsFor, widthGapMm, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 
 const COLOR_COUNTS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -96,6 +96,22 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [acrossSize, aroundSize, cylinder]);
   const matchedDie = dieUps?.dies[0];
+
+  // Width gap follows cylinder, width ups and width size. Like label per
+  // round above, it only replaces its own fill: a gap typed by hand stays.
+  // Seeded with the saved plate's sum, so a gap that was worked out still
+  // follows a corrected cylinder.
+  const layoutNow = useRef(layout);
+  layoutNow.current = layout;
+  const lastGap = useRef(String(widthGapMm(cylinder, layout.around_ups, aroundSize) ?? ''));
+  const autoGap = widthGapMm(cylinder, layout.around_ups, aroundSize);
+  useEffect(() => {
+    const next = autoGap === null ? '' : String(autoGap);
+    const current = layoutNow.current.around_gap;
+    if ((current.trim() && current !== lastGap.current) || current === next) return;
+    lastGap.current = next;
+    setLayout({ ...layoutNow.current, around_gap: next });
+  }, [autoGap]);
   const dieChoices = dieUps?.dies ?? [];
 
   // Picking a die brings its layout in, when it has one; the database then
@@ -216,20 +232,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
             />
           </div>
 
-          <LayoutFields
-            value={layout}
-            onChange={setLayout}
-            inputClassName={inputCls}
-            sizes={{
-              across: acrossSize,
-              around: aroundSize,
-              onChange: (side, v) => (side === 'across' ? setAcrossSize : setAroundSize)(v),
-            }}
-            note={dieId
-              ? 'Ups and gaps are shared with the linked roto die and every plate on it.'
-              : 'Link a roto die below to share ups and gaps with it.'}
-          />
-
+          {/* What the plate runs on comes first: the gap below is worked out from it. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <PlateLabel>Cylinder</PlateLabel>
@@ -237,58 +240,13 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                   <input
                   type="number"
                   inputMode="numeric"
+                  aria-label="Cylinder in teeth"
                   value={cylinder}
                   onChange={(e) => setCylinder(e.target.value)}
                   className={cn(inputCls, 'font-mono')}
                 />
               </WithUnit>
             </div>
-            <div>
-              <PlateLabel>Location</PlateLabel>
-              <WithExample example="Rack B2">
-                  <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className={inputCls}
-                />
-              </WithExample>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <PlateLabel>Plate date</PlateLabel>
-              <input
-                type="date"
-                value={plateDate}
-                onChange={(e) => setPlateDate(e.target.value)}
-                className={cn(inputCls, 'font-mono')}
-              />
-            </div>
-            <div>
-              <PlateLabel>Label per round</PlateLabel>
-              <input
-                type="number"
-                inputMode="numeric"
-                value={labelPerRound}
-                onChange={(e) => setLabelPerRound(e.target.value)}
-                className={cn(inputCls, 'font-mono')}
-              />
-              {dieUps && (
-                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
-                  {!matchedDie
-                    ? 'No die of this size and cylinder.'
-                    : dieUps.ups !== null
-                      ? `${dieUps.ups} ups, from die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''}.`
-                      : dieUps.options.length
-                        ? `Dies for this size have ${dieUps.options.join(' or ')} ups: enter yours.`
-                        : `Die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''} has no ups recorded.`}
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
               <PlateLabel>Total colours</PlateLabel>
               <select
@@ -300,6 +258,30 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                 {COLOR_COUNTS.map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
+          </div>
+
+          <LayoutFields
+            value={layout}
+            onChange={setLayout}
+            inputClassName={inputCls}
+            auto={{ around_gap: autoGap !== null && layout.around_gap === String(autoGap) }}
+            sizes={{
+              across: acrossSize,
+              around: aroundSize,
+              onChange: (side, v) => (side === 'across' ? setAcrossSize : setAroundSize)(v),
+            }}
+            note={<>
+              {autoGap !== null && layout.around_gap === String(autoGap) && (
+                <>Width gap {autoGap} = {cylinder} × 3.175 ÷ {layout.around_ups} − {aroundSize}. </>
+              )}
+              {dieId
+                ? 'Ups and gaps are shared with the linked roto die and every plate on it.'
+                : 'Link a roto die below to share ups and gaps with it.'}
+            </>}
+          />
+
+          {/* Found from the sizes and cylinder above. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
               <PlateLabel>Roto die</PlateLabel>
               <select
@@ -324,6 +306,49 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                 </span>
               )}
             </label>
+            <div>
+              <PlateLabel>Label per round</PlateLabel>
+              <input
+                type="number"
+                inputMode="numeric"
+                value={labelPerRound}
+                onChange={(e) => setLabelPerRound(e.target.value)}
+                className={cn(inputCls, 'font-mono')}
+              />
+              {dieUps && (
+                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                  {!matchedDie
+                    ? 'No die of this size and cylinder.'
+                    : dieUps.ups !== null
+                      ? `${dieUps.ups} ups, from die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''}.`
+                      : dieUps.options.length
+                        ? `Dies for this size have ${dieUps.options.join(' or ')} ups: enter yours.`
+                        : `Die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''} has no ups recorded.`}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <PlateLabel>Location</PlateLabel>
+              <WithExample example="Rack B2">
+                  <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className={inputCls}
+                />
+              </WithExample>
+            </div>
+            <div>
+              <PlateLabel>Plate date</PlateLabel>
+              <input
+                type="date"
+                value={plateDate}
+                onChange={(e) => setPlateDate(e.target.value)}
+                className={cn(inputCls, 'font-mono')}
+              />
+            </div>
           </div>
 
           <div>

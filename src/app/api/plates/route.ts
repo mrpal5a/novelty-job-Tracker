@@ -9,7 +9,7 @@ import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
-import { containsPattern, onSearchText, orContains, orMatch, orSizePair, searchAsPhrase, searchTerms } from '@/lib/search';
+import { containsPattern, escapeLike, onSearchText, orContains, orMatch, orSizePair, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
 import { layoutFrom } from '@/lib/plateDie';
@@ -30,12 +30,14 @@ function optionalInt(value: unknown): number | null {
 // and PostgREST/supabase-js does not apply a `column::text` cast through
 // the filter builder (confirmed: it raises "operator does not exist:
 // integer ~~* unknown") — so those match on the exact number instead.
-type PlateSearchField = { column: string; type: 'text' | 'size' | 'int' };
+type PlateSearchField = { column: string; type: 'text' | 'size' | 'int' | 'exact' };
 
 const PLATE_SEARCH_FIELDS: Record<string, PlateSearchField> = {
   party:           { column: 'party',           type: 'text' },
   plate_id:        { column: 'plate_id',        type: 'text' },
   pm_code:         { column: 'pm_code',         type: 'text' },
+  // The whole code, any case: a Job Separation line's plates (its metres).
+  pm_code_exact:   { column: 'pm_code',         type: 'exact' },
   item_name:       { column: 'item_name',       type: 'text' },
   location:        { column: 'location',        type: 'text' },
   // One "Size" option, as on dies: a number read off either side of the plate.
@@ -94,6 +96,7 @@ export async function GET(request: NextRequest) {
       // Size matches across or around on the whole millimetre: "60" finds 60
       // and 60.5, not 160 or 600.
       else if (config?.type === 'size') query = query.or(orMatch([], ['across_size', 'around_size'], search));
+      else if (config?.type === 'exact') query = query.ilike(config.column, escapeLike(search));
       else if (config) query = query.ilike(config.column, containsPattern(search));
       else if (terms) query = onSearchText(query, terms, asPhrase);
       // Only punctuation typed ("%"): matched as typed.

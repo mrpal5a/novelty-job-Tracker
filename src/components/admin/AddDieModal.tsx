@@ -45,7 +45,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   const picks = useMemo(() => ({
     material: commonValues(allDies, 'material'),
     corner:   commonValues(allDies, 'corner'),
-    gap:      commonValues(allDies, 'gap'),
+    shape:    commonValues(allDies, 'shape'),
   }), [allDies]);
 
   const [jobName,  setJobName]  = useState(editing?.job_name ?? '');
@@ -54,7 +54,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   const [cylinder, setCylinder] = useState(editing?.cylinder?.toString() ?? '');
   const [material, setMaterial] = useState(editing?.material ?? '');
   const [ups,      setUps]      = useState(editing?.ups?.toString() ?? '');
-  const [gap,      setGap]      = useState(editing?.gap ?? '');
+  const [shape,    setShape]    = useState(editing?.shape ?? '');
   const [corner,   setCorner]   = useState(editing?.corner ?? '');
   const [serialNo, setSerialNo] = useState(editing?.serial_no ?? '');
   // <input type="date"> only speaks yyyy-MM-dd; the column is a DATE, so the
@@ -78,12 +78,11 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
     e.preventDefault();
 
     if (!jobName.trim())    { toast.error('Enter the job this die was cut for'); return; }
-    if (!length.trim())     { toast.error('Enter the across size'); return; }
-    if (!width.trim())      { toast.error('Enter the around size'); return; }
+    if (!length.trim())     { toast.error('Enter the height'); return; }
+    if (!width.trim())      { toast.error('Enter the width'); return; }
     if (!cylinder.trim())   { toast.error('Enter the cylinder'); return; }
     if (!material.trim())   { toast.error('Enter the material'); return; }
     if (!ups.trim())        { toast.error('Enter the ups per repeat'); return; }
-    if (!gap.trim())        { toast.error('Enter the gap across'); return; }
     if (!corner.trim())     { toast.error('Enter the corner radius'); return; }
     if (!serialNo.trim())   { toast.error('Enter the serial no'); return; }
     if (!receivedOn.trim()) { toast.error('Enter the date the die was first used'); return; }
@@ -105,7 +104,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
           cylinder:        cylinder.trim(),
           material:        material.trim(),
           ups:             ups.trim(),
-          gap:             gap.trim(),
+          shape:           shape.trim(),
           corner:          corner.trim(),
           serial_no:       serialNo.trim(),
           die_received_on: receivedOn,
@@ -164,7 +163,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </WithExample>
           </div>
 
-          {/* Across = length (H), Around = width (W), as on the plate form. */}
+          {/* Height = length, Width = width, as on the plate form. */}
           <LayoutFields
             value={layout}
             onChange={setLayout}
@@ -234,12 +233,12 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
               </WithUnit>
             </div>
             <div>
-              <DieLabel required>Gap across</DieLabel>
-              <WithExample example="5 MM">
+              <DieLabel>Shape</DieLabel>
+              <WithExample example="ROUND, OVAL, RECTANGLE">
                   <input
-                  value={gap}
-                  onChange={(e) => setGap(e.target.value)}
-                  list={`${listId}-gap`}
+                  value={shape}
+                  onChange={(e) => setShape(e.target.value)}
+                  list={`${listId}-shape`}
                   autoComplete="off"
                   className={inputCls}
                 />
@@ -330,7 +329,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
           )}
         </div>
 
-        {(['material', 'corner', 'gap'] as const).map((k) => (
+        {(['material', 'corner', 'shape'] as const).map((k) => (
           <datalist key={k} id={`${listId}-${k}`}>
             {picks[k].map((v) => <option key={v} value={v} />)}
           </datalist>

@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   const config = search && field ? DIE_SEARCH_FIELDS[field] : undefined;
   // Not a whole number — an integer column can't contain it, so the
   // answer is "no matches" rather than a query error.
-  if (search && config?.type === 'int' && !Number.isFinite(Number(search))) {
+  if (search && (config?.type === 'int' || config?.type === 'number') && !Number.isFinite(Number(search))) {
     return NextResponse.json({ dies: [] });
   }
 
@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
       .range(from, to);
 
     if (search) {
-      if (config?.type === 'int') {
-        query = query.eq(config.column, Math.trunc(Number(search)));
+      if (config?.type === 'int' || config?.type === 'number') {
+        query = query.eq(config.column, config.type === 'int' ? Math.trunc(Number(search)) : Number(search));
       } else if (config) {
         // Picked a specific text field — search just that column. Size looks
         // at length and width, on the whole millimetre: "210" finds 210 and
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
       cylinder:        integer(body.cylinder),
       material:        text(body.material),
       ups:             integer(body.ups),
-      gap:             text(body.gap),
+      shape:           text(body.shape),
       corner:          text(body.corner),
       serial_no:       serialNo,
       die_received_on: text(body.die_received_on),

@@ -90,7 +90,7 @@ const PLATE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }
   { value: 'pm_code',         label: 'PM code',          placeholder: 'Search by PM code' },
   { value: 'item_name',       label: 'Item name',        placeholder: 'Search by item name' },
   { value: 'location',        label: 'Location',         placeholder: 'Search by location' },
-  { value: 'size',            label: 'Size',             placeholder: 'Search by across or around size' },
+  { value: 'size',            label: 'Size',             placeholder: 'Search by height or width' },
   { value: 'cylinder',        label: 'Cylinder',         placeholder: 'Search by cylinder' },
   { value: 'label_per_round', label: 'Labels / round',   placeholder: 'Search by labels per round' },
 ];
@@ -100,8 +100,8 @@ const PLATE_EXPORT_COLUMNS: CsvColumn<Plate>[] = [
   { header: 'Party',           value: (p) => p.party },
   { header: 'PM Code',         value: (p) => p.pm_code },
   { header: 'Item Name',       value: (p) => p.item_name },
-  { header: 'Across Size (H)', value: (p) => p.across_size },
-  { header: 'Around Size (W)', value: (p) => p.around_size },
+  { header: 'Height',          value: (p) => p.across_size },
+  { header: 'Width',           value: (p) => p.around_size },
   { header: 'Cylinder',        value: (p) => p.cylinder },
   { header: 'Label Per Round', value: (p) => p.label_per_round },
   { header: 'Location',        value: (p) => p.location },
@@ -264,7 +264,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Across', 'Around']} />
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Height', 'Width']} />
 
         <CsvExportButton fetchRows={fetchAllPlates} count={total} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
 
