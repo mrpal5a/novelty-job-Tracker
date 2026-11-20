@@ -262,7 +262,12 @@ export default function CommandPalette({
   }
 
   const term = q.trim();
-  let lastGroup = '';
+  // Rows are already in group order; split them into runs, keeping each row's index.
+  const groups: { name: string; items: { r: Row; i: number }[] }[] = [];
+  rows.forEach((r, i) => {
+    if (groups.at(-1)?.name !== r.group) groups.push({ name: r.group, items: [] });
+    groups.at(-1)!.items.push({ r, i });
+  });
 
   return (
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keys bubble from the input; the dialog itself isn't a control
@@ -317,18 +322,19 @@ export default function CommandPalette({
         </div>
 
         <div className="flex min-h-0 flex-1">
-        <div ref={listRef} id="palette-results" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto py-2">
-          {rows.map((r, i) => {
-            const head = r.group !== lastGroup;
-            lastGroup = r.group;
+        <div ref={listRef} id="palette-results" role="listbox" aria-label="Results" className="min-h-0 flex-1 overflow-y-auto pb-2">
+          {groups.map((g, gi) => (
+            // Each group is its own block: a rule above it, and its label stays
+            // pinned at the top while you scroll through its rows.
+            <div key={g.name} role="group" aria-labelledby={`palette-group-${gi}`} className={cn('pb-1.5', gi > 0 && 'mt-1')}>
+              {/* Mint band, as the table header rows: a solid bar marks where each kind starts. */}
+              <div role="presentation" className="sticky top-0 z-10 mb-1 border-y border-brand-border bg-[var(--glass-bg-strong)] px-5 py-2">
+                <span id={`palette-group-${gi}`} className="text-[11px] font-bold uppercase tracking-[0.06em] text-brand-ink">{g.name}</span>
+              </div>
+          {g.items.map(({ r, i }) => {
             const Icon = r.icon;
             return (
               <div key={r.key} role="presentation">
-                {head && (
-                  <div role="presentation" className="px-5 pb-1.5 pt-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-brand-muted">
-                    {r.group}
-                  </div>
-                )}
                 <div
                   id={`palette-row-${i}`}
                   data-index={i}
@@ -338,7 +344,8 @@ export default function CommandPalette({
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => go(r)}
                   className={cn(
-                    'mx-1.5 flex min-h-[52px] cursor-pointer items-center gap-3.5 rounded-xl px-3 py-2',
+                    // scroll-mt: ↑ into a row scrolls it clear of the pinned group label.
+                    'mx-1.5 flex min-h-[52px] scroll-mt-10 cursor-pointer items-center gap-3.5 rounded-xl px-3 py-2',
                     i === active && 'bg-[#EEF6F1] shadow-[inset_0_0_0_1px_#CFE3D7]',
                   )}
                 >
@@ -358,6 +365,8 @@ export default function CommandPalette({
               </div>
             );
           })}
+            </div>
+          ))}
 
           {rows.length === 0 && (
             <p className="px-5 py-10 text-center text-sm text-brand-muted" role="status">
