@@ -132,7 +132,7 @@ export type DieStatus = 'IN USE' | 'EXTRA' | 'DAMAGE';
 
 export const DIE_STATUSES: DieStatus[] = ['IN USE', 'EXTRA', 'DAMAGE'];
 
-export interface Die {
+export interface Die extends DieLayout {
   id: string;
   job_name: string;               // JOB — the product/label this die was cut for
   length: string | null;          // LENGTH
@@ -151,6 +151,15 @@ export interface Die {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Label layout on the die, shared with every plate linked to it (the
+// database keeps the two in step, migration 101). Gaps in mm.
+export interface DieLayout {
+  around_ups: number | null;
+  around_gap: number | null;
+  across_ups: number | null;
+  across_gap: number | null;
 }
 
 // ── flatbed dies ─────────────────────────────────────────────
@@ -184,8 +193,10 @@ export interface FlatbedDie {
 // SIZE (H), AROUND SIZE (W), CYLINDER, PLATE ID, PLATE DATE, LABEL PER
 // ROUND, LOCATION).
 
-export interface Plate {
+export interface Plate extends DieLayout {
   id: string;
+  die_id: string | null;          // the roto die this plate runs with
+  total_colors: number | null;    // 1–12, one plate per colour
   party: string;                  // PARTY
   pm_code: string | null;         // PM CODE
   item_name: string | null;       // ITEM NAME

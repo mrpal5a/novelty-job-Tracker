@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
 import { ModalShell } from './modals';
 import type { Die, DieStatus } from '@/lib/types';
+import { layoutPair } from '@/lib/plateDie';
 
 // A die's state as a dot + its name (StateChip). The stored values are
 // upper case; the screen says them in sentence case.
@@ -72,6 +73,8 @@ export default function DieDetailModal({ die, srNo, onClose, onEdit }: Props) {
             <Detail label="Material" value={die.material} />
             <Detail label="Gap across" value={die.gap} />
             <Detail label="Ups / repeat" value={die.ups?.toString()} mono />
+            <Detail label="Around" value={layoutPair(die.around_ups, die.around_gap)} mono />
+            <Detail label="Across" value={layoutPair(die.across_ups, die.across_gap)} mono />
             <Detail label="First used" value={formatNumericDate(die.die_received_on)} mono />
             <Detail label="Added" value={formatAdminDate(die.created_at)} mono />
           </dl>

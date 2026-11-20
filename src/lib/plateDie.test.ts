@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dieUpsFor, commonValues, flatbedDiesFor } from './plateDie';
+import { dieUpsFor, commonValues, flatbedDiesFor, layoutFrom } from './plateDie';
 import type { Die, FlatbedDie } from '@/lib/types';
 
 const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
@@ -41,5 +41,14 @@ describe('flatbed dies for a plate', () => {
     const dies = [fb('a', '60', '146'), fb('b', '146.4', '60'), fb('c', '60', '1460'), fb('d', '61', '146')];
     expect(flatbedDiesFor(dies, '60', '146').map((d) => d.id)).toEqual(['a', 'b']);
     expect(flatbedDiesFor(dies, '', '146')).toEqual([]);
+  });
+});
+
+describe('layout fields from a request body', () => {
+  it('reads only the keys sent: whole ups, decimal gaps, blank as null', () => {
+    expect(layoutFrom({ around_ups: '4.7', around_gap: '3.5', across_ups: '', other: 1 }))
+      .toEqual({ around_ups: 4, around_gap: 3.5, across_ups: null });
+    expect(layoutFrom({ across_gap: 'abc' })).toEqual({ across_gap: null });
+    expect(layoutFrom({})).toEqual({});
   });
 });

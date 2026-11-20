@@ -17,7 +17,10 @@ import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import PartySuggestInput from './PartySuggestInput';
-import { dieUpsFor, type DieUps } from '@/lib/plateDie';
+import { dieUpsFor, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
+import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
+
+const COLOR_COUNTS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 const inputCls = cn(
   'w-full px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -45,6 +48,9 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const [plateDate,     setPlateDate]     = useState(editing?.plate_date ?? '');
   const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
   const [location,      setLocation]      = useState(editing?.location ?? '');
+  const [totalColors,   setTotalColors]   = useState(editing?.total_colors?.toString() ?? '');
+  const [dieId,         setDieId]         = useState(editing?.die_id ?? '');
+  const [layout,        setLayout]        = useState<LayoutState>(() => layoutState(editing));
   const [saving,        setSaving]        = useState(false);
 
   // PM code → its Job Separation line: party and item name fill in, spelt
@@ -90,6 +96,15 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [acrossSize, aroundSize, cylinder]);
   const matchedDie = dieUps?.dies[0];
+  const dieChoices = dieUps?.dies ?? [];
+
+  // Picking a die brings its layout in, when it has one; the database then
+  // keeps plate and die in step (migration 101).
+  function pickDie(id: string) {
+    setDieId(id);
+    const die = dieChoices.find((d) => d.id === id);
+    if (die && LAYOUT_KEYS.some((k) => die[k] != null)) setLayout(layoutState(die));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -123,6 +138,9 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
           plate_date:      plateDate,
           label_per_round: labelPerRound,
           location:        location.trim(),
+          total_colors:    totalColors,
+          die_id:          dieId,
+          ...layout,
         }),
       });
       const data = await res.json();
@@ -198,28 +216,19 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <PlateLabel>Across size (H)</PlateLabel>
-              <WithUnit unit="mm">
-                  <input
-                  value={acrossSize}
-                  onChange={(e) => setAcrossSize(e.target.value)}
-                  className={cn(inputCls, 'font-mono')}
-                />
-              </WithUnit>
-            </div>
-            <div>
-              <PlateLabel>Around size (W)</PlateLabel>
-              <WithUnit unit="mm">
-                  <input
-                  value={aroundSize}
-                  onChange={(e) => setAroundSize(e.target.value)}
-                  className={cn(inputCls, 'font-mono')}
-                />
-              </WithUnit>
-            </div>
-          </div>
+          <LayoutFields
+            value={layout}
+            onChange={setLayout}
+            inputClassName={inputCls}
+            sizes={{
+              across: acrossSize,
+              around: aroundSize,
+              onChange: (side, v) => (side === 'across' ? setAcrossSize : setAroundSize)(v),
+            }}
+            note={dieId
+              ? 'Ups and gaps are shared with the linked roto die and every plate on it.'
+              : 'Link a roto die below to share ups and gaps with it.'}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -277,6 +286,44 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                 </p>
               )}
             </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="block">
+              <PlateLabel>Total colours</PlateLabel>
+              <select
+                value={totalColors}
+                onChange={(e) => setTotalColors(e.target.value)}
+                className={cn(inputCls, 'font-mono')}
+              >
+                <option value="">Not set</option>
+                {COLOR_COUNTS.map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <PlateLabel>Roto die</PlateLabel>
+              <select
+                value={dieId}
+                onChange={(e) => pickDie(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Not linked</option>
+                {dieId && !dieChoices.some((d) => d.id === dieId) && (
+                  <option value={dieId}>Current die (other size)</option>
+                )}
+                {dieChoices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {[d.serial_no || d.job_name, d.location ? `location ${d.location}` : 'no location', d.status !== 'IN USE' && d.status]
+                      .filter(Boolean).join(' · ')}
+                  </option>
+                ))}
+              </select>
+              {!dieUps && !dieId && (
+                <span className="block text-[11px] text-[var(--glass-muted)] mt-1">
+                  Enter both sizes and the cylinder to list its dies.
+                </span>
+              )}
+            </label>
           </div>
 
           <div>

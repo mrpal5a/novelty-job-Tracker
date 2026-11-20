@@ -14,6 +14,7 @@ import { containsPattern, orMatch, orSizePair } from '@/lib/search';
 import { ROTO_DIE_SEARCH } from '@/lib/dieSearch';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
+import { layoutFrom } from '@/lib/plateDie';
 
 // Optional free text: blank means "not recorded", not an empty string.
 function text(value: unknown): string | null {
@@ -170,6 +171,7 @@ export async function POST(request: NextRequest) {
       status:          statusResult.status,
       damage_date:     statusResult.damage_date,
       damage_reason:   statusResult.damage_reason,
+      ...layoutFrom(body),
       created_by:      user.email ?? perms.key,
     })
     .select()

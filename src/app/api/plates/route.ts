@@ -12,6 +12,7 @@ import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/dep
 import { containsPattern, onSearchText, orContains, orMatch, orSizePair, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
+import { layoutFrom } from '@/lib/plateDie';
 
 function optionalText(value: unknown): string | null {
   return typeof value === 'string' ? value.trim() || null : null;
@@ -154,6 +155,9 @@ export async function POST(request: NextRequest) {
       plate_date:      optionalText(body.plate_date),
       label_per_round: optionalInt(body.label_per_round),
       location:        optionalText(body.location),
+      die_id:          optionalText(body.die_id),
+      total_colors:    optionalInt(body.total_colors),
+      ...layoutFrom(body),
       created_by:      user.email ?? perms.key,
     })
     .select()

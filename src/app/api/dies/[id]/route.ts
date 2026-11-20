@@ -4,8 +4,8 @@
 // DELETE /api/dies/[id] — remove one outright. Prepress or Admin.
 //
 // Delete is a hard delete: these rows are hand-typed off a paper sheet,
-// so duplicates and mis-entries are common and nothing else in the
-// schema points at a die.
+// so duplicates and mis-entries are common. Plates linked to a deleted die
+// are unlinked (plates.die_id ON DELETE SET NULL) and keep their layout.
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,6 +15,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { DIE_STATUSES } from '@/lib/types';
 import { deptKeyOf } from '@/lib/identity';
+import { layoutFrom } from '@/lib/plateDie';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -101,6 +102,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       updates.damage_reason = null;
     }
   }
+
+  // Layout reaches every plate linked to this die (migration 101).
+  Object.assign(updates, layoutFrom(body));
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });

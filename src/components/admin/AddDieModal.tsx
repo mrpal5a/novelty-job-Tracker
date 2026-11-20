@@ -17,6 +17,7 @@ import { DIE_STATUSES, type Die, type DieStatus } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { dieListQuery } from '@/lib/listQueries';
 import { dieUpsFor, commonValues } from '@/lib/plateDie';
+import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { istToday } from '@/lib/jobViews';
 
 const NO_DIES: Die[] = [];
@@ -64,6 +65,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   // Only meaningful while status is 'DAMAGE' — cleared server-side otherwise.
   const [damageDate,   setDamageDate]   = useState(editing?.damage_date ?? '');
   const [damageReason, setDamageReason] = useState(editing?.damage_reason ?? '');
+  const [layout, setLayout] = useState<LayoutState>(() => layoutState(editing));
   const [saving, setSaving] = useState(false);
 
   // Same cylinder and whole-mm size either way round — the plate matcher's rule.
@@ -76,8 +78,8 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
     e.preventDefault();
 
     if (!jobName.trim())    { toast.error('Enter the job this die was cut for'); return; }
-    if (!length.trim())     { toast.error('Enter the length'); return; }
-    if (!width.trim())      { toast.error('Enter the width'); return; }
+    if (!length.trim())     { toast.error('Enter the across size'); return; }
+    if (!width.trim())      { toast.error('Enter the around size'); return; }
     if (!cylinder.trim())   { toast.error('Enter the cylinder'); return; }
     if (!material.trim())   { toast.error('Enter the material'); return; }
     if (!ups.trim())        { toast.error('Enter the ups per repeat'); return; }
@@ -111,6 +113,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
           status,
           damage_date:     status === 'DAMAGE' ? damageDate.trim()   : '',
           damage_reason:   status === 'DAMAGE' ? damageReason.trim() : '',
+          ...layout,
         }),
       });
       const data = await res.json();
@@ -161,30 +164,19 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </WithExample>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <DieLabel required>Length</DieLabel>
-              <WithUnit unit="mm">
-                  <input
-                  value={length}
-                  onChange={(e) => setLength(e.target.value)}
-                  className={cn(inputCls, 'font-mono')}
-                />
-              </WithUnit>
-            </div>
-            <div>
-              <DieLabel required>Width</DieLabel>
-              <WithExample example="60, or 85 x 60">
-                  <WithUnit unit="mm">
-                    <input
-                    value={width}
-                    onChange={(e) => setWidth(e.target.value)}
-                    className={cn(inputCls, 'font-mono')}
-                  />
-                </WithUnit>
-              </WithExample>
-            </div>
-          </div>
+          {/* Across = length (H), Around = width (W), as on the plate form. */}
+          <LayoutFields
+            value={layout}
+            onChange={setLayout}
+            inputClassName={inputCls}
+            sizes={{
+              across: length,
+              around: width,
+              required: true,
+              onChange: (side, v) => (side === 'across' ? setLength : setWidth)(v),
+            }}
+            note="Sizes are required. Ups and gaps are shared with every plate linked to this die."
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import type { Plate } from '@/lib/types';
 import { dieListQuery, flatbedDieListQuery } from '@/lib/listQueries';
-import { dieUpsFor, flatbedDiesFor } from '@/lib/plateDie';
+import { dieUpsFor, flatbedDiesFor, layoutPair } from '@/lib/plateDie';
 
 type MatchedDie = {
   id: string;
@@ -21,6 +21,7 @@ type MatchedDie = {
   location: string | null;
   detail: (string | number | false | null)[];
   status: 'Damaged' | 'Extra' | null;
+  linked?: boolean;   // the die this plate is linked to
   href: string;
 };
 
@@ -52,8 +53,9 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
       location: d.location,
       detail: [d.serial_no, d.job_name, d.ups != null && `${d.ups} ups`],
       status: d.status === 'DAMAGE' ? 'Damaged' as const : d.status === 'EXTRA' ? 'Extra' as const : null,
+      linked: d.id === plate.die_id,
       href: `/admin/dies?q=${encodeURIComponent(d.serial_no || d.job_name)}`,
-    })),
+    })).sort((x, y) => Number(!!y.linked) - Number(!!x.linked)),
     ...flatbedDiesFor(flatbedQuery.data ?? [], across, around).map((d) => ({
       id: d.id,
       kind: 'Flatbed' as const,
@@ -93,6 +95,10 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
             <Detail label="Size (across × around)" value={size} mono />
             <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
             <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
+            <Detail label="Total colours" value={plate.total_colors?.toString()} mono />
+            <Detail label="Roto die" value={plate.die_id ? 'Linked' : 'Not linked'} />
+            <Detail label="Around" value={layoutPair(plate.around_ups, plate.around_gap)} mono />
+            <Detail label="Across" value={layoutPair(plate.across_ups, plate.across_gap)} mono />
             <Detail label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />
             <Detail label="Added" value={formatAdminDate(plate.created_at)} mono />
             <Detail label="Added by" value={plate.created_by} />
@@ -125,6 +131,7 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
                         </span>
                         <span className="block text-xs text-[var(--glass-muted)] break-words">
                           {d.detail.filter(Boolean).join(' · ')}
+                          {d.linked && <span className="ml-1 font-semibold text-emerald-700">· Linked</span>}
                           {d.status && (
                             <span className={cn('ml-1 font-semibold', d.status === 'Damaged' ? 'text-red-700' : 'text-amber-700')}>
                               · {d.status}

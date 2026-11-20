@@ -5,7 +5,28 @@
 // die carry exactly its ups. Sizes compare on the whole millimetre, the
 // same as the die search.
 
-import type { Die, FlatbedDie } from '@/lib/types';
+import type { Die, DieLayout, FlatbedDie } from '@/lib/types';
+
+export const LAYOUT_KEYS = ['around_ups', 'around_gap', 'across_ups', 'across_gap'] as const;
+
+// "4 ups · 3.5 mm" for one direction of a layout; null when neither is recorded.
+export function layoutPair(ups: number | null, gap: number | null): string | null {
+  return ups == null && gap == null ? null : `${ups ?? '—'} ups · ${gap ?? '—'} mm`;
+}
+
+// Request body → layout columns, for the keys the body carries. Blank or
+// unreadable means not recorded; ups are whole, gaps keep their decimals.
+// Out-of-range values are left for the table's CHECKs to refuse.
+export function layoutFrom(body: Record<string, unknown>): Partial<DieLayout> {
+  const out: Partial<DieLayout> = {};
+  for (const key of LAYOUT_KEYS) {
+    if (!(key in body)) continue;
+    const raw = body[key];
+    const n = raw === null || raw === '' ? NaN : Number(raw);
+    out[key] = Number.isFinite(n) ? (key.endsWith('_ups') ? Math.trunc(n) : n) : null;
+  }
+  return out;
+}
 
 const mm = (v: string | number | null | undefined): number | null => {
   const n = parseFloat(String(v ?? ''));

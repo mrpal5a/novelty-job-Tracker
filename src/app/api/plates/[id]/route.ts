@@ -11,6 +11,7 @@ import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
+import { layoutFrom } from '@/lib/plateDie';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -24,7 +25,7 @@ const TEXT_FIELDS = [
   'location',
 ] as const;
 
-const INT_FIELDS = ['cylinder', 'label_per_round'] as const;
+const INT_FIELDS = ['cylinder', 'label_per_round', 'total_colors'] as const;
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params;
@@ -76,6 +77,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     }
   }
 
+  // Linking a die: its layout and this plate's are kept in step by the
+  // database (migration 101).
+  if ('die_id' in body) {
+    updates.die_id = typeof body.die_id === 'string' ? body.die_id.trim() || null : null;
+  }
+  Object.assign(updates, layoutFrom(body));
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
   }
@@ -96,6 +104,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
 // Hard delete. These rows are typed by hand and duplicates happen; nothing
 // else in the schema points at a plate, so there is no history to preserve.
+// Its die stays; the die keeps the layout.
 export async function DELETE(_request: NextRequest, { params }: Params) {
   const { id } = await params;
   const supabase = await createServerSupabaseClient();
