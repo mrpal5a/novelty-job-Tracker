@@ -9,7 +9,7 @@ import { cn, sortJobs, type JobSortOption } from '@/lib/utils';
 import { compareValues, type SortDir, type SortKind } from '@/lib/sort';
 import { JOBS_CHANGED_EVENT, JOBS_FILTER_EVENT, type JobsFilterDetail } from '@/lib/constants/events';
 import type { Job, AddJobFormData } from '@/lib/types';
-import type { DeptPermissions } from '@/lib/constants/departments';
+import { canDeptSeePrices, type DeptPermissions } from '@/lib/constants/departments';
 import JobRow, { JOB_ROW_COLS } from './JobRow';
 import JobCard from './JobCard';
 import FilterBar from './FilterBar';
@@ -499,7 +499,7 @@ export default function JobsTable({ initialJobs, dept, addJobFormRef, hideAddTri
                           <span className="sr-only">Actions</span>
                         ) : COLUMN_SORT_FIELDS[col] ? (
                           <SortableHeaderLabel
-                            label={col}
+                            label={col === 'Qty / Rate' && !canDeptSeePrices(dept) ? 'Qty' : col}
                             active={colSortField === COLUMN_SORT_FIELDS[col]}
                             dir={colSortDir}
                             onClick={() => handleColSort(COLUMN_SORT_FIELDS[col]!)}

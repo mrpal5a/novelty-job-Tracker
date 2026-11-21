@@ -9,7 +9,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptManageJobSeparation, canDeptManagePrepressTodo, canDeptUseMeterCalculator, canDeptSeeMoneyTotals, canDeptSeeDispatchedQty, canDeptRecordDispatchedQty } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptManageJobSeparation, canDeptManagePrepressTodo, canDeptUseMeterCalculator, canDeptSeeMoneyTotals, canDeptSeePrices, canDeptSeeDispatchedQty, canDeptRecordDispatchedQty } from '@/lib/constants/departments';
 import JobSeparationManager from '@/components/admin/JobSeparationManager';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -40,6 +40,7 @@ export default async function JobSeparationPage() {
         canManageTodo={canDeptManagePrepressTodo(perms)}
         canUseMeterCalculator={canDeptUseMeterCalculator(perms)}
         canSeeTotal={canDeptSeeMoneyTotals(perms)}
+        canSeePrices={canDeptSeePrices(perms)}
         canSeeDispatched={canDeptSeeDispatchedQty(perms)}
         canDispatch={canDeptRecordDispatchedQty(perms)}
         dept={perms?.key ?? null}

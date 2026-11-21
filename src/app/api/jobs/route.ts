@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getDeptPermissions } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptSeePrices } from '@/lib/constants/departments';
 import { createJobRecord } from '@/lib/jobs/createJob';
 import type { AddJobFormData } from '@/lib/types';
 import { onSearchText, orContains, searchAsPhrase, searchTerms } from '@/lib/search';
@@ -51,9 +51,12 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  let query = supabase
+  // The line's rate rides along only for those who may see prices.
+  // Logins can't read it (migration 104): with prices, through the service role.
+  const seePrices = canDeptSeePrices(await getDeptPermissions(deptKeyOf(user)));
+  let query = (seePrices ? createAdminClient() : supabase)
     .from('jobs')
-    .select('*, job_stage_timestamps(stage), printing_units(id, name, printing_method), job_separations(rate, unit, material_name)')
+    .select(`*, job_stage_timestamps(stage), printing_units(id, name, printing_method), job_separations(${seePrices ? 'rate, ' : ''}unit, material_name)`)
     .eq('is_closed', closed)
     .order('delivery_date', { ascending: true, nullsFirst: false });
   if (status) query = query.eq('status', status);

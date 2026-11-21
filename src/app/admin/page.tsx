@@ -3,7 +3,8 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions } from '@/lib/constants/departments';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getDeptPermissions, canDeptSeePrices } from '@/lib/constants/departments';
 import { redirect } from 'next/navigation';
 import DashboardBoard from '@/components/admin/DashboardBoard';
 import { deptKeyOf } from '@/lib/identity';
@@ -19,9 +20,12 @@ export default async function AdminPage() {
 
   // Fetch initial jobs (server-side for first paint)
   // job_stage_timestamps(stage) join powers the stage control's step count and tick bar
-  const { data: jobs } = await supabase
+  // The line's rate only for those who may see prices — and logins can't
+  // read it (migration 104), so then through the service role.
+  const seePrices = canDeptSeePrices(perms);
+  const { data: jobs } = await (seePrices ? createAdminClient() : supabase)
     .from('jobs')
-    .select('*, job_stage_timestamps(stage), printing_units(id, name, printing_method), job_separations(rate, unit, material_name)')
+    .select(`*, job_stage_timestamps(stage), printing_units(id, name, printing_method), job_separations(${seePrices ? 'rate, ' : ''}unit, material_name)`)
     .eq('is_closed', false)
     .order('delivery_date', { ascending: true, nullsFirst: false });
 

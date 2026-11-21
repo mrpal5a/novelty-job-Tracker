@@ -18,7 +18,7 @@ import { ChevronDown, ChevronUp, PauseCircle, Pencil, Trash2, CheckCircle2 } fro
 import { cn, formatJobCardNumber, formatNumericDate, formatQty } from '@/lib/utils';
 import { deliveryWords, separationOf } from '@/lib/jobViews';
 import { JOB_TYPE_BADGE, unitDigit, unitCircleClass } from '@/lib/constants/statusColors';
-import { canDeptEditJobDetails } from '@/lib/constants/departments';
+import { canDeptEditJobDetails, canDeptSeePrices } from '@/lib/constants/departments';
 import { useJobActions } from '@/hooks/useJobActions';
 import type { Job } from '@/lib/types';
 import type { DeptPermissions } from '@/lib/constants/departments';
@@ -151,7 +151,7 @@ function JobRow({
           <p className="font-mono text-[13px] font-bold tracking-wide text-brand-ink">
             {job.label_qty ? formatQty(job.label_qty) : '—'}
           </p>
-          <p className="mt-0.5 font-mono text-xs text-brand-muted">@ {formatRate(sep?.rate ?? null) ?? '—'}</p>
+          {canDeptSeePrices(dept) && <p className="mt-0.5 font-mono text-xs text-brand-muted">@ {formatRate(sep?.rate ?? null) ?? '—'}</p>}
           {job.label_qty && (actions.effectiveDispatched > 0 || job.is_scheduled_release) ? (
             <>
               <p className="mt-0.5 font-mono text-[11px] text-brand-muted">

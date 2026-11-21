@@ -289,7 +289,14 @@ export function canDeptUseMeterCalculator(perms: DeptPermissions | null): boolea
  * no migration; it simply covers BOM's totals too now.
  */
 export function canDeptSeeMoneyTotals(perms: DeptPermissions | null): boolean {
-  return hasFeature(perms, 'job_separation_total_view');
+  return canDeptSeePrices(perms) && hasFeature(perms, 'job_separation_total_view');
+}
+
+/** Who sees a Job Separation line's rate and order value. Everyone but a
+ *  read-only (Viewer) login, which may be handed to people outside the
+ *  office: the APIs leave the two out, the pages hide where they'd show. */
+export function canDeptSeePrices(perms: DeptPermissions | null): boolean {
+  return !!perms && !perms.isReadOnly;
 }
 
 /** Who sees material ₹/m² rates and anything computed from them (expense,

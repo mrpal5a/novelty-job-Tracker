@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getDeptPermissions, canDeptManageJobSeparation, canDeptSeeDispatchedQty, canDeptSeeMoneyTotals } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptManageJobSeparation, canDeptSeeDispatchedQty, canDeptSeeMoneyTotals, canDeptSeePrices } from '@/lib/constants/departments';
 import { parseDateRange, rangeOrClause, parseLimit, type DateRange } from '@/lib/jobSeparationQuery';
 import { containsPattern, orContains, onSearchText, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
@@ -61,6 +61,10 @@ export async function GET(request: NextRequest) {
 
   const user = await getClaimsUser(supabase);
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  // Logins can't read rate / order_value (migration 104), so whole rows come
+  // through the service role, signed-in checked above; prices are blanked
+  // below for whoever may not see them.
+  const admin = createAdminClient();
 
   const { searchParams } = new URL(request.url);
   const search = searchParams.get('search')?.trim();
@@ -124,7 +128,7 @@ export async function GET(request: NextRequest) {
   if (terms) {
     try {
       asPhrase = await searchAsPhrase(terms, async () => {
-        const { data, error } = await applyFilters(supabase.from('job_separations').select('*').order('id')).limit(1);
+        const { data, error } = await applyFilters(admin.from('job_separations').select('*').order('id')).limit(1);
         return { data, error };
       });
     } catch (err) {
@@ -146,14 +150,15 @@ export async function GET(request: NextRequest) {
   const all: { id: string }[] = [];
   for (let from = 0; from <= limit; from += SLICE) {
     const { data, error } = await applyFilters(
-      supabase.from('job_separations').select('*').order('created_at', { ascending: false }).order('id'),
+      admin.from('job_separations').select('*').order('created_at', { ascending: false }).order('id'),
     ).range(from, Math.min(from + SLICE - 1, limit));
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     all.push(...(data ?? []));
     if ((data?.length ?? 0) < SLICE) break;
   }
   const hasMore = all.length > limit;
-  const rows = hasMore ? all.slice(0, limit) : all;
+  const page = hasMore ? all.slice(0, limit) : all;
+  const rows = canDeptSeePrices(perms) ? page : page.map((r) => ({ ...r, rate: null, order_value: null }));
 
   try {
     // The page shows one total for everything that matches. When it all fits
@@ -162,7 +167,7 @@ export async function GET(request: NextRequest) {
     let totalOrderValue: number | undefined;
     if (hasMore && canDeptSeeMoneyTotals(perms)) {
       const values = await allPages<{ order_value: number | null }>((from, to) => applyFilters(
-        supabase.from('job_separations').select('order_value').is('cancelled_at', null).order('id').range(from, to),
+        admin.from('job_separations').select('order_value').is('cancelled_at', null).order('id').range(from, to),
       ));
       totalOrderValue = values.reduce((sum, r) => sum + (Number(r.order_value) || 0), 0);
     }

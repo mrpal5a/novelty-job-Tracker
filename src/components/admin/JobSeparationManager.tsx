@@ -190,7 +190,7 @@ const JOB_SEPARATION_EXPORT_COLUMNS: CsvColumn<JobSeparation>[] = [
   { header: 'Added',          value: (j) => csvTimestamp(j.created_at) },
 ];
 
-type Props = { canManage: boolean; canManageTodo: boolean; canUseMeterCalculator: boolean; canSeeTotal: boolean; canSeeDispatched: boolean; canDispatch: boolean; dept: Department | null };
+type Props = { canManage: boolean; canManageTodo: boolean; canUseMeterCalculator: boolean; canSeeTotal: boolean; canSeePrices: boolean; canSeeDispatched: boolean; canDispatch: boolean; dept: Department | null };
 
 /** "3,000" over "7,000 left" / "Done" / "+500 over" — what's gone out against the order. */
 function DispatchedFigure({ row }: { row: JobSeparation }) {
@@ -209,11 +209,13 @@ function DispatchedFigure({ row }: { row: JobSeparation }) {
   );
 }
 
-export default function JobSeparationManager({ canManage, canManageTodo, canUseMeterCalculator, canSeeTotal, canSeeDispatched, canDispatch, dept }: Props) {
-  const columns = canSeeDispatched ? JOB_SEPARATION_COLUMNS : WITHOUT_DISPATCHED;
-  const exportColumns = canSeeDispatched
-    ? JOB_SEPARATION_EXPORT_COLUMNS
-    : JOB_SEPARATION_EXPORT_COLUMNS.filter((c) => c.header !== 'Dispatched');
+export default function JobSeparationManager({ canManage, canManageTodo, canUseMeterCalculator, canSeeTotal, canSeePrices, canSeeDispatched, canDispatch, dept }: Props) {
+  // Viewer: no Order Value column, and Qty / Rate shows the qty alone.
+  const columns = (canSeeDispatched ? JOB_SEPARATION_COLUMNS : WITHOUT_DISPATCHED)
+    .filter((c) => canSeePrices || c !== 'Order Value');
+  const exportColumns = JOB_SEPARATION_EXPORT_COLUMNS.filter((c) =>
+    (canSeeDispatched || c.header !== 'Dispatched') && (canSeePrices || (c.header !== 'Rate' && c.header !== 'Order Value')));
+  const header = (col: string) => (col === 'Qty / Rate' && !canSeePrices ? 'Qty' : col);
   const [search,      setSearch]      = useState('');
   const [searchField, setSearchField] = useState('all');
   // The Party box: this party's jobs, ANDed with the search box.
@@ -539,7 +541,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           <SearchClearButton value={party} onClear={() => setParty('')} />
         </div>
 
-        <button
+        {canSeePrices && <button
           type="button"
           onClick={toggleHideMoney}
           aria-pressed={hideMoney}
@@ -553,7 +555,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           )}
         >
           {hideMoney ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
-        </button>
+        </button>}
 
         <CsvExportButton rows={sortedRows} columns={exportColumns} filename="job-separation" />
 
@@ -647,7 +649,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         // doubled-up border.
                         col !== 'Actions' && col !== 'Sr No' && 'border-r border-white/8',
                       )}>
-                        {col}
+                        {header(col)}
                       </th>
                     ))}
                   </tr>
@@ -730,9 +732,9 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         <SpecField label="PM Code" value={row.pm_code} mono />
                         <SpecField label="Quantity" value={row.quantity !== null ? formatQty(row.quantity) : null} mono />
                         {canSeeDispatched && <SpecField label="Dispatched" value={row.dispatched ? formatQty(row.dispatched) : null} mono />}
-                        <SpecField label="Rate" value={money(row.rate)} mono />
+                        {canSeePrices && <SpecField label="Rate" value={money(row.rate)} mono />}
                         <SpecField label="Artwork Status" value={row.job_status} />
-                        <SpecField label="Order Value" value={money(row.order_value)} mono />
+                        {canSeePrices && <SpecField label="Order Value" value={money(row.order_value)} mono />}
                         <SpecField label="Added" value={formatNumericDate(row.created_at)} mono />
                       </div>
                     </div>
@@ -849,7 +851,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         // doubled-up border.
                         col !== 'Actions' && col !== 'Sr No' && 'border-r border-white/8',
                       )}>
-                        {COLUMN_SORT_FIELDS[col] ? sortLabel(col, COLUMN_SORT_FIELDS[col]!) : col}
+                        {COLUMN_SORT_FIELDS[col] ? sortLabel(header(col), COLUMN_SORT_FIELDS[col]!) : col}
                       </th>
                     ))}
                   </tr>
@@ -909,7 +911,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                         </td>
                         <td className="px-3 py-1.5 whitespace-nowrap align-top border-r border-white/8">
                           <p className={cn('font-mono text-[13px] font-bold tracking-wide', !isCancelled && 'text-[var(--glass-ink)]')}>{row.quantity !== null ? formatQty(row.quantity) : '—'}</p>
-                          <p className={cn('font-mono text-xs mt-0.5', !isCancelled && 'text-[var(--glass-muted)]')}>@ {money(row.rate) ?? '—'}</p>
+                          {canSeePrices && <p className={cn('font-mono text-xs mt-0.5', !isCancelled && 'text-[var(--glass-muted)]')}>@ {money(row.rate) ?? '—'}</p>}
                         </td>
                         {canSeeDispatched && <td className="px-3 py-1.5 whitespace-nowrap align-top border-r border-white/8">
                           <div className="flex items-start justify-between gap-1.5">
@@ -938,7 +940,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                             </span>
                           ) : '—'}
                         </td>
-                        <td className="px-3 py-1.5 font-mono whitespace-nowrap border-r border-white/8">{money(row.order_value) ?? '—'}</td>
+                        {canSeePrices && <td className="px-3 py-1.5 font-mono whitespace-nowrap border-r border-white/8">{money(row.order_value) ?? '—'}</td>}
                         <td className="px-3 py-1.5 whitespace-normal break-words min-w-[90px] border-r border-white/8">
                           {row.jc_status ? (
                             <span className={cn(

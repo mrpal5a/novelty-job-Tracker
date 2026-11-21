@@ -3,7 +3,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { signIn, respond, json, params, writes } from '@/test/api';
-import { POST } from './route';
+import { GET, POST } from './route';
 import { POST as DISPATCH } from './[id]/dispatch/route';
 
 const LINES = 'job_separations';
@@ -127,5 +127,18 @@ describe('POST /api/job-separations/[id]/dispatch', () => {
     book(null);
     expect((await dispatch({ qty: 100 })).status).toBe(404);
     expect(writes()).toHaveLength(0);
+  });
+});
+
+describe('GET /api/job-separations', () => {
+  const LINE = { id: 'line-1', party: 'Acme', quantity: 5000, rate: 1.25, order_value: 6250 };
+  const list = async () => (await (await GET(json('/api/job-separations?range=all', 'GET'))).json()).job_separations;
+
+  it('a Viewer gets the lines without rate or order value; staff get both', async () => {
+    respond((c) => ({ data: c.table === LINES ? [LINE] : [] }));
+    signIn('Viewer');
+    expect((await list())[0]).toMatchObject({ party: 'Acme', quantity: 5000, rate: null, order_value: null });
+    signIn('Prepress');
+    expect((await list())[0]).toMatchObject({ rate: 1.25, order_value: 6250 });
   });
 });
