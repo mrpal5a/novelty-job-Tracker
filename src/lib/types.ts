@@ -1026,7 +1026,7 @@ export interface MessageJobRef {
 export interface Message {
   id:              string;
   conversation_id: string;
-  sender_id:       string;
+  sender_id:       string | null;   // null: the sender's login was deleted (migration 106)
   sender_email:    string;
   body:            string;
   job_id:          string | null;
@@ -1049,7 +1049,7 @@ export interface ConversationParticipant {
 export interface ConversationSummary {
   conversation_id:            string;
   subject:                    string | null;
-  started_by:                 string;
+  started_by:                 string | null;   // null: login deleted (106)
   created_at:                 string;
   last_read_at:                string | null;
   last_message_id:             string | null;
@@ -1066,7 +1066,7 @@ export interface ConversationSummary {
 export interface ConversationDetail {
   id:           string;
   subject:      string | null;
-  started_by:   string;
+  started_by:   string | null;   // null: login deleted (106)
   created_at:   string;
   participants: ConversationParticipant[];
   messages:     MessageWithJob[];
