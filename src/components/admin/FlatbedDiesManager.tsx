@@ -97,11 +97,11 @@ function sortFlatbedDies(dies: FlatbedDie[], field: SortField, dir: SortDir): Fl
 // in src/lib/dieSearch.ts. "All fields" ('all') looks in every text field
 // and the sizes.
 const FLATBED_DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[] = [
-  { value: 'all',       label: 'All fields', placeholder: 'Search length, width, shape, corner or location' },
+  { value: 'all',       label: 'All fields', placeholder: 'Search height, width, shape, corner or location' },
   { value: 'shape',     label: 'Shape',      placeholder: 'Search by shape' },
   { value: 'corner',    label: 'Corner',     placeholder: 'Search by corner' },
   { value: 'location',  label: 'Location',   placeholder: 'Search by location' },
-  { value: 'size',      label: 'Size',       placeholder: 'Search by length or width' },
+  { value: 'size',      label: 'Size',       placeholder: 'Search by height or width' },
   { value: 'repeat_length', label: 'Repeat length', placeholder: 'Search by repeat length' },
   { value: 'gap',       label: 'Gap',        placeholder: 'Search by gap' },
   { value: 'ups',       label: 'Ups',        placeholder: 'Search by ups' },
@@ -123,7 +123,7 @@ function buildFlatbedDieExportColumns(srNoMap: Map<string, number>): CsvColumn<F
     { header: 'Serial No',        value: (d) => srNoMap.get(d.id) ?? null },
     { header: 'Shape',            value: (d) => d.shape },
     { header: 'Corner',           value: (d) => d.corner },
-    { header: 'Length',           value: (d) => d.length },
+    { header: 'Height',           value: (d) => d.length },
     { header: 'Width',            value: (d) => d.width },
     { header: 'Repeat Length',    value: (d) => d.repeat_length },
     { header: 'Ups',              value: (d) => d.ups },
@@ -283,7 +283,7 @@ export default function FlatbedDiesManager({ canManage }: { canManage: boolean }
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Length', 'Width']} />
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Height', 'Width']} />
 
         <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField) || sizes.active} />
 

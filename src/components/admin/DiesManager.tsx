@@ -100,13 +100,13 @@ function sortDies(dies: Die[], field: SortField, dir: SortDir): Die[] {
 // src/lib/dieSearch.ts. "All fields" ('all') looks in every text field and
 // the sizes.
 const DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[] = [
-  { value: 'all',       label: 'All fields',    placeholder: 'Search job, length, width, material, corner, serial no or location' },
+  { value: 'all',       label: 'All fields',    placeholder: 'Search job, height, width, material, corner, serial no or location' },
   { value: 'job_name',  label: 'Job name',      placeholder: 'Search by job name' },
   { value: 'serial_no', label: 'Serial no',     placeholder: 'Search by serial no' },
   { value: 'material',  label: 'Material',      placeholder: 'Search by material' },
   { value: 'corner',    label: 'Corner',        placeholder: 'Search by corner' },
   { value: 'location',  label: 'Location',      placeholder: 'Search by location' },
-  { value: 'size',      label: 'Size',          placeholder: 'Search by length or width' },
+  { value: 'size',      label: 'Size',          placeholder: 'Search by height or width' },
   { value: 'cylinder',  label: 'Cylinder',      placeholder: 'Search by cylinder' },
   { value: 'shape',     label: 'Shape',         placeholder: 'Search by shape' },
   { value: 'height_gap', label: 'Height gap',   placeholder: 'Search by height gap (mm)' },
@@ -131,7 +131,7 @@ function buildDieExportColumns(srNoMap: Map<string, number>): CsvColumn<Die>[] {
   { header: 'Serial No',        value: (d) => d.serial_no },
   { header: 'Job Name',         value: (d) => d.job_name },
   { header: 'Corner',           value: (d) => d.corner },
-  { header: 'Length',           value: (d) => d.length },
+  { header: 'Height',           value: (d) => d.length },
   { header: 'Width',            value: (d) => d.width },
   { header: 'Cylinder',         value: (d) => d.cylinder },
   { header: 'Material',         value: (d) => d.material },
@@ -303,7 +303,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Length', 'Width']} />
+        <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Height', 'Width']} />
 
         <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField) || sizes.active} />
 

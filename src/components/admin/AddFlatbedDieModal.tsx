@@ -3,7 +3,7 @@
 // Entering a flatbed die, or correcting one already entered. Mirrors
 // AddDieModal.tsx, minus job/material/cylinder/serial (flatbed dies carry
 // no job or material identity) plus Shape. Field order matches how the
-// team listed them: Length, Width, UPS, Gap, Corner Radius, Shape,
+// team listed them: Height, Width, UPS, Gap, Corner Radius, Shape,
 // Location, Date.
 
 import React, { useState, useId } from 'react';
@@ -109,7 +109,7 @@ export default function AddFlatbedDieModal({ editing, onClose, onSaved }: Props)
               {editing ? 'Edit flatbed die' : 'Add flatbed die'}
             </h2>
             <p className="text-xs text-[var(--glass-muted)] mt-0.5">
-              Length, Width, Repeat Length, UPS, Gap, Corner Radius, Shape, Location, Date
+              Height, Width, Repeat Length, UPS, Gap, Corner Radius, Shape, Location, Date
             </p>
           </div>
           <button
@@ -125,7 +125,7 @@ export default function AddFlatbedDieModal({ editing, onClose, onSaved }: Props)
         <div className="px-5 py-4 overflow-y-auto space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <FlatbedDieLabel required>Length</FlatbedDieLabel>
+              <FlatbedDieLabel required>Height</FlatbedDieLabel>
               <WithUnit unit="mm">
                   <input
                   value={length}
