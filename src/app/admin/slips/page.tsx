@@ -33,8 +33,8 @@ export default async function SlipsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Print slips</h1>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Print slips</h1>
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           Pick a job, pick the slip — everything else fills in from the job.
           Prints on the TSC P210&rsquo;s 6″ × 4″ stock.
         </p>

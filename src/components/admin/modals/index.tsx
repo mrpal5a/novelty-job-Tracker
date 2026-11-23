@@ -18,6 +18,7 @@ import {
 
 export { partialDispatchPayload, fullDispatchPayload } from '@/lib/stageDialogs';
 import { buttonClass } from '@/components/ui/Button';
+import { useExitGhost } from '@/hooks/useExitGhost';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { PIPELINE_STAGES, stageIndex, type Stage } from '@/lib/constants/stages';
 import type { Job } from '@/lib/types';
@@ -62,6 +63,10 @@ export function ModalShell({
   children: React.ReactNode;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // The backdrop fades and the dialog rises in (a sheet from the bottom on a
+  // phone), and both go back out the same way however the dialog closes.
+  const rootRef = useRef<HTMLDivElement>(null);
+  useExitGhost(rootRef);
 
   // `onClose` is an inline arrow at nearly every call site, so it carries a
   // fresh identity on every parent render. Holding it in a ref lets the
@@ -150,9 +155,9 @@ export function ModalShell({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="admin-light contents">
+    <div ref={rootRef} className="admin-light contents">
       <div
-        className="fixed inset-0 z-50 modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4"
+        className="anim-fade fixed inset-0 z-50 modal-backdrop flex items-end sm:items-center justify-center p-0 sm:p-4"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) onClose?.();
         }}
@@ -163,7 +168,7 @@ export function ModalShell({
           aria-modal="true"
           aria-labelledby={titleId}
           tabIndex={-1}
-          className="modal-panel glass-strong glass shadow-2xl text-[var(--glass-ink)] w-full focus:outline-none"
+          className="anim-modal modal-panel glass-strong glass shadow-2xl text-[var(--glass-ink)] w-full focus:outline-none"
         >
           {children}
         </div>

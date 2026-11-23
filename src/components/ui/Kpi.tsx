@@ -26,13 +26,18 @@ export function Kpi({ label, value, delta, loading, active, onClick }: Props) {
   const body = (
     <>
       <span className={cn('text-[13px]', active ? 'font-semibold text-brand-ink' : 'text-brand-muted')}>{label}</span>
-      <span className="font-mono text-[26px] font-semibold leading-8 tracking-[-0.02em] text-brand-ink">{loading ? '—' : value}</span>
+      <span className="font-mono text-[22px] font-semibold leading-7 tracking-[-0.02em] text-brand-ink sm:text-[26px] sm:leading-8">{loading ? '—' : value}</span>
       <span className={cn('text-xs', delta?.tone === 'good' ? 'text-brand-success' : delta?.tone === 'bad' ? 'text-brand-warning' : 'text-brand-muted')}>
         {loading ? ' ' : delta?.text}
       </span>
     </>
   );
-  const base = 'flex min-w-[180px] flex-1 flex-col gap-1 px-5 py-4 [&+&]:border-l [&+&]:border-brand-line-soft';
+  // Two to a row on a phone (lines between them, the last row's bottom line
+  // tucked under the card's border); one row from sm.
+  const base = cn(
+    'flex min-w-0 basis-1/2 grow flex-col gap-0.5 border-brand-line-soft px-3 py-3 max-sm:-mb-px max-sm:border-b max-sm:odd:border-r',
+    'sm:min-w-[180px] sm:flex-1 sm:gap-1 sm:px-5 sm:py-4 sm:[&+&]:border-l',
+  );
 
   if (!onClick) return <div className={base}>{body}</div>;
   return (

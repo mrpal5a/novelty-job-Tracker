@@ -224,15 +224,15 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      {/* Toolbar — on a phone: search, then field + sizes, then the buttons. */}
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
           aria-label="Search field"
           title="Narrow the search to one field"
           className={cn(
-            'min-h-11 px-3 rounded-xl text-sm shrink-0',
+            'min-h-11 max-w-[45%] sm:max-w-none px-3 rounded-xl text-sm shrink-0',
             'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
             'focus:outline-none focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
           )}
@@ -242,7 +242,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           ))}
         </select>
 
-        <div className="relative flex-1">
+        <div className="relative order-first basis-full sm:order-none sm:basis-auto sm:flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--glass-muted)]"
             aria-hidden="true"
@@ -269,7 +269,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         <CsvExportButton fetchRows={fetchAllPlates} count={total} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
 
         {canManage && (
-          <Button intent="primary" icon={Plus} onClick={() => setAdding(true)}>
+          <Button intent="primary" icon={Plus} onClick={() => setAdding(true)} className="max-sm:ml-auto">
               Add plate
           </Button>
         )}

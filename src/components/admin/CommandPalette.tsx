@@ -21,6 +21,7 @@ import { matchRow } from '@/lib/search';
 import SearchPreview, { type PreviewTarget } from './SearchPreview';
 import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
 import type { Stage } from '@/lib/constants/stages';
+import { Exiting } from '@/components/ui/Exiting';
 
 export type PaletteSection = { href: string; label: string; icon: LucideIcon };
 
@@ -271,13 +272,13 @@ export default function CommandPalette({
 
   return (
     // eslint-disable-next-line jsx-a11y/no-static-element-interactions -- keys bubble from the input; the dialog itself isn't a control
-    <div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[10vh]" onKeyDown={onKeyDown}>
-      <div aria-hidden="true" className="absolute inset-0 bg-[rgba(12,42,32,0.32)]" onClick={onClose} />
+    <Exiting><div className="fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[10vh]" onKeyDown={onKeyDown}>
+      <div aria-hidden="true" className="anim-fade absolute inset-0 bg-[rgba(12,42,32,0.32)]" onClick={onClose} />
       <section
         role="dialog"
         aria-modal="true"
         aria-label="Search everything"
-        className="relative flex max-h-[76vh] w-full max-w-[680px] flex-col lg:max-w-[1000px] overflow-hidden rounded-2xl border border-brand-border bg-white shadow-[0_24px_64px_rgba(12,42,32,0.24)]"
+        className="anim-drop relative flex max-h-[76vh] w-full max-w-[680px] flex-col lg:max-w-[1000px] overflow-hidden rounded-2xl border border-brand-border bg-white shadow-[0_24px_64px_rgba(12,42,32,0.24)]"
       >
         {/* shrink-0: a long result list scrolls; the box and filters never squeeze. */}
         <label className="flex shrink-0 items-center gap-3 border-b border-brand-border px-5">
@@ -393,7 +394,7 @@ export default function CommandPalette({
           </span>
         </div>
       </section>
-    </div>
+    </div></Exiting>
   );
 }
 

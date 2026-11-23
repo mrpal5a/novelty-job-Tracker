@@ -64,14 +64,15 @@ export default function CsvExportButton<T>({ rows, fetchRows, count, columns, fi
       aria-busy={busy}
       title={`Download ${total} row${total === 1 ? '' : 's'} as CSV`}
       className={cn(
-        'inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl',
+        // Icon only on a phone (the word stays for screen readers).
+        'relative inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 px-3 rounded-xl shrink-0',
         'text-sm font-medium border border-black/[0.12] text-[var(--glass-muted)]',
         'hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors',
         'disabled:opacity-40 disabled:cursor-not-allowed',
       )}
     >
       <Download className="w-4 h-4" aria-hidden="true" />
-      {busy ? 'Exporting…' : label}
+      <span className="max-sm:sr-only">{busy ? 'Exporting…' : label}</span>
     </button>
   );
 }

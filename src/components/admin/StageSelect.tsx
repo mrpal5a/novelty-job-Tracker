@@ -26,6 +26,7 @@ import type { Job } from '@/lib/types';
 import type { DeptPermissions } from '@/lib/constants/departments';
 import type { Stage } from '@/lib/constants/stages';
 import type { JobActions } from '@/hooks/useJobActions';
+import { Exiting } from '@/components/ui/Exiting';
 
 type Props = {
   job:       Job;
@@ -253,7 +254,7 @@ export default function StageSelect({ job, dept, actions, jobLabel, variant = 'r
       </button>
 
       {open && createPortal(
-        <div
+        <Exiting><div
           ref={menuRef}
           id={menuId}
           role="menu"
@@ -271,7 +272,7 @@ export default function StageSelect({ job, dept, actions, jobLabel, variant = 'r
             ['--focus-bloom' as string]: '0 0 0 4px rgba(16, 85, 63, 0.16)',
           }}
           className={cn(
-            'stage-menu-in z-[60] flex flex-col gap-0.5 overflow-y-auto rounded-[14px] border border-brand-border bg-white p-1.5',
+            'anim-drop z-[60] flex flex-col gap-0.5 overflow-y-auto rounded-[14px] border border-brand-border bg-white p-1.5',
             'font-sans text-brand-ink shadow-[0_18px_40px_rgba(12,42,32,0.16),0_2px_6px_rgba(12,42,32,0.06)]',
           )}
         >
@@ -328,7 +329,7 @@ export default function StageSelect({ job, dept, actions, jobLabel, variant = 'r
             Open full timeline
             <ArrowRight aria-hidden="true" className="h-3.5 w-3.5" />
           </Link>
-        </div>,
+        </div></Exiting>,
         document.body,
       )}
     </>

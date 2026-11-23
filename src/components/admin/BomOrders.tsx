@@ -22,6 +22,7 @@ import type { BomMaterialOrder, BomMaterialRequestWithJob } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
 import { ModalShell } from './modals';
+import { Exiting } from '@/components/ui/Exiting';
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -236,7 +237,7 @@ function OrderMenu({ label, onCancel }: { label: string; onCancel: () => void })
     <div ref={ref} className="relative shrink-0">
       <Button size="sm" icon={MoreHorizontal} aria-label={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)} className="!px-2" />
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg shadow-black/10">
+        <Exiting><div role="menu" className="anim-drop absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg shadow-black/10">
           <button
             type="button"
             role="menuitem"
@@ -246,7 +247,7 @@ function OrderMenu({ label, onCancel }: { label: string; onCancel: () => void })
             <XCircle className="h-4 w-4 shrink-0 opacity-70" aria-hidden="true" />
             Cancel order
           </button>
-        </div>
+        </div></Exiting>
       )}
     </div>
   );

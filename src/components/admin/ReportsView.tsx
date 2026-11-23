@@ -206,7 +206,7 @@ export default function ReportsView() {
     <div className="space-y-6">
       <div>
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Reports</h1>
+          <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Reports</h1>
           {q.data && (
             <span className="inline-flex flex-wrap items-center gap-x-2 font-mono text-xs text-brand-muted">
               <span className="inline-flex items-center gap-2"
@@ -225,7 +225,7 @@ export default function ReportsView() {
             </span>
           )}
         </div>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           The order book from Job Separation, by PO date — what came in, on which unit, from whom, and for what.
         </p>
       </div>

@@ -27,8 +27,8 @@ export default async function PlatesPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Plates</h1>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Plates</h1>
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           Plate sets on the racks, with the cylinder they run on. Search here before making a new one.
         </p>
       </div>

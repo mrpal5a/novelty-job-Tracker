@@ -23,8 +23,8 @@ export default async function RegisterPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Follow-ups</h1>
-        <p className="text-sm text-[var(--glass-muted)] mt-1">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Follow-ups</h1>
+        <p className="mt-1 hidden text-sm text-[var(--glass-muted)] sm:block">
           Customer accounts, enquiries, and follow-up history — Admin only.
         </p>
       </div>

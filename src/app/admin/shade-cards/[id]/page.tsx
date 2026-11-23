@@ -71,7 +71,7 @@ export default async function ShadeCardDetailPage(
       </Link>
 
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">{card.party}</h1>
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">{card.party}</h1>
         <StateChip label={card.status} dot={SHADE_CARD_STATUS_DOT[card.status]} />
         <StateChip label={card.making_status} dot={MAKING_STATUS_DOT[card.making_status]} />
         {!card.is_current && (

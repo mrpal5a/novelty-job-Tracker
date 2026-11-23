@@ -25,6 +25,7 @@ import { useTeamDirectory, type DirectoryPerson } from '@/hooks/useReferenceData
 import { MentionText, MentionTextarea } from '@/components/ui/Mention';
 import { initials } from '@/lib/team';
 import { DesktopNotificationsToggle } from '@/components/ui/DesktopNotificationsToggle';
+import { useExitGhost } from '@/hooks/useExitGhost';
 
 type Props = {
   userEmail:    string;
@@ -118,6 +119,8 @@ export default function MessagesDrawer({ userEmail, onClose, initialConversation
   const [listQuery,   setListQuery] = useState('');
   const [sending,     setSending]   = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  // Slides in from the right, and back out however it closes.
+  useExitGhost(panelRef);
   const threadEndRef = useRef<HTMLDivElement>(null);
 
   // ── New-chat view: opened from the header's "New chat" button. Pick
@@ -343,7 +346,7 @@ export default function MessagesDrawer({ userEmail, onClose, initialConversation
     <section
       ref={panelRef}
       aria-label="Team messages"
-      className="fixed right-0 top-14 z-50 flex h-[calc(100dvh-3.5rem)] w-full bg-white shadow-[-18px_0_50px_rgba(12,42,32,0.18)] sm:w-[min(760px,100vw)]"
+      className="anim-right fixed right-0 top-14 z-50 flex h-[calc(100dvh-3.5rem)] w-full bg-white shadow-[-18px_0_50px_rgba(12,42,32,0.18)] sm:w-[min(760px,100vw)]"
     >
       {/* ── Left: conversations ─────────────────────────────── */}
       <div className={cn('w-full flex-col border-brand-line-soft sm:flex sm:w-[300px] sm:shrink-0 sm:border-r', rightOpen ? 'hidden' : 'flex')}>

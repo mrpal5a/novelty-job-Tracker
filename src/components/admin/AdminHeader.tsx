@@ -10,22 +10,21 @@
 // always agree.
 //
 // Below lg the groups move into a sheet behind the hamburger, listed under
-// their group names. On phones a tab bar at the bottom carries Jobs,
-// Machines, Stock, Notes and More.
+// their group names. On phones a tab bar at the bottom carries Jobs, Job
+// Separation, a raised Search, Shade Cards and Dispatch Emails.
 
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { LIST_WARMUP } from '@/lib/listQueries';
-import { ChevronDown, Cpu, LayoutDashboard, LogOut, Menu, MessageSquare, MoreHorizontal, Package, Printer, Search, Settings, X } from 'lucide-react';
+import { ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, Palette, Printer, Search, Settings, SplitSquareHorizontal, Truck, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
   canDeptUseBOM,
   canDeptManageDispatchNotifications,
   canDeptExportData,
-  canDeptViewStock,
   canDeptPrintRollSlips,
   canDeptPrintBoxSlips,
   type DeptPermissions,
@@ -36,6 +35,8 @@ import {
   type NavGroup, type NavLink,
 } from '@/lib/adminNav';
 import { initials } from '@/lib/team';
+import { useExitGhost } from '@/hooks/useExitGhost';
+import { Exiting } from '@/components/ui/Exiting';
 import { Logo } from '@/components/brand/Logo';
 import ExportButton from './ExportButton';
 import CommandPalette, { warmSearch } from './CommandPalette';
@@ -109,8 +110,15 @@ function onMenuArrows(e: React.KeyboardEvent<HTMLElement>) {
   items[next]?.focus();
 }
 
+/** A header dropdown's panel: eases in under its tab and back out on close. */
+function MenuPanel({ id, className, children }: { id: string; className: string; children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useExitGhost(ref);
+  return <div ref={ref} id={id} className={cn(menuPanel, className)} onKeyDown={onMenuArrows}>{children}</div>;
+}
+
 const menuPanel =
-  'nav-menu-in absolute top-[calc(100%+6px)] z-50 min-w-[200px] rounded-xl border border-brand-border bg-white p-1.5 text-brand-ink shadow-[0_12px_32px_rgba(12,42,32,0.18)]';
+  'anim-drop absolute top-[calc(100%+6px)] z-50 min-w-[200px] rounded-xl border border-brand-border bg-white p-1.5 text-brand-ink shadow-[0_12px_32px_rgba(12,42,32,0.18)]';
 
 // Pointer or keyboard focus reaching a menu link starts loading that page's
 // list (lib/listQueries), so it is usually in memory by the time the click
@@ -199,11 +207,11 @@ function GroupMenu({ group, pathname, active }: { group: NavGroup; pathname: str
         />
       </button>
       {open && (
-        <div id={menuId} className={cn(menuPanel, 'left-0')} onKeyDown={onMenuArrows}>
+        <MenuPanel id={menuId} className={'left-0'}>
           {group.items.map((item) => (
             <MenuLink key={item.href} item={item} pathname={pathname} onPick={close} />
           ))}
-        </div>
+        </MenuPanel>
       )}
     </div>
   );
@@ -299,12 +307,12 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
             onPointerEnter={warmSearch}
             aria-label="Search everything (Ctrl K)"
             title="Search everything (Ctrl K)"
-            className={iconBtn}
+            className={cn(iconBtn, 'hidden sm:inline-flex')}
           >
             <Search className="h-[19px] w-[19px]" aria-hidden="true" />
           </button>
 
-          <button type="button" onClick={openNotes} aria-label={notesLabel} title={notesLabel} className={cn(iconBtn, 'hidden sm:inline-flex')}>
+          <button type="button" onClick={openNotes} aria-label={notesLabel} title={notesLabel} className={iconBtn}>
             <MessageSquare className="h-[19px] w-[19px]" aria-hidden="true" />
             {notesUnread > 0 && (
               <span aria-hidden="true" className="absolute right-1 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-mint px-1 font-mono text-[10px] font-semibold text-[#0A1F18]">
@@ -338,11 +346,11 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
       </div>
 
       {/* Section sheet — every group with its pages, full names, 44px rows. */}
-      {sheetOpen && (
+      {sheetOpen && <Exiting>
         <nav
           id="admin-mobile-nav"
           aria-label="Admin sections (menu)"
-          className="nav-panel-in max-h-[calc(100dvh-56px)] overflow-y-auto border-t border-white/10 bg-brand-header px-4 pb-3 pt-1 lg:hidden"
+          className="anim-drop max-h-[calc(100dvh_-_56px_-_var(--tabbar-h))] sm:max-h-[calc(100dvh-56px)] overflow-y-auto overscroll-contain border-t border-white/10 bg-brand-header px-4 pb-3 pt-1 lg:hidden"
         >
           {sheetGroups.map((g) => (
             <div key={g.key} className="border-b border-white/10 py-2">
@@ -387,60 +395,60 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
             </button>
           </div>
         </nav>
-      )}
+      </Exiting>}
 
-      {/* Phone tab bar — below sm. What the floor reaches for on a phone;
-          everything else is under More. */}
+      {/* Phone tab bar — below sm. Jobs, Job Separation, Shade Cards and
+          Dispatch Emails either side of a raised Search in the middle;
+          everything else is behind the hamburger. Notes sits in the bar up top. */}
       <nav
         aria-label="Quick sections"
         className="fixed inset-x-0 bottom-0 z-40 flex border-t border-brand-border bg-white pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         {(() => {
-          const tab = 'relative flex min-h-[60px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium';
-          const third = canDeptViewStock(dept)
-            ? { href: '/admin/stock', label: 'Stock', icon: Package }
-            : { href: '/admin/slips', label: 'Slips', icon: Printer };
+          const tab = 'relative flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium';
+          const dispatch = groups.find((g) => g.key === 'dispatch')?.items.find((i) => i.href === '/admin/dispatch-notifications');
           const links = [
-            { href: '/admin',          label: 'Jobs',     icon: LayoutDashboard },
-            { href: '/admin/machines', label: 'Machines', icon: Cpu },
-            third,
+            { href: '/admin',                label: 'Jobs',        icon: LayoutDashboard },
+            { href: '/admin/job-separation', label: 'Job Sep.',    icon: SplitSquareHorizontal, name: 'Job Separation' },
+            null,
+            { href: '/admin/shade-cards',    label: 'Shade Cards', icon: Palette },
+            dispatch
+              ? { href: dispatch.href, label: 'Dispatch', icon: Truck, name: 'Dispatch Emails', badge: dispatch.badge }
+              : { href: '/admin/slips', label: 'Slips', icon: Printer },
           ];
-          return (
-            <>
-              {links.map((l) => {
-                const on = !sheetOpen && (l.href === '/admin'
-                  ? pathname === '/admin' || pathname.startsWith('/admin/jobs/')
-                  : isActiveHref(pathname, l.href));
-                const Icon = l.icon;
-                return (
-                  <Link key={l.href} href={l.href} aria-current={on ? 'page' : undefined}
-                        className={cn(tab, on ? 'font-semibold text-brand-primary' : 'text-brand-muted')}>
-                    <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
-                    {l.label}
-                  </Link>
-                );
-              })}
-              <button type="button" onClick={openNotes} aria-label={notesLabel} className={cn(tab, 'text-brand-muted')}>
-                <MessageSquare className="h-[22px] w-[22px]" aria-hidden="true" />
-                Notes
-                {notesUnread > 0 && (
-                  <span aria-hidden="true" className="absolute left-[52%] top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-primary px-1 font-mono text-[10px] font-semibold text-white">
-                    {notesUnread > 99 ? '99+' : notesUnread}
+          return links.map((l) => {
+            if (!l) return (
+              <div key="search" className="flex flex-1 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setPaletteOpen(true)}
+                  onPointerEnter={warmSearch}
+                  aria-label="Search everything"
+                  className="-mt-5 flex h-14 w-14 items-center justify-center rounded-full bg-brand-primary text-white shadow-[0_6px_16px_rgba(16,85,63,0.35)] ring-4 ring-white transition-transform active:scale-95 motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-brand-mint"
+                >
+                  <Search className="h-6 w-6" aria-hidden="true" />
+                </button>
+              </div>
+            );
+            const on = !sheetOpen && (l.href === '/admin'
+              ? pathname === '/admin' || pathname.startsWith('/admin/jobs/')
+              : isActiveHref(pathname, l.href));
+            const Icon = l.icon;
+            const badge = 'badge' in l ? l.badge ?? 0 : 0;
+            return (
+              <Link key={l.href} href={l.href} aria-current={on ? 'page' : undefined}
+                    aria-label={'name' in l ? l.name : undefined}
+                    className={cn(tab, on ? 'font-semibold text-brand-primary' : 'text-brand-muted')}>
+                <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
+                <span className="max-w-full truncate px-0.5">{l.label}</span>
+                {badge > 0 && (
+                  <span aria-hidden="true" className="absolute left-[54%] top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-300 px-1 font-mono text-[10px] font-semibold text-[#0A1F18]">
+                    {badge > 99 ? '99+' : badge}
                   </span>
                 )}
-              </button>
-              <button
-                type="button"
-                onClick={() => { setSheetOpen((o) => !o); window.scrollTo({ top: 0 }); }}
-                aria-expanded={sheetOpen}
-                aria-controls="admin-mobile-nav"
-                className={cn(tab, sheetOpen ? 'font-semibold text-brand-primary' : 'text-brand-muted')}
-              >
-                <MoreHorizontal className="h-[22px] w-[22px]" aria-hidden="true" />
-                More
-              </button>
-            </>
-          );
+              </Link>
+            );
+          });
         })()}
       </nav>
 
@@ -475,9 +483,9 @@ function AdminGear({ links, pathname, active }: { links: NavLink[]; pathname: st
         <Settings className="h-[19px] w-[19px]" aria-hidden="true" />
       </button>
       {open && (
-        <div id={menuId} className={cn(menuPanel, 'right-0')} onKeyDown={onMenuArrows}>
+        <MenuPanel id={menuId} className={'right-0'}>
           {links.map((l) => <MenuLink key={l.href} item={l} pathname={pathname} onPick={close} />)}
-        </div>
+        </MenuPanel>
       )}
     </div>
   );
@@ -509,7 +517,7 @@ function AccountMenu({ userName, displayName, canExport, onLogout, pathname }: {
         </span>
       </button>
       {open && (
-        <div id={menuId} className={cn(menuPanel, 'right-0 w-[240px]')} onKeyDown={onMenuArrows}>
+        <MenuPanel id={menuId} className={'right-0 w-[240px]'}>
           <div className="px-3 pb-2 pt-1.5">
             <p className="truncate text-sm font-semibold">{userName}</p>
             <p className="font-mono text-[11px] uppercase text-brand-muted">{displayName}</p>
@@ -527,7 +535,7 @@ function AccountMenu({ userName, displayName, canExport, onLogout, pathname }: {
               Sign out
             </button>
           </div>
-        </div>
+        </MenuPanel>
       )}
     </div>
   );

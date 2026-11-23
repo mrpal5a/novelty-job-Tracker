@@ -35,7 +35,7 @@ export default function SizePairSearch({ value, onChange, labels }: {
       placeholder={labels[i]}
       aria-label={`${labels[i]} (mm)`}
       className={cn(
-        'min-w-0 flex-1 sm:flex-none sm:w-24 min-h-11 px-3 rounded-xl text-sm font-mono',
+        'w-0 min-w-0 flex-1 sm:flex-none sm:w-24 min-h-11 px-3 rounded-xl text-sm font-mono',
         'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
         'placeholder:font-sans placeholder:text-[var(--glass-muted)] focus:outline-none',
         'focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
@@ -47,7 +47,7 @@ export default function SizePairSearch({ value, onChange, labels }: {
       role="group"
       aria-label="Search by both sizes"
       title={`${labels[0]} × ${labels[1]} in mm — matches either way round, with the search box`}
-      className="flex items-center gap-1.5 shrink-0"
+      className="flex min-w-[150px] flex-1 items-center gap-1.5 sm:flex-none"
     >
       {box(0)}
       <span aria-hidden="true" className="text-sm text-[var(--glass-muted)]">×</span>

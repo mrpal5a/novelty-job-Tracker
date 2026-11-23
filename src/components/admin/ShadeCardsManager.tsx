@@ -273,7 +273,7 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
       </section>
 
       {/* ── controls ─────────────────────────────────────────── */}
-      <div className="shrink-0 flex flex-col sm:flex-row sm:items-center gap-2">
+      <div className="shrink-0 flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <label htmlFor="sc-search-field" className="sr-only">Search field</label>
         <select
           id="sc-search-field"
@@ -281,7 +281,7 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
           onChange={(e) => changeFilter(() => setField(e.target.value))}
           title="Narrow the search to one field"
           className={cn(
-            'min-h-11 px-3 rounded-lg text-sm shrink-0',
+            'min-h-11 min-w-0 flex-1 sm:flex-none px-3 rounded-lg text-sm sm:shrink-0',
             'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
             'focus:outline-none focus:border-emerald-300/70 transition-all',
           )}
@@ -291,7 +291,7 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
           ))}
         </select>
 
-        <div className="relative flex-1">
+        <div className="relative order-first basis-full sm:order-none sm:basis-auto sm:flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--glass-muted)]"
             aria-hidden="true"

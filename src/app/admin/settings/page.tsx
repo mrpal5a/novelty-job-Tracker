@@ -42,7 +42,7 @@ export default async function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <AdminSectionNav />
-      <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Settings</h1>
+      <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Settings</h1>
 
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="lg:sticky lg:top-24 lg:w-[220px] lg:shrink-0">

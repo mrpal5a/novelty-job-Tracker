@@ -27,6 +27,7 @@ import type { Machine, MachineQueueItem } from '@/lib/types';
 import { ConfirmModal } from './modals';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { StateChip } from '@/components/ui/StateChip';
+import { Exiting } from '@/components/ui/Exiting';
 
 type AvailableJob = {
   id:        string;
@@ -965,7 +966,7 @@ function OverflowMenu({
         // shell — without re-declaring it here the glass tokens fall back to
         // their dark-theme values and the menu renders white-on-white.
         // `contents` keeps the wrapper boxless so it paints no background.
-        <div className="admin-light contents">
+        <Exiting><div className="admin-light contents">
         <div
           ref={menuRef}
           role="menu"
@@ -973,7 +974,7 @@ function OverflowMenu({
           onKeyDown={onMenuKey}
           style={{ position: 'fixed', top: pos.top, left: pos.left, transform: 'translateX(-100%)' }}
           // Above the sticky header (z-40), below modals (z-50).
-          className="z-[45] min-w-[176px] rounded-lg border border-white/10 bg-white p-1 shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
+          className="anim-drop z-[45] min-w-[176px] rounded-lg border border-white/10 bg-white p-1 shadow-[0_8px_30px_rgba(0,0,0,0.18)]"
         >
           {actions.map((a) => (
             <button
@@ -993,7 +994,7 @@ function OverflowMenu({
             </button>
           ))}
         </div>
-        </div>,
+        </div></Exiting>,
         document.body,
       )}
     </>

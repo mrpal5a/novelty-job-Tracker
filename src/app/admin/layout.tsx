@@ -9,6 +9,7 @@ import { usernameOf } from '@/lib/username';
 import NotesFeed from '@/components/admin/NotesFeed';
 import OfflineBanner from '@/components/admin/OfflineBanner';
 import MessagesWidget from '@/components/admin/MessagesWidget';
+import FabDock from '@/components/admin/FabDock';
 import { NotificationPrompt } from '@/components/ui/DesktopNotificationsToggle';
 import QueryProvider from '@/components/providers/QueryProvider';
 import { deptKeyOf, appMetaOf } from '@/lib/identity';
@@ -45,7 +46,7 @@ export default async function AdminLayout({
           userName={usernameOf(appMetaOf(user), user.email)}
         />
         <OfflineBanner />
-        <main className="max-w-screen-2xl 3xl:max-w-[1800px] 4xl:max-w-[2200px] mx-auto px-4 py-6">
+        <main className="max-w-screen-2xl 3xl:max-w-[1800px] 4xl:max-w-[2200px] mx-auto px-4 py-4 sm:py-6">
           {children}
         </main>
         {/* Global internal-note feed + team messaging. Both mounted in the
@@ -55,6 +56,7 @@ export default async function AdminLayout({
             NotesFeed/PrepressTodoPanel/MeterCalculatorPanel. */}
         <NotesFeed deptName={perms.displayName} deptKey={perms.key} userEmail={user.email ?? ''} username={usernameOf(appMetaOf(user), user.email)} isAdmin={perms.isSuperAdmin} />
         <MessagesWidget userEmail={user.email ?? ''} />
+        <FabDock />
         <NotificationPrompt />
       </div>
     </QueryProvider>

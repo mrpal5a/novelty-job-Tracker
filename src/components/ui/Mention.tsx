@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { applyMention, mentionQuery, rankOptions, splitMentions, type MentionOption, type Trigger } from '@/lib/mentionInput';
 import { useTeamDirectory } from '@/hooks/useReferenceData';
 import { initials } from '@/lib/team';
+import { Exiting } from '@/components/ui/Exiting';
 
 type TextareaProps = Omit<React.TextareaHTMLAttributes<HTMLTextAreaElement>, 'value' | 'onChange'>;
 
@@ -107,11 +108,11 @@ export function MentionTextarea({
       />
       {open && (
         // Above the box: every composer sits at the bottom of its card or drawer.
-        <ul
+        <Exiting><ul
           id={listId}
           role="listbox"
           aria-label={trigger === '#' ? 'Jobs to link' : 'People and departments to tag'}
-          className="absolute bottom-full left-0 z-50 mb-1 w-full max-w-[320px] overflow-hidden rounded-xl border border-brand-border bg-white py-1 shadow-[0_12px_32px_rgba(12,42,32,0.16)]"
+          className="anim-rise absolute bottom-full left-0 z-50 mb-1 w-full max-w-[320px] overflow-hidden rounded-xl border border-brand-border bg-white py-1 shadow-[0_12px_32px_rgba(12,42,32,0.16)]"
         >
           {list.map((o, i) => (
             <li
@@ -142,7 +143,7 @@ export function MentionTextarea({
               </span>
             </li>
           ))}
-        </ul>
+        </ul></Exiting>
       )}
     </div>
   );

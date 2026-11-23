@@ -11,6 +11,7 @@ import type { Party } from '@/lib/types';
 import { useListKeys } from '@/hooks/useListKeys';
 import { useParties } from '@/hooks/useReferenceData';
 import { findParties } from '@/lib/search';
+import { Exiting } from '@/components/ui/Exiting';
 
 const NO_PARTIES: Party[] = [];
 
@@ -58,7 +59,7 @@ export default function PartySuggestInput({
         className={className}
       />
       {open && (suggestions.length > 0 || isSuccess) && (
-        <div {...keys.listProps} className="absolute z-20 top-full left-0 right-0 mt-1 glass-strong glass rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+        <Exiting><div {...keys.listProps} className="anim-drop absolute z-20 top-full left-0 right-0 mt-1 glass-strong glass rounded-lg shadow-lg overflow-hidden max-h-56 overflow-y-auto">
           {suggestions.length > 0 ? (
             suggestions.map((p, i) => (
               <button
@@ -78,7 +79,7 @@ export default function PartySuggestInput({
           ) : (
             <p className="px-3 py-2 text-xs text-[var(--glass-muted)]">Not on the party list — the name will be saved as typed.</p>
           )}
-        </div>
+        </div></Exiting>
       )}
     </div>
   );

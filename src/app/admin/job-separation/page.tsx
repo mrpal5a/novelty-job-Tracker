@@ -28,8 +28,8 @@ export default async function JobSeparationPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Job Separation</h1>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Job Separation</h1>
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           Every PO split into job entries, live for the whole shop. Anyone can
           search the worksheet; Prepress and Admin add and correct rows.
         </p>

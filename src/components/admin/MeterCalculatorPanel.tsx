@@ -36,6 +36,7 @@ import PanelResizeHandles from './PanelResizeHandles';
 import BasicCalculator, { useBasicCalculator } from './BasicCalculator';
 import { isBlank } from '@/lib/basicCalculator';
 import { METER, GAP, RATE, runCalc, type CalcSpec, type FieldSpec } from '@/lib/meterCalculator';
+import { Exiting } from '@/components/ui/Exiting';
 
 const fieldCls = cn(
   'w-full h-11 px-2 rounded-xl text-center text-sm font-mono tabular-nums',
@@ -353,7 +354,7 @@ export default function MeterCalculatorPanel() {
         onClick={handleOpen}
         aria-label="Calculator — meter, gap, rate and basic"
         className={cn(
-          'admin-fab fixed bottom-[172px] right-5 z-40 h-14 w-14 rounded-full',
+          'fab-item fab-tool admin-fab fixed bottom-[172px] right-5 z-40 h-14 w-14 rounded-full',
           'bg-brand-primary hover:bg-brand-primary-hover text-white',
           'shadow-lg shadow-black/20 flex items-center justify-center',
           'transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/40',
@@ -364,14 +365,14 @@ export default function MeterCalculatorPanel() {
     );
   }
 
-  // ── Panel ───────────────────────────────────────────────────────
+  // ── Panel ─── rises in over its button, and back down on close ─────
   return (
-    <section
+    <Exiting><section
       ref={panelRef}
       aria-label="Calculator"
       style={resizeStyle}
       className={cn(
-        'fixed z-50 grid grid-rows-[auto_minmax(0,1fr)]',
+        'anim-rise fixed z-50 grid grid-rows-[auto_minmax(0,1fr)]',
         !resizable && 'admin-fab bottom-[172px] right-5 w-[min(92vw,360px)] max-h-[80vh]',
         'bg-brand-surface border border-brand-border rounded-2xl',
         'shadow-2xl shadow-black/20 overflow-hidden',
@@ -466,6 +467,6 @@ export default function MeterCalculatorPanel() {
           )}
         </div>
       </div>
-    </section>
+    </section></Exiting>
   );
 }

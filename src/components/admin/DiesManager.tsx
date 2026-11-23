@@ -32,9 +32,12 @@ const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
 
 // Header labels for the desk table — must stay in the same order as the
 // <td>s rendered below.
+// Location first after Sr No: it's where the floor goes to pick the die up.
+// The serial (with its status dot) sits last, by the actions. First used
+// lives in the detail view, not the table.
 const DIE_COLUMNS = [
-  'Sr No', 'Serial No', 'Job Name', 'Corner', 'Size', 'Cylinder', 'Material',
-  'Location', 'Height gap', 'Labels / round', 'First Used', 'Actions',
+  'Sr No', 'Location', 'Job Name', 'Size', 'Cylinder', 'Material',
+  'Corner', 'Shape', 'Height gap', 'Labels / round', 'Serial No', 'Actions',
 ] as const;
 const DIE_COLS = DIE_COLUMNS.length;
 
@@ -48,7 +51,7 @@ const SHOW_STEP = 100;
 // by the more useful of its two source fields.
 type SortField =
   | 'status' | 'serial_no' | 'job_name' | 'corner' | 'length' | 'cylinder'
-  | 'material' | 'location' | 'across_gap' | 'ups' | 'die_received_on' | 'damage_date' | 'created_at';
+  | 'material' | 'shape' | 'location' | 'across_gap' | 'ups' | 'die_received_on' | 'damage_date' | 'created_at';
 type SortDir = 'asc' | 'desc';
 
 const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>> = {
@@ -60,14 +63,14 @@ const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>>
   'Cylinder':      'cylinder',
   'Material':      'material',
   'Location':      'location',
+  'Shape':         'shape',
   'Height gap':    'across_gap',
   'Labels / round':  'ups',
-  'First Used':    'die_received_on',
 };
 
 const SORT_FIELD_KIND: Record<SortField, 'text' | 'number' | 'date'> = {
   status: 'text', serial_no: 'text', job_name: 'text', corner: 'text', length: 'text',
-  cylinder: 'number', material: 'text', location: 'text', across_gap: 'number', ups: 'number',
+  cylinder: 'number', material: 'text', shape: 'text', location: 'text', across_gap: 'number', ups: 'number',
   die_received_on: 'date', damage_date: 'date', created_at: 'date',
 };
 
@@ -263,15 +266,15 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="space-y-3">
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      {/* Toolbar — on a phone: search, then field + sizes, then the buttons. */}
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <select
           value={searchField}
           onChange={(e) => setSearchField(e.target.value)}
           aria-label="Search field"
           title="Narrow the search to one field"
           className={cn(
-            'min-h-11 px-3 rounded-xl text-sm shrink-0',
+            'min-h-11 max-w-[45%] sm:max-w-none px-3 rounded-xl text-sm shrink-0',
             'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
             'focus:outline-none focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
           )}
@@ -281,7 +284,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
           ))}
         </select>
 
-        <div className="relative flex-1">
+        <div className="relative order-first basis-full sm:order-none sm:basis-auto sm:flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--glass-muted)]"
             aria-hidden="true"
@@ -310,7 +313,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
         <CsvExportButton rows={dies} columns={exportColumns} filename="dies" />
 
         {canManage && (
-          <Button intent="primary" icon={Plus} onClick={() => setAdding(true)}>
+          <Button intent="primary" icon={Plus} onClick={() => setAdding(true)} className="max-sm:ml-auto">
               Add die
           </Button>
         )}
@@ -403,13 +406,13 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                       'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3 mt-3 pt-3 border-t',
                       isDamaged ? 'border-red-200/70' : 'border-black/[0.06]',
                     )}>
+                      <SpecField label="Location" value={die.location} />
                       <SpecField label="Size" value={sizeOf(die)} mono />
                       <SpecField label="Cylinder" value={die.cylinder?.toString()} mono />
                       <SpecField label="Material" value={die.material} />
-                      <SpecField label="Location" value={die.location} />
+                      <SpecField label="Shape" value={die.shape} />
                       <SpecField label="Height gap" value={die.across_gap != null ? `${die.across_gap} mm` : null} />
                       <SpecField label="Labels / round" value={die.ups?.toString()} mono />
-                      <SpecField label="First used" value={formatNumericDate(die.die_received_on)} mono />
                     </div>
 
                     {isDamaged && (die.damage_date || die.damage_reason) && (
@@ -484,7 +487,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         col === 'Job Name' && 'min-w-[220px]',
                         // Short values under long labels: let the label wrap so the
                         // table fits a 1366 px screen without a sideways scroll.
-                        ['Corner', 'Material', 'Height gap', 'Labels / round', 'First Used'].includes(col) && 'whitespace-normal',
+                        ['Corner', 'Material', 'Shape', 'Height gap', 'Labels / round'].includes(col) && 'whitespace-normal',
                         // Sr No is the team's floor reference number — keep it pinned to the
                         // left edge through both scroll axes so it's always visible. z-20
                         // (above the plain top-sticky headers at z-10) so it stays on top at
@@ -513,6 +516,15 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         <td className="sticky left-0 z-10 px-3 py-1.5 font-mono text-xs whitespace-nowrap bg-[var(--glass-bg-strong)] backdrop-blur-[14px] border-r border-white/8">
                           {srNoMap.get(die.id) ?? '—'}
                         </td>
+                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
+                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] min-w-[220px] whitespace-normal break-words">{die.job_name}</td>
+                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{sizeOf(die) ?? '—'}</td>
+                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
+                        <td className="px-3 py-1.5 min-w-[100px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
+                        <td className="px-3 py-1.5 min-w-[96px] max-w-[160px] whitespace-normal break-words">{die.corner || '—'}</td>
+                        <td className="px-3 py-1.5 min-w-[90px] max-w-[160px] whitespace-normal break-words">{die.shape || '—'}</td>
+                        <td className="px-3 py-1.5 whitespace-nowrap font-mono">{die.across_gap ?? '—'}</td>
+                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>
                         {/* Status rides on the serial as its dot: green in use, orange
                             extra, red damaged. The name is in the tooltip and for
                             screen readers. */}
@@ -531,15 +543,6 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                             />
                           </button>
                         </td>
-                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] min-w-[220px] whitespace-normal break-words">{die.job_name}</td>
-                        <td className="px-3 py-1.5 min-w-[96px] max-w-[160px] whitespace-normal break-words">{die.corner || '—'}</td>
-                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{sizeOf(die) ?? '—'}</td>
-                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.cylinder ?? '—'}</td>
-                        <td className="px-3 py-1.5 min-w-[100px] max-w-[200px] whitespace-normal break-words">{die.material || '—'}</td>
-                        <td className="px-3 py-1.5 font-semibold text-[var(--glass-ink)] whitespace-nowrap">{die.location || '—'}</td>
-                        <td className="px-3 py-1.5 whitespace-nowrap font-mono">{die.across_gap ?? '—'}</td>
-                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{die.ups ?? '—'}</td>
-                        <td className="px-3 py-1.5 font-mono whitespace-nowrap">{formatNumericDate(die.die_received_on) || '—'}</td>
                         <td className="px-3 py-1.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           {canManage && (
                             <div className="inline-flex items-center gap-1.5">

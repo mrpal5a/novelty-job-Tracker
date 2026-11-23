@@ -84,7 +84,7 @@ export default function DashboardBoard({ dept, jobs }: Props) {
           ways new work enters — a PO line in Job Separation, or a job. */}
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Jobs</h1>
+          <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Jobs</h1>
           <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-brand-muted">
             <span><span className="font-mono font-semibold text-brand-ink">{jobs.length}</span> in production</span>
             <span aria-hidden="true">·</span>

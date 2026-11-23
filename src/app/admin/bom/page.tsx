@@ -29,8 +29,8 @@ export default async function BomPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Bill of Material</h1>
-        <p className="text-sm text-[var(--glass-muted)] mt-1">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Bill of Material</h1>
+        <p className="mt-1 hidden text-sm text-[var(--glass-muted)] sm:block">
           {canDecide
             ? 'Order value against material cost for every job, and the material requests Production sends you.'
             : 'Pick the material, enter its width and running metres, use paper from stock when it’s there, and send Admin a request when it isn’t.'}

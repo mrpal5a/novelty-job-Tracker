@@ -36,8 +36,8 @@ export default async function ShadeCardsPage() {
     // small-screen card list is meant to scroll with the page anyway.
     <div className="flex flex-col gap-4 lg:h-[calc(100dvh-105px)] lg:overflow-hidden">
       <div className="shrink-0">
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Shade Cards</h1>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Shade Cards</h1>
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           Every colour approval, every version. A rejected card is revised, never overwritten.
         </p>
       </div>

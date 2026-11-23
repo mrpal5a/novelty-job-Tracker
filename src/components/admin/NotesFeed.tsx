@@ -49,6 +49,7 @@ import { initials } from '@/lib/team';
 import { notify } from '@/lib/notify';
 import { DesktopNotificationsToggle } from '@/components/ui/DesktopNotificationsToggle';
 import type { NoteFeedItem } from '@/lib/types';
+import { Exiting } from '@/components/ui/Exiting';
 
 const POLL_MS  = 60_000;
 /** Seen notes are saved as read together, this long after the first. */
@@ -557,14 +558,14 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
   const firstUnreadId = unreadList.length && !searchHits ? unreadList[unreadList.length - 1].id : null;
 
   return (
-    <>
+    <Exiting>
       {/* Scrim under the header — a click on it closes the drawer. */}
-      <div aria-hidden="true" onClick={() => setOpen(false)} className="fixed inset-x-0 bottom-0 top-14 z-40 bg-[rgba(10,31,24,0.22)]" />
+      <div aria-hidden="true" onClick={() => setOpen(false)} className="anim-fade fixed inset-x-0 bottom-0 top-14 z-40 bg-[rgba(10,31,24,0.22)]" />
 
       <aside
         role="dialog"
         aria-labelledby={titleId}
-        className="nav-panel-in fixed bottom-0 right-0 top-14 z-50 flex w-full flex-col bg-white shadow-[-18px_0_50px_rgba(12,42,32,0.18)] sm:w-[460px]"
+        className="anim-right fixed bottom-0 right-0 top-14 z-50 flex w-full flex-col bg-white shadow-[-18px_0_50px_rgba(12,42,32,0.18)] sm:w-[460px]"
       >
         <div className="flex items-center justify-between gap-3 px-6 pb-3 pt-5">
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -1007,6 +1008,6 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
           </div>
         </form>
       </aside>
-    </>
+    </Exiting>
   );
 }

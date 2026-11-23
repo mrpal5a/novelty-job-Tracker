@@ -30,8 +30,8 @@ export default async function ActivityLogPage() {
     <div className="flex flex-col gap-6">
       <AdminSectionNav />
       <div>
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Activity Log</h1>
-        <p className="mt-1.5 max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Activity Log</h1>
+        <p className="mt-1.5 hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           Every change to the app&apos;s data: who made it, when, and what changed. Team chat is not recorded. Entries are kept for 12 months.
         </p>
       </div>

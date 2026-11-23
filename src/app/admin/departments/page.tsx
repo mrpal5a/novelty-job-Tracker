@@ -33,8 +33,8 @@ export default async function DepartmentsPage() {
     <div className="flex flex-col gap-6">
       <AdminSectionNav />
       <div className="flex flex-col gap-1.5">
-        <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Departments</h1>
-        <p className="max-w-[72ch] text-sm text-brand-muted">
+        <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Departments</h1>
+        <p className="hidden max-w-[72ch] text-sm text-brand-muted sm:block">
           What each department may change. The server checks this on every request — the screen only hides buttons.
           Changes apply within a minute, or at next sign-in.
         </p>

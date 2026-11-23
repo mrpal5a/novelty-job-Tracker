@@ -261,22 +261,6 @@ select:disabled {
 }
 .cyc-fade { animation: cyc-fade .3s ease; }
 
-/* ── Header nav ────────────────────────────────────────────────────
-   Grouped tabs (Jobs, Production, Stock, Dispatch…) with a dropdown under
-   each group. The dropdown fades in a few pixels below its tab; nothing
-   else in the bar moves. */
-@keyframes nav-menu-in {
-  from { opacity: 0; transform: translateY(-4px); }
-  to   { opacity: 1; transform: none; }
-}
-.nav-menu-in { animation: nav-menu-in .14s ease-out both; }
-
-/* Mobile section sheet dropping out of the header bar. */
-@keyframes nav-panel-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: none; }
-}
-.nav-panel-in { animation: nav-panel-in .2s cubic-bezier(.2,.8,.3,1) both; }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton     { animation: none; background: rgba(255,255,255,.12); }
@@ -286,8 +270,6 @@ select:disabled {
   .signal-ping  { animation: none; opacity: 0.35; }
   .loading-bar  { animation: none; width: 100%; }
   .animate-pulse { animation: none; }
-  .nav-panel-in  { animation: none; }
-  .nav-menu-in   { animation: none; }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -496,15 +478,6 @@ select:disabled {
   .field-example { transition: none; }
 }
 
-/* ── Stage menu (StageSelect) — a short rise-in; nothing moves for reduced motion ── */
-@keyframes stage-menu-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
-  to   { opacity: 1; transform: none; }
-}
-.stage-menu-in { animation: stage-menu-in 120ms ease-out; transform-origin: top left; }
-@media (prefers-reduced-motion: reduce) {
-  .stage-menu-in { animation: none; }
-}
 
 /* ── Phone tab bar (AdminHeader's PhoneTabBar) ──────────────────
    Below sm a 60px bar sits at the bottom of every admin page. The floating
@@ -514,6 +487,87 @@ select:disabled {
    clear of it. */
 :root { --tabbar-h: calc(60px + env(safe-area-inset-bottom)); }
 @media (max-width: 639px) {
-  .admin-fab { margin-bottom: var(--tabbar-h); }
+  /* !important: a launcher mounted inside a space-y list (the calculator on
+     Job Separation) would otherwise have its margin reset to 0 and sit on
+     the one below it. */
+  .admin-fab { margin-bottom: var(--tabbar-h) !important; }
   .admin-light > main { padding-bottom: calc(var(--tabbar-h) + 1.5rem); }
+}
+
+/* ── Floating button dock (FabDock) ─────────────────────────────
+   On a phone, a page with floating tools (.fab-tool: calculator, prepress
+   to-do) folds them and Messages (.fab-item) behind one "+" in Messages'
+   slot. Open, they stand one slot (76px) higher than usual, above the "+".
+   Opening and closing ease in and out: they fade, grow and rise into place,
+   and sink back the same way (hidden only once the fade ends, so a folded
+   button can't be tapped). The "+" wears a dot while a folded button has a
+   count. Pages with only Messages keep it as it was. */
+@media (max-width: 639px) {
+  html:has(.fab-tool) .fab-dock { display: flex; }
+  html:has(.fab-tool) .fab-item {
+    translate: 0 -60px;
+    scale: 0.8;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 220ms ease-in-out, translate 220ms ease-in-out, scale 220ms ease-in-out, visibility 0s linear 220ms;
+  }
+  html[data-fab-open]:has(.fab-tool) .fab-item {
+    translate: 0 -76px;
+    scale: 1;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+  html:has(.fab-item [data-fab-badge]):not([data-fab-open]) .fab-dock-dot { display: block; }
+}
+@media (max-width: 639px) and (prefers-reduced-motion: reduce) {
+  html:has(.fab-tool) .fab-item { transition: none; }
+}
+
+/* ── In and out ──────────────────────────────────────────────────
+   Everything that opens and closes eases in and out over 200ms, the same
+   both ways. An `anim-*` class is the way in; on the frozen copy that
+   useExitGhost leaves as it closes, `anim-out` plays the same move back.
+   Individual translate/scale/opacity, never transform, so a box that is
+   centred with transform (.modal-panel) stays put.
+
+     anim-drop   menus and the phone sheet, falling a few px from above
+     anim-rise   panels anchored low (to-do, calculator), rising a few px
+     anim-fade   backdrops
+     anim-modal  dialogs: a bottom sheet on a phone, a soft rise on a desk
+     anim-right  the notes drawer, from the right edge */
+@keyframes anim-drop-in   { from { opacity: 0; translate: 0 -6px; } }
+@keyframes anim-drop-out  { to   { opacity: 0; translate: 0 -6px; } }
+@keyframes anim-rise-in   { from { opacity: 0; translate: 0 10px; scale: 0.98; } }
+@keyframes anim-rise-out  { to   { opacity: 0; translate: 0 10px; scale: 0.98; } }
+@keyframes anim-fade-in   { from { opacity: 0; } }
+@keyframes anim-fade-out  { to   { opacity: 0; } }
+@keyframes anim-sheet-in  { from { translate: 0 100%; } }
+@keyframes anim-sheet-out { to   { translate: 0 100%; } }
+@keyframes anim-right-in  { from { translate: 100% 0; } }
+@keyframes anim-right-out { to   { translate: 100% 0; } }
+
+.anim-drop, .anim-rise, .anim-fade, .anim-modal, .anim-right { animation: 200ms ease-in-out both; }
+.anim-drop  { animation-name: anim-drop-in; }
+.anim-rise  { animation-name: anim-rise-in; transform-origin: bottom right; }
+.anim-fade  { animation-name: anim-fade-in; }
+.anim-modal { animation-name: anim-rise-in; }
+.anim-right { animation-name: anim-right-in; }
+@media (max-width: 499px) { .anim-modal { animation-name: anim-sheet-in; } }
+
+.anim-out:is(.anim-drop, .anim-rise, .anim-fade, .anim-modal, .anim-right),
+.anim-out :is(.anim-drop, .anim-rise, .anim-fade, .anim-modal, .anim-right) { pointer-events: none; }
+.anim-out.anim-drop,  .anim-out .anim-drop  { animation-name: anim-drop-out; }
+.anim-out.anim-rise,  .anim-out .anim-rise  { animation-name: anim-rise-out; }
+.anim-out.anim-fade,  .anim-out .anim-fade  { animation-name: anim-fade-out; }
+.anim-out.anim-modal, .anim-out .anim-modal { animation-name: anim-rise-out; }
+.anim-out.anim-right, .anim-out .anim-right { animation-name: anim-right-out; }
+@media (max-width: 499px) {
+  .anim-out.anim-modal, .anim-out .anim-modal { animation-name: anim-sheet-out; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-drop, .anim-rise, .anim-fade, .anim-modal, .anim-right { animation: none; }
 }

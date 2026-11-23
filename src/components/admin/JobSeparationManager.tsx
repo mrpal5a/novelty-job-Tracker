@@ -40,6 +40,7 @@ import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import PartySuggestInput from './PartySuggestInput';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
+import { Exiting } from '@/components/ui/Exiting';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddJobSeparationModal = dynamic(() => import('./AddJobSeparationModal'), { ssr: false });
@@ -449,15 +450,16 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
       {canManageTodo && <PrepressTodoPanel />}
       {canUseMeterCalculator && <MeterCalculatorPanel />}
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+      {/* Toolbar — on a phone: search; field + party; dates + unit; then the
+          buttons. From sm, one row in the order written. */}
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as DateRangeOption)}
           aria-label="Date range"
           title="Which rows to show and search"
           className={cn(
-            'min-h-11 px-3 rounded-xl text-sm shrink-0',
+            'order-3 min-h-11 min-w-[120px] flex-1 basis-0 px-3 rounded-xl text-sm sm:order-none sm:min-w-0 sm:flex-none sm:basis-auto sm:shrink-0',
             'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
             'focus:outline-none focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
           )}
@@ -469,7 +471,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
 
         {/* One tap per unit, the current one filled. "1&2" lines are shared
             work, so they show under Unit 1 and Unit 2 alike. */}
-        <div role="group" aria-label="Unit" className="flex shrink-0 rounded-xl border border-brand-border bg-white p-0.5">
+        <div role="group" aria-label="Unit" className="order-3 flex shrink-0 rounded-xl sm:order-none border border-brand-border bg-white p-0.5">
           {([['', 'All'], ['1', 'Unit 1'], ['2', 'Unit 2']] as const).map(([value, label]) => (
             <button
               key={label}
@@ -478,7 +480,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
               onClick={() => setUnit(value)}
               title={value ? `Unit ${value} lines, plus those shared by both units` : 'Every unit'}
               className={cn(
-                'min-h-10 [@media(pointer:coarse)]:min-h-11 whitespace-nowrap rounded-[10px] px-3 text-sm font-medium transition-colors',
+                'min-h-10 [@media(pointer:coarse)]:min-h-11 whitespace-nowrap rounded-[10px] px-2.5 sm:px-3 text-sm font-medium transition-colors',
                 unit === value ? 'bg-brand-ink text-white' : 'text-brand-ink hover:bg-brand-surface-alt',
               )}
             >
@@ -493,7 +495,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           aria-label="Search field"
           title="Narrow the search to one field"
           className={cn(
-            'min-h-11 px-3 rounded-xl text-sm shrink-0',
+            'order-2 min-h-11 min-w-0 basis-[calc(50%-4px)] px-3 rounded-xl text-sm sm:order-none sm:basis-auto sm:shrink-0',
             'bg-[var(--field-bg)] border border-[var(--field-border)] text-[var(--glass-ink)]',
             'focus:outline-none focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
           )}
@@ -503,7 +505,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           ))}
         </select>
 
-        <div className="relative flex-1">
+        <div className="relative order-first basis-full sm:order-none sm:basis-auto sm:flex-1">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--glass-muted)]"
             aria-hidden="true"
@@ -525,7 +527,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           <SearchClearButton value={search} onClear={() => setSearch('')} />
         </div>
 
-        <div className="relative sm:w-56 shrink-0" title="Only this party's jobs — works together with the search box">
+        <div className="relative order-2 min-w-0 basis-[calc(50%-4px)] sm:order-none sm:basis-auto sm:w-56 sm:shrink-0" title="Only this party's jobs — works together with the search box">
           <PartySuggestInput
             value={party}
             onChange={setParty}
@@ -548,7 +550,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           aria-label={hideMoney ? 'Show rates and order values' : 'Hide rates and order values'}
           title={hideMoney ? 'Show rates and order values' : 'Hide rates and order values (for screenshots)'}
           className={cn(
-            'inline-flex items-center justify-center min-h-11 min-w-11 rounded-xl shrink-0',
+            'order-4 inline-flex items-center justify-center min-h-11 min-w-11 rounded-xl shrink-0 sm:order-none',
             'border border-[var(--glass-border)] text-[var(--glass-muted)]',
             'hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors',
             hideMoney && 'text-[var(--glass-ink)] bg-black/[0.04]',
@@ -557,24 +559,25 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           {hideMoney ? <EyeOff className="w-4 h-4" aria-hidden="true" /> : <Eye className="w-4 h-4" aria-hidden="true" />}
         </button>}
 
-        <CsvExportButton rows={sortedRows} columns={exportColumns} filename="job-separation" />
+        <div className="order-4 sm:order-none"><CsvExportButton rows={sortedRows} columns={exportColumns} filename="job-separation" /></div>
 
         {canManage && (
           <button
             onClick={() => setManagingParties(true)}
+            title="Manage parties"
             className={cn(
-              'inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-xl shrink-0',
+              'relative order-4 inline-flex items-center justify-center gap-1.5 min-h-11 min-w-11 px-3 rounded-xl shrink-0 sm:order-none',
               'text-sm font-medium border border-[var(--glass-border)] text-[var(--glass-muted)]',
               'hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors',
             )}
           >
             <Users className="w-4 h-4" aria-hidden="true" />
-            Parties
+            <span className="max-sm:sr-only">Parties</span>
           </button>
         )}
 
         {canManage && (
-          <Button intent="primary" icon={Plus} onClick={() => { setDuplicateSource(null); setAdding(true); }}>
+          <Button intent="primary" icon={Plus} onClick={() => { setDuplicateSource(null); setAdding(true); }} className="order-4 max-sm:ml-auto sm:order-none">
               Add row
           </Button>
         )}
@@ -1131,11 +1134,11 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
       )}
 
       {addingJobFrom && dept && (
-        <div
-          className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/40 p-4"
+        <Exiting><div
+          className="anim-fade fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto bg-black/40 p-4"
           onClick={(e) => { if (e.target === e.currentTarget) setAddingJobFrom(null); }}
         >
-          <div className="w-full max-w-2xl my-8">
+          <div className="anim-rise w-full max-w-2xl my-8">
             <AddJobForm
               key={addingJobFrom.id}
               dept={dept}
@@ -1145,7 +1148,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
               onCancel={() => setAddingJobFrom(null)}
             />
           </div>
-        </div>
+        </div></Exiting>
       )}
     </div>
   );

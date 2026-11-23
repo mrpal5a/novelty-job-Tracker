@@ -35,6 +35,7 @@ import { formatMeters } from '@/lib/paperStock';
 import type { BomMaterialRequestWithJob, BomRequestStatus } from '@/lib/types';
 import { Button } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
+import { Exiting } from '@/components/ui/Exiting';
 
 export type RequestGroup = {
   key:          string;
@@ -393,7 +394,7 @@ function RowMenu({ items, label }: { items: MenuItem[]; label: string }) {
         className="!px-2"
       />
       {open && (
-        <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg shadow-black/10">
+        <Exiting><div role="menu" className="anim-drop absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg shadow-black/10">
           {items.map((item) => (
             <button
               key={item.label}
@@ -409,7 +410,7 @@ function RowMenu({ items, label }: { items: MenuItem[]; label: string }) {
               {item.label}
             </button>
           ))}
-        </div>
+        </div></Exiting>
       )}
     </div>
   );

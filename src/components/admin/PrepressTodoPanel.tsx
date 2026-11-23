@@ -28,6 +28,7 @@ import { groupTodos, jobTags, splitTags, tagLink } from '@/lib/prepressTodoView'
 import { useJobSepTagRows, useJobSepTagSearch } from '@/hooks/useJobSepTags';
 import { MentionTextarea } from '@/components/ui/Mention';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import { Exiting } from '@/components/ui/Exiting';
 
 // prepress_todo_logs is auto-trimmed to its 1000 most recent rows
 // (029_prepress_todo_logs_trim.sql) — this is where the panel starts
@@ -532,7 +533,7 @@ export default function PrepressTodoPanel() {
         onClick={handleOpen}
         aria-label={openCount > 0 ? `Prepress To-Do, ${openCount} open` : 'Prepress To-Do'}
         className={cn(
-          'admin-fab fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full',
+          'fab-item fab-tool admin-fab fixed bottom-24 right-5 z-40 h-14 w-14 rounded-full',
           'bg-brand-primary hover:bg-brand-primary-hover text-white',
           'shadow-lg shadow-black/20 flex items-center justify-center',
           'transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/40',
@@ -541,6 +542,7 @@ export default function PrepressTodoPanel() {
         <ListChecks className="h-6 w-6" aria-hidden="true" />
         {!loading && openCount > 0 && (
           <span
+            data-fab-badge
             className={cn(
               'absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full',
               'bg-amber-400 text-brand-header text-[11px] font-semibold leading-[22px]',
@@ -554,14 +556,14 @@ export default function PrepressTodoPanel() {
     );
   }
 
-  // ── Panel ───────────────────────────────────────────────────────
+  // ── Panel ─── rises in over its button, and back down on close ─────
   return (
-    <section
+    <Exiting><section
       ref={panelRef}
       aria-label="Prepress To-Do"
       style={resizeStyle}
       className={cn(
-        'fixed z-50 grid grid-rows-[auto_minmax(0,1fr)_auto]',
+        'anim-rise fixed z-50 grid grid-rows-[auto_minmax(0,1fr)_auto]',
         !resizable && 'admin-fab bottom-24 right-5 w-[min(90vw,320px)] max-h-[min(70vh,460px)]',
         'bg-brand-surface border border-brand-border rounded-2xl',
         'shadow-2xl shadow-black/20 overflow-hidden',
@@ -731,9 +733,9 @@ export default function PrepressTodoPanel() {
                   <Download className="w-3.5 h-3.5" aria-hidden="true" />
                 </button>
                 {exportMenuOpen && (
-                  <div
+                  <Exiting><div
                     role="menu"
-                    className="absolute right-0 top-full mt-1 z-10 w-48 rounded-lg border border-brand-border bg-white shadow-lg overflow-hidden"
+                    className="anim-drop absolute right-0 top-full mt-1 z-10 w-48 rounded-lg border border-brand-border bg-white shadow-lg overflow-hidden"
                   >
                     <button
                       type="button"
@@ -755,7 +757,7 @@ export default function PrepressTodoPanel() {
                       <Trash2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       Download &amp; clear
                     </button>
-                  </div>
+                  </div></Exiting>
                 )}
               </div>
             </div>
@@ -846,6 +848,6 @@ export default function PrepressTodoPanel() {
           </button>
         </form>
       )}
-    </section>
+    </section></Exiting>
   );
 }

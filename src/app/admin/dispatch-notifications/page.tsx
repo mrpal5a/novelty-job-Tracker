@@ -94,7 +94,7 @@ export default async function DispatchNotificationsPage({
 
   return (
     <div className="space-y-4">
-      <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Dispatch Emails</h1>
+      <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Dispatch Emails</h1>
 
       <DispatchEmailTabs tabs={tabs} active={active}>
         {active === 'queue'   && <PendingDispatchNotifications />}

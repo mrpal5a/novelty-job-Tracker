@@ -141,7 +141,7 @@ export default function MessagesWidget({ userEmail }: Props) {
         onFocus={preloadDrawer}
         aria-label={unread > 0 ? `Messages, ${unread} unread` : 'Messages'}
         className={cn(
-          'admin-fab fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full',
+          'fab-item admin-fab fixed bottom-5 right-5 z-40 h-14 w-14 rounded-full',
           'bg-brand-primary hover:bg-brand-primary-hover text-white',
           'shadow-lg shadow-black/20 flex items-center justify-center',
           'transition-colors focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-primary/40',
@@ -150,6 +150,7 @@ export default function MessagesWidget({ userEmail }: Props) {
         <MessageCircle className="h-6 w-6" aria-hidden="true" />
         {unread > 0 && (
           <span
+            data-fab-badge
             className={cn(
               'absolute -top-1 -right-1 min-w-[22px] h-[22px] px-1 rounded-full',
               'bg-brand-danger text-white text-[11px] font-semibold leading-[22px]',

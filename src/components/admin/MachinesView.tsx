@@ -119,7 +119,7 @@ export default function MachinesView({ canManage, utilisation }: Props) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[30px] font-semibold leading-9 tracking-[-0.025em] text-brand-ink">Machines</h1>
+          <h1 className="text-[22px] leading-7 sm:text-[30px] sm:leading-9 font-semibold tracking-[-0.025em] text-brand-ink">Machines</h1>
           <p className="text-sm text-brand-muted">
             {query.data ? (
               machines.length === 0 ? 'No machines on the board yet.' : (
