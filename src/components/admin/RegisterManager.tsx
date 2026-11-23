@@ -25,6 +25,7 @@ import type {
 } from '@/lib/types';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { WithExample } from '@/components/ui/FieldAffix';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 
 // ── constants ────────────────────────────────────────────────
 const STAGES: { id: RegisterStage; name: string; dot: string }[] = [
@@ -586,7 +587,14 @@ function AccountFormModal({ account, onClose, onSaved }: {
   const [busy, setBusy] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  const values = {
+    name: name.trim(), contact_name: contactName, contact_role: contactRole,
+    phone, email, segment, city, notes,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function save() {
+    if (account && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
     if (!name.trim()) return toast.error('Give the account a company name');
     setBusy(true);
     try {
@@ -594,10 +602,7 @@ function AccountFormModal({ account, onClose, onSaved }: {
       const res = await fetch(url, {
         method: account ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(), contact_name: contactName, contact_role: contactRole,
-          phone, email, segment, city, notes,
-        }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) return toast.error(data.error ?? 'Failed to save account');
@@ -722,17 +727,19 @@ function DealFormModal({ deal, presetAccountId, accounts, onClose, onSaved }: {
     }
   }
 
+  const values = { account_id: accountId, title: title.trim(), stage, owner, qty, value, substrate, next_action: nextAction, next_action_date: nextDate };
+  const { unchanged } = useUnchanged(values);
+
   async function save() {
+    if (deal && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
     if (!accountId) return toast.error('Choose an account');
     if (!title.trim()) return toast.error('Describe the job in a line');
-    if (deal) {
-      return patch({ account_id: accountId, title: title.trim(), stage, owner, qty, value, substrate, next_action: nextAction, next_action_date: nextDate }, 'Enquiry updated');
-    }
+    if (deal) return patch(values, 'Enquiry updated');
     setBusy(true);
     try {
       const res = await fetch('/api/register/deals', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account_id: accountId, title: title.trim(), stage, owner, qty, value, substrate, next_action: nextAction, next_action_date: nextDate }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) return toast.error(data.error ?? 'Failed to add enquiry');

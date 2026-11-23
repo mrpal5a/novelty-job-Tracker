@@ -172,6 +172,8 @@ export default function PrintingUnitsManager() {
   async function saveEdit(id: string) {
     const name = editName.trim();
     if (!name) return;
+    const unit = units.find((u) => u.id === id);
+    if (unit && name === unit.name && editMethod === unit.printing_method) { setEditId(null); return; }
     await patch(id, { name, printing_method: editMethod });
     setEditId(null);
   }

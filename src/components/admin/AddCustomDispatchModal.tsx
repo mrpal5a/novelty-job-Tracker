@@ -22,6 +22,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import PartyPicker from './PartyPicker';
 import type { Party, PendingDispatchNotification } from '@/lib/types';
 import type { LineChoice } from '@/lib/dispatchChecks';
@@ -113,8 +114,21 @@ export default function AddCustomDispatchModal({ existing, onClose, onSaved }: P
       .catch(() => toast.error('Failed to load the parties list'));
   }, []);
 
+  // What Save changes; an edit saved with none of it changed stays local.
+  const values = {
+    party:     party.trim(),
+    po_number: poNumber.trim(),
+    job_name:  jobName.trim() || undefined,
+    status,
+    qty:       qty.trim() ? Number(qty) : undefined,
+    remark:    remark.trim() || undefined,
+    pm_code:   pmCode.trim() || undefined,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (existing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!party.trim())    { toast.error('Choose a party'); return; }
     if (!poNumber.trim()) { toast.error('Enter a PO number'); return; }
@@ -126,17 +140,7 @@ export default function AddCustomDispatchModal({ existing, onClose, onSaved }: P
         {
           method:  existing ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            party:     party.trim(),
-            po_number: poNumber.trim(),
-            job_name:  jobName.trim() || undefined,
-            status,
-            qty:       qty.trim() ? Number(qty) : undefined,
-            remark:    remark.trim() || undefined,
-            pm_code:   pmCode.trim() || undefined,
-            confirm:   warnings.length > 0,
-            line_id:   lineId ?? undefined,
-          }),
+          body: JSON.stringify({ ...values, confirm: warnings.length > 0, line_id: lineId ?? undefined }),
         },
       );
       const data = await res.json();

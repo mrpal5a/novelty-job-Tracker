@@ -438,6 +438,7 @@ export default function NotesFeed({ deptName, deptKey, userEmail, username, isAd
   }
 
   async function saveEdit(note: NoteFeedItem, text: string) {
+    if (text === note.comment.trim()) { cancelEdit(); return; }
     const res = await fetch(`/api/notes/${note.id}`, {
       method:  'PATCH',
       headers: { 'Content-Type': 'application/json' },

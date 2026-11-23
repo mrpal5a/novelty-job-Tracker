@@ -168,6 +168,9 @@ export default function BomMaterialsManager({ canManage }: Props) {
   async function saveEdit(material: BomMaterial) {
     const body = validate(editDraft);
     if (!body) return;
+    // Saved as it was: close without rewriting the row.
+    if (body.name === material.name && body.specification === (material.specification ?? '')
+        && body.rate_per_sqm === Number(material.rate_per_sqm)) { setEditingId(null); return; }
     const ok = await patch(material, body, `${body.name} saved`);
     if (ok) setEditingId(null);
   }

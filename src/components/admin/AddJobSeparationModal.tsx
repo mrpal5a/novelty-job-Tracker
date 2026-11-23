@@ -21,6 +21,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import type { JobSeparation, Party, Plate } from '@/lib/types';
 import { isPlaceholderPm, metresFromPlates } from '@/lib/plateDie';
 import { formatNum } from '@/lib/meterCalculator';
@@ -190,8 +191,25 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
     onPick: selectParty, onClose: () => setShowPartySuggestions(false),
   });
 
+  // What Save sends; an edit saved with none of it changed stays local.
+  const values = {
+    party:         party.trim(),
+    po_no:         poNo.trim(),
+    po_date:       poDate,
+    pm_code:       pmCode.trim(),
+    material_name: materialName.trim(),
+    quantity:      quantity.trim(),
+    unit:          unit.trim(),
+    job_status:    jobStatus.trim(),
+    rate:          rate.trim(),
+    jc_status:     jcStatus.trim(),
+    aw_send_to:    awSendTo.trim(),
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (editing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!party.trim())        { toast.error('Enter the party'); return; }
     if (!partyConfirmed) {
@@ -209,19 +227,7 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
       const res = await fetch(editing ? `/api/job-separations/${editing.id}` : '/api/job-separations', {
         method:  editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          party:         party.trim(),
-          po_no:         poNo.trim(),
-          po_date:       poDate,
-          pm_code:       pmCode.trim(),
-          material_name: materialName.trim(),
-          quantity:      quantity.trim(),
-          unit:          unit.trim(),
-          job_status:    jobStatus.trim(),
-          rate:          rate.trim(),
-          jc_status:     jcStatus.trim(),
-          aw_send_to:    awSendTo.trim(),
-        }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) {

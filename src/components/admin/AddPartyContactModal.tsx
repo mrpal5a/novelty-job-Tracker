@@ -14,6 +14,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import PartyPicker from './PartyPicker';
 import type { Party, PartyContact } from '@/lib/types';
 import { WithExample } from '@/components/ui/FieldAffix';
@@ -48,8 +49,18 @@ export default function AddPartyContactModal({ existing, onClose, onSaved }: Pro
       .catch(() => toast.error('Failed to load the parties list'));
   }, []);
 
+  // What Save sends; an edit saved with none of it changed stays local.
+  const values = {
+    party:        party.trim(),
+    contact_name: contactName.trim() || undefined,
+    email:        email.trim() || undefined,
+    whatsapp:     whatsapp.trim() || undefined,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (existing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!party.trim()) { toast.error('Choose a party'); return; }
 
@@ -60,12 +71,7 @@ export default function AddPartyContactModal({ existing, onClose, onSaved }: Pro
         {
           method:  existing ? 'PATCH' : 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            party:        party.trim(),
-            contact_name: contactName.trim() || undefined,
-            email:        email.trim() || undefined,
-            whatsapp:     whatsapp.trim() || undefined,
-          }),
+          body: JSON.stringify(values),
         },
       );
       const data = await res.json();

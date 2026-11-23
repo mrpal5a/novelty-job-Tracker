@@ -44,6 +44,7 @@ export default function DeliveryDateEdit({ jobId, deliveryDate, dept, onUpdated,
   const canEdit = canDeptEditDeliveryDate(dept);
 
   async function handleSave() {
+    if (value === (deliveryDate ?? '')) { cancel(); return; }
     setLoading(true);
     try {
       const res = await fetch(`/api/jobs/${jobId}`, {

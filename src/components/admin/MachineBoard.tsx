@@ -802,6 +802,7 @@ function MachineRate({
   const [value, setValue]     = useState('');
 
   async function save() {
+    if (value === (machine.labels_per_hour ? String(machine.labels_per_hour) : '')) { setEditing(false); return; }
     const ok = await mutate(
       () => fetch(`/api/machines/${machine.id}`, {
         method:  'PATCH',

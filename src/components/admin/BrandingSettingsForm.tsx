@@ -12,6 +12,7 @@ import { Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import type { Branding } from '@/lib/branding-utils';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 
 const inputCls = cn(
   'w-full rounded-[10px] border border-brand-border bg-white px-3 text-[15px] text-brand-ink',
@@ -64,19 +65,24 @@ export default function BrandingSettingsForm({ initial }: { initial: Branding })
   const [saving, setSaving]         = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
 
+  const values = { name, shortName, productionName, address, supportEmail, returnAddress };
+  const { unchanged, markSaved } = useUnchanged(values);
+
   async function handleSave() {
+    if (unchanged) { toast(NOTHING_CHANGED); return; }
     setSaving(true);
     try {
       const res = await fetch('/api/settings/branding', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, shortName, productionName, address, supportEmail, returnAddress }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data?.error ?? 'Failed to save settings');
         return;
       }
+      markSaved();
       toast.success('Settings saved');
     } catch {
       toast.error('Network error. Please try again.');

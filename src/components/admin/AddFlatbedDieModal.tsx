@@ -12,6 +12,7 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import type { FlatbedDie } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 
@@ -56,8 +57,23 @@ export default function AddFlatbedDieModal({ editing, onClose, onSaved }: Props)
     }
   }
 
+  // What Save sends; an edit saved with none of it changed stays local.
+  const values = {
+    length:          length.trim(),
+    width:           width.trim(),
+    repeat_length:   repeatLength.trim(),
+    ups:             ups.trim(),
+    gap:             gap.trim(),
+    corner:          corner.trim(),
+    shape:           shape.trim(),
+    location:        location.trim(),
+    die_received_on: receivedOn,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (editing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!length.trim())       { toast.error('Enter the length'); return; }
     if (!width.trim())        { toast.error('Enter the width'); return; }
@@ -74,17 +90,7 @@ export default function AddFlatbedDieModal({ editing, onClose, onSaved }: Props)
       const res = await fetch(editing ? `/api/flatbed-dies/${editing.id}` : '/api/flatbed-dies', {
         method:  editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          length:          length.trim(),
-          width:           width.trim(),
-          repeat_length:   repeatLength.trim(),
-          ups:             ups.trim(),
-          gap:             gap.trim(),
-          corner:          corner.trim(),
-          shape:           shape.trim(),
-          location:        location.trim(),
-          die_received_on: receivedOn,
-        }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) {

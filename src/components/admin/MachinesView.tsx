@@ -627,6 +627,7 @@ function RateEditor({ machine, busy, mutate, onDone }: {
   const [value, setValue] = useState(machine.labels_per_hour ? String(machine.labels_per_hour) : '');
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (value === (machine.labels_per_hour ? String(machine.labels_per_hour) : '')) { onDone(); return; }
     const ok = await mutate(() => fetch(`/api/machines/${machine.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ labels_per_hour: value === '' ? null : value }),

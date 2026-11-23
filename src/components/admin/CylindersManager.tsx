@@ -21,6 +21,7 @@ import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 
 type SortField = 'serial_no' | 'teeth' | 'type' | 'manufacturer' | 'purchase_date';
@@ -346,14 +347,18 @@ function CylinderModal({ editing, copyOf, onClose, onSaved }: { editing?: Cylind
   const n = Number(teeth);
   const repeat = Number.isInteger(n) && n > 0 ? mm(n) : '—';
 
+  const values = { serial_no: serial, teeth, type, manufacturer, purchase_date: purchaseDate };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (editing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
     setSaving(true);
     try {
       const res = await fetch(editing ? `/api/cylinders/${editing.id}` : '/api/cylinders', {
         method:  editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ serial_no: serial, teeth, type, manufacturer, purchase_date: purchaseDate }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error ?? 'Failed to save cylinder'); return; }
