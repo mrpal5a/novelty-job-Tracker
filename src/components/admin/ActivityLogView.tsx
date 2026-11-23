@@ -195,7 +195,9 @@ export default function ActivityLogView({ people, departments }: {
 
           {/* Desk: table */}
           <div className="glass hidden overflow-hidden rounded-xl sm:block">
-            <div className="table-scroll-wrapper max-h-[70vh] overflow-y-auto">
+            {/* relative: the rows' sr-only spans are absolute; without a positioned
+                box here they sit on the page and stretch it to the table's full height. */}
+            <div className="table-scroll-wrapper relative max-h-[70vh] overflow-y-auto">
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
