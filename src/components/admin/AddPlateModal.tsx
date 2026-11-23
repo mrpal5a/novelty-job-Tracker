@@ -13,12 +13,14 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import type { Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import PartySuggestInput from './PartySuggestInput';
-import { colorBoxes, dieUpsFor, widthGapMm, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
+import { colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
+import { useAutoFill } from '@/hooks/useAutoFill';
 
 const COLOR_COUNTS = Array.from({ length: 12 }, (_, i) => i + 1);
 
@@ -66,22 +68,11 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     setItemName(fillIfUntouched(itemName, prev.item, lastFill.current.item));
   });
 
-  // Sizes + cylinder → the die cut for them: its ups is this plate's label
-  // per round, and the note says which die and where it sits.
+  // Sizes + cylinder → the dies cut for them, offered in the Roto die list.
   const [dieUps, setDieUps] = useState<DieUps | null>(null);
-  const lastUps = useRef('');   // what this lookup last wrote, '' if nothing
-  const lprNow = useRef(labelPerRound);
-  lprNow.current = labelPerRound;
   useEffect(() => {
     const a = parseFloat(acrossSize), b = parseFloat(aroundSize), cyl = parseFloat(cylinder);
-    // Takes back its own fill when the die no longer matches; a typed value stays.
-    const refill = (next: string) => {
-      const current = lprNow.current;
-      if (current.trim() && current !== lastUps.current) return;
-      lastUps.current = next;
-      setLabelPerRound(next);
-    };
-    if (!(a > 0 && b > 0 && cyl > 0)) { setDieUps(null); refill(''); return; }
+    if (!(a > 0 && b > 0 && cyl > 0)) { setDieUps(null); return; }
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
@@ -91,30 +82,20 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
         const found = dieUpsFor((await res.json()).dies ?? [], acrossSize, aroundSize, cylinder);
         if (cancelled) return;
         setDieUps(found);
-        refill(found.ups !== null ? String(found.ups) : '');
       } catch {
-        // Best-effort: label per round can still be typed.
+        // Best-effort: a die can still be linked from another plate's size.
       }
     }, 400);
     return () => { cancelled = true; clearTimeout(timer); };
   }, [acrossSize, aroundSize, cylinder]);
   const matchedDie = dieUps?.dies[0];
 
-  // Width gap follows cylinder, width ups and width size. Like label per
-  // round above, it only replaces its own fill: a gap typed by hand stays.
-  // Seeded with the saved plate's sum, so a gap that was worked out still
-  // follows a corrected cylinder.
-  const layoutNow = useRef(layout);
-  layoutNow.current = layout;
-  const lastGap = useRef(String(widthGapMm(cylinder, layout.around_ups, aroundSize) ?? ''));
+  // Width gap follows cylinder, width ups and width size; label per round
+  // is height ups × width ups. A value typed by hand stays (useAutoFill).
   const autoGap = widthGapMm(cylinder, layout.around_ups, aroundSize);
-  useEffect(() => {
-    const next = autoGap === null ? '' : String(autoGap);
-    const current = layoutNow.current.around_gap;
-    if ((current.trim() && current !== lastGap.current) || current === next) return;
-    lastGap.current = next;
-    setLayout({ ...layoutNow.current, around_gap: next });
-  }, [autoGap]);
+  useAutoFill(autoGap, layout.around_gap, (v) => setLayout((l) => ({ ...l, around_gap: v })));
+  const autoLpr = labelsPerRound(layout.across_ups, layout.around_ups);
+  useAutoFill(autoLpr, labelPerRound, setLabelPerRound);
   const dieChoices = dieUps?.dies ?? [];
 
   // Picking a die brings its layout in, when it has one; the database then
@@ -125,8 +106,32 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     if (die && LAYOUT_KEYS.some((k) => die[k] != null)) setLayout(layoutState(die));
   }
 
+  // Each line the team enters is its own etched plate ID; drop blank
+  // lines from stray Enters and store the rest newline-joined.
+  const plateIdNormalized = plateId.split('\n').map((line) => line.trim()).filter(Boolean).join('\n');
+  // What Save sends; an edit saved with none of it changed stays local.
+  const values = {
+    party:           party.trim(),
+    pm_code:         pmCode.trim(),
+    item_name:       itemName.trim(),
+    across_size:     acrossSize.trim(),
+    around_size:     aroundSize.trim(),
+    cylinder,
+    plate_id:        plateIdNormalized,
+    plate_date:      plateDate,
+    label_per_round: labelPerRound,
+    location:        location.trim(),
+    total_colors:    totalColors,
+    colors:          colorCount ? colors.slice(0, colorCount) : null,
+    die_id:          dieId,
+    ...layout,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (editing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!party.trim()) {
       toast.error('Enter the party this plate belongs to');
@@ -135,33 +140,10 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
 
     setSaving(true);
     try {
-      // Each line the team enters is its own etched plate ID; drop blank
-      // lines from stray Enters and store the rest newline-joined.
-      const plateIdNormalized = plateId
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .join('\n');
-
       const res = await fetch(editing ? `/api/plates/${editing.id}` : '/api/plates', {
         method:  editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          party:           party.trim(),
-          pm_code:         pmCode.trim(),
-          item_name:       itemName.trim(),
-          across_size:     acrossSize.trim(),
-          around_size:     aroundSize.trim(),
-          cylinder,
-          plate_id:        plateIdNormalized,
-          plate_date:      plateDate,
-          label_per_round: labelPerRound,
-          location:        location.trim(),
-          total_colors:    totalColors,
-          colors:          colorCount ? colors.slice(0, colorCount) : null,
-          die_id:          dieId,
-          ...layout,
-        }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -330,9 +312,11 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                   </option>
                 ))}
               </select>
-              {!dieUps && !dieId && (
+              {!dieId && (
                 <span className="block text-[11px] text-[var(--glass-muted)] mt-1">
-                  Enter both sizes and the cylinder to list its dies.
+                  {!dieUps
+                    ? 'Enter both sizes and the cylinder to list its dies.'
+                    : !matchedDie && 'No die of this size and cylinder.'}
                 </span>
               )}
             </label>
@@ -341,21 +325,18 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
               <input
                 type="number"
                 inputMode="numeric"
+                aria-label="Label per round"
                 value={labelPerRound}
                 onChange={(e) => setLabelPerRound(e.target.value)}
                 className={cn(inputCls, 'font-mono')}
               />
-              {dieUps && (
-                <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
-                  {!matchedDie
-                    ? 'No die of this size and cylinder.'
-                    : dieUps.ups !== null
-                      ? `${dieUps.ups} ups, from die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''}.`
-                      : dieUps.options.length
-                        ? `Dies for this size have ${dieUps.options.join(' or ')} ups: enter yours.`
-                        : `Die ${matchedDie.serial_no ?? matchedDie.job_name}${matchedDie.location ? ` · location: ${matchedDie.location}` : ''} has no ups recorded.`}
-                </p>
-              )}
+              <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                {autoLpr === null
+                  ? 'Fills in from height ups × width ups.'
+                  : labelPerRound === String(autoLpr)
+                    ? `${layout.across_ups} × ${layout.around_ups} = ${autoLpr} (height ups × width ups).`
+                    : `Typed by hand; height ups × width ups is ${autoLpr}.`}
+              </p>
             </div>
           </div>
 

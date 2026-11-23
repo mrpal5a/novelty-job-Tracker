@@ -27,6 +27,12 @@ export function widthGapMm(cylinder: string, widthUps: string, widthSize: string
   return gap >= 0 ? Math.round(gap * 100) / 100 : null;
 }
 
+// Label per round = height ups × width ups. Null until both are whole numbers above 0.
+export function labelsPerRound(heightUps: string, widthUps: string): number | null {
+  const h = Number(heightUps), w = Number(widthUps);
+  return Number.isInteger(h) && Number.isInteger(w) && h > 0 && w > 0 ? h * w : null;
+}
+
 // Request body → layout columns, for the keys the body carries. Blank or
 // unreadable means not recorded; ups are whole, gaps keep their decimals.
 // Out-of-range values are left for the table's CHECKs to refuse.

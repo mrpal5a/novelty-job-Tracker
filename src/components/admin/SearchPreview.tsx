@@ -186,7 +186,7 @@ function fieldsFor(kind: PreviewTarget['kind'], d: Data): Field[] {
         ['Job', str(d.job_name)],
         ['Size', size(d.length, d.width), true],
         ['Cylinder', d.cylinder != null ? `${d.cylinder}T` : null, true],
-        ['Ups', str(d.ups), true],
+        ['Labels / round', str(d.ups), true],
         ['Height gap', d.across_gap != null ? `${d.across_gap} mm` : null, true],
         ['Shape', str(d.shape)],
         ['Corner', str(d.corner)],

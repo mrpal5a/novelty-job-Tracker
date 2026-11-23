@@ -2,9 +2,9 @@
 // src/components/admin/AddDieModal.tsx
 // Entering a die off the Prepress sheet, or correcting one already entered.
 //
-// The field order is the sheet's column order deliberately: whoever is typing
-// is reading across a printed row, and reordering the form would make every
-// entry a lookup instead of a straight copy.
+// The field order follows the sheet's columns, except cylinder and material
+// come before the layout: the width gap is worked out from the cylinder, as
+// on the plate form.
 
 import React, { useState, useId, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -13,12 +13,14 @@ import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
+import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
 import { DIE_STATUSES, type Die, type DieStatus } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { dieListQuery } from '@/lib/listQueries';
-import { dieUpsFor, commonValues } from '@/lib/plateDie';
+import { dieUpsFor, commonValues, labelsPerRound, widthGapMm } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { istToday } from '@/lib/jobViews';
+import { useAutoFill } from '@/hooks/useAutoFill';
 
 const NO_DIES: Die[] = [];
 
@@ -68,21 +70,52 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   const [layout, setLayout] = useState<LayoutState>(() => layoutState(editing));
   const [saving, setSaving] = useState(false);
 
+  // Label per round = height ups × width ups, as on the plate form; a count
+  // typed by hand stays.
+  const autoLpr = labelsPerRound(layout.across_ups, layout.around_ups);
+  useAutoFill(autoLpr, ups, setUps);
+  // Width gap = cylinder × 3.175 ÷ width ups − width, as on the plate form.
+  const autoGap = widthGapMm(cylinder, layout.around_ups, width);
+  useAutoFill(autoGap, layout.around_gap, (v) => setLayout((l) => ({ ...l, around_gap: v })));
+  const gapIsAuto = autoGap !== null && layout.around_gap === String(autoGap);
+
   // Same cylinder and whole-mm size either way round — the plate matcher's rule.
   const twins = useMemo(
     () => dieUpsFor(allDies, length, width, cylinder).dies.filter((d) => d.id !== editing?.id),
     [allDies, length, width, cylinder, editing?.id],
   );
 
+  // What Save sends; an edit saved with none of it changed stays local.
+  const values = {
+    job_name:        jobName.trim(),
+    length:          length.trim(),
+    width:           width.trim(),
+    cylinder:        cylinder.trim(),
+    material:        material.trim(),
+    ups:             ups.trim(),
+    shape:           shape.trim(),
+    corner:          corner.trim(),
+    serial_no:       serialNo.trim(),
+    die_received_on: receivedOn,
+    location:        location.trim(),
+    status,
+    damage_date:     status === 'DAMAGE' ? damageDate.trim()   : '',
+    damage_reason:   status === 'DAMAGE' ? damageReason.trim() : '',
+    ...layout,
+  };
+  const { unchanged } = useUnchanged(values);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (editing && unchanged) { toast(NOTHING_CHANGED); onClose(); return; }
 
     if (!jobName.trim())    { toast.error('Enter the job this die was cut for'); return; }
     if (!length.trim())     { toast.error('Enter the height'); return; }
     if (!width.trim())      { toast.error('Enter the width'); return; }
     if (!cylinder.trim())   { toast.error('Enter the cylinder'); return; }
     if (!material.trim())   { toast.error('Enter the material'); return; }
-    if (!ups.trim())        { toast.error('Enter the ups per repeat'); return; }
+    if (!ups.trim())        { toast.error('Enter the label per round'); return; }
     if (!corner.trim())     { toast.error('Enter the corner radius'); return; }
     if (!serialNo.trim())   { toast.error('Enter the serial no'); return; }
     if (!receivedOn.trim()) { toast.error('Enter the date the die was first used'); return; }
@@ -97,23 +130,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
       const res = await fetch(editing ? `/api/dies/${editing.id}` : '/api/dies', {
         method:  editing ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          job_name:        jobName.trim(),
-          length:          length.trim(),
-          width:           width.trim(),
-          cylinder:        cylinder.trim(),
-          material:        material.trim(),
-          ups:             ups.trim(),
-          shape:           shape.trim(),
-          corner:          corner.trim(),
-          serial_no:       serialNo.trim(),
-          die_received_on: receivedOn,
-          location:        location.trim(),
-          status,
-          damage_date:     status === 'DAMAGE' ? damageDate.trim()   : '',
-          damage_reason:   status === 'DAMAGE' ? damageReason.trim() : '',
-          ...layout,
-        }),
+        body: JSON.stringify(values),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -163,20 +180,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </WithExample>
           </div>
 
-          {/* Height = length, Width = width, as on the plate form. */}
-          <LayoutFields
-            value={layout}
-            onChange={setLayout}
-            inputClassName={inputCls}
-            sizes={{
-              across: length,
-              around: width,
-              required: true,
-              onChange: (side, v) => (side === 'across' ? setLength : setWidth)(v),
-            }}
-            note="Sizes are required. Ups and gaps are shared with every plate linked to this die."
-          />
-
+          {/* What the die runs on comes first: the width gap below is worked out from it. */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <DieLabel required>Cylinder</DieLabel>
@@ -184,6 +188,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
                   <input
                   type="number"
                   inputMode="numeric"
+                  aria-label="Cylinder in teeth"
                   value={cylinder}
                   onChange={(e) => setCylinder(e.target.value)}
                   className={cn(inputCls, 'font-mono')}
@@ -204,6 +209,24 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </div>
           </div>
 
+          {/* Height = length, Width = width, as on the plate form. */}
+          <LayoutFields
+            value={layout}
+            onChange={setLayout}
+            inputClassName={inputCls}
+            auto={{ around_gap: gapIsAuto }}
+            sizes={{
+              across: length,
+              around: width,
+              required: true,
+              onChange: (side, v) => (side === 'across' ? setLength : setWidth)(v),
+            }}
+            note={<>
+              {gapIsAuto && <>Width gap {autoGap} = {cylinder} × 3.175 ÷ {layout.around_ups} − {width}. </>}
+              Sizes are required. Ups and gaps are shared with every plate linked to this die.
+            </>}
+          />
+
           {twins.length > 0 && (
             <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
               <p className="font-semibold">
@@ -212,7 +235,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
               <ul className="mt-1 space-y-0.5">
                 {twins.slice(0, 3).map((d) => (
                   <li key={d.id}>
-                    {d.job_name} · {d.location || 'no location'} · {d.status}{d.ups != null && ` · ${d.ups} ups`}
+                    {d.job_name} · {d.location || 'no location'} · {d.status}{d.ups != null && ` · ${d.ups} per round`}
                   </li>
                 ))}
               </ul>
@@ -221,16 +244,22 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <DieLabel required>Ups per repeat</DieLabel>
-              <WithUnit unit="ups">
-                  <input
-                  type="number"
-                  inputMode="numeric"
-                  value={ups}
-                  onChange={(e) => setUps(e.target.value)}
-                  className={cn(inputCls, 'font-mono')}
-                />
-              </WithUnit>
+              <DieLabel required>Label per round</DieLabel>
+              <input
+                type="number"
+                inputMode="numeric"
+                aria-label="Label per round"
+                value={ups}
+                onChange={(e) => setUps(e.target.value)}
+                className={cn(inputCls, 'font-mono')}
+              />
+              <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+                {autoLpr === null
+                  ? 'Fills in from height ups × width ups.'
+                  : ups === String(autoLpr)
+                    ? `${layout.across_ups} × ${layout.around_ups} = ${autoLpr} (height ups × width ups).`
+                    : `Typed by hand; height ups × width ups is ${autoLpr}.`}
+              </p>
             </div>
             <div>
               <DieLabel>Shape</DieLabel>

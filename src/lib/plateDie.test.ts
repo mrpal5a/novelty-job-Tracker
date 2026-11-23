@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dieUpsFor, commonValues, flatbedDiesFor, layoutFrom, widthGapMm, metresFromPlates, colorBoxes, colorsFrom } from './plateDie';
+import { dieUpsFor, commonValues, flatbedDiesFor, layoutFrom, widthGapMm, labelsPerRound, metresFromPlates, colorBoxes, colorsFrom } from './plateDie';
 import type { Die, FlatbedDie, Plate } from '@/lib/types';
 
 const die = (length: string, width: string, cylinder: number, ups: number | null, status = 'IN USE') =>
@@ -62,6 +62,15 @@ describe('width gap from the cylinder', () => {
     expect(widthGapMm('', '2', '146')).toBeNull();
     expect(widthGapMm('95', '0', '146')).toBeNull();
     expect(widthGapMm('95', '3', '146')).toBeNull();    // 100.5 − 146 < 0
+  });
+});
+
+describe('label per round from the layout', () => {
+  it('is height ups × width ups, once both are whole numbers', () => {
+    expect(labelsPerRound('3', '4')).toBe(12);
+    expect(labelsPerRound('', '4')).toBeNull();
+    expect(labelsPerRound('0', '4')).toBeNull();
+    expect(labelsPerRound('2.5', '4')).toBeNull();
   });
 });
 

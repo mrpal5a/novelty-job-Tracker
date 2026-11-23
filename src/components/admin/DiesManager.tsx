@@ -34,7 +34,7 @@ const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
 // <td>s rendered below.
 const DIE_COLUMNS = [
   'Sr No', 'Serial No', 'Job Name', 'Corner', 'Size', 'Cylinder', 'Material',
-  'Location', 'Height gap', 'Ups / repeat', 'First Used', 'Actions',
+  'Location', 'Height gap', 'Labels / round', 'First Used', 'Actions',
 ] as const;
 const DIE_COLS = DIE_COLUMNS.length;
 
@@ -61,7 +61,7 @@ const COLUMN_SORT_FIELDS: Partial<Record<typeof DIE_COLUMNS[number], SortField>>
   'Material':      'material',
   'Location':      'location',
   'Height gap':    'across_gap',
-  'Ups / repeat':  'ups',
+  'Labels / round':  'ups',
   'First Used':    'die_received_on',
 };
 
@@ -110,7 +110,7 @@ const DIE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }[]
   { value: 'cylinder',  label: 'Cylinder',      placeholder: 'Search by cylinder' },
   { value: 'shape',     label: 'Shape',         placeholder: 'Search by shape' },
   { value: 'height_gap', label: 'Height gap',   placeholder: 'Search by height gap (mm)' },
-  { value: 'ups',       label: 'Ups / repeat',  placeholder: 'Search by ups / repeat' },
+  { value: 'ups',       label: 'Labels / round',  placeholder: 'Search by labels per round' },
 ];
 
 // Sr No isn't a stored field — it's each die's rank by created_at among the
@@ -408,7 +408,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                       <SpecField label="Material" value={die.material} />
                       <SpecField label="Location" value={die.location} />
                       <SpecField label="Height gap" value={die.across_gap != null ? `${die.across_gap} mm` : null} />
-                      <SpecField label="Ups / repeat" value={die.ups?.toString()} mono />
+                      <SpecField label="Labels / round" value={die.ups?.toString()} mono />
                       <SpecField label="First used" value={formatNumericDate(die.die_received_on)} mono />
                     </div>
 
@@ -484,7 +484,7 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
                         col === 'Job Name' && 'min-w-[220px]',
                         // Short values under long labels: let the label wrap so the
                         // table fits a 1366 px screen without a sideways scroll.
-                        ['Corner', 'Material', 'Height gap', 'Ups / repeat', 'First Used'].includes(col) && 'whitespace-normal',
+                        ['Corner', 'Material', 'Height gap', 'Labels / round', 'First Used'].includes(col) && 'whitespace-normal',
                         // Sr No is the team's floor reference number — keep it pinned to the
                         // left edge through both scroll axes so it's always visible. z-20
                         // (above the plain top-sticky headers at z-10) so it stays on top at
