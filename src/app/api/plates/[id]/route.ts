@@ -21,6 +21,8 @@ const TEXT_FIELDS = [
   'across_size',
   'around_size',
   'material',
+  'direction',
+  'roll_sheet',
   'plate_id',
   'plate_date',
   'location',

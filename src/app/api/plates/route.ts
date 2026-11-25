@@ -156,6 +156,8 @@ export async function POST(request: NextRequest) {
       around_size:     optionalText(body.around_size),
       cylinder:        optionalInt(body.cylinder),
       material:        optionalText(body.material),
+      direction:       optionalText(body.direction),
+      roll_sheet:      optionalText(body.roll_sheet),
       plate_id:        optionalText(body.plate_id),
       plate_date:      optionalText(body.plate_date),
       label_per_round: optionalInt(body.label_per_round),

@@ -207,6 +207,8 @@ export interface Plate extends DieLayout {
   around_size: string | null;     // AROUND SIZE (W)
   cylinder: number | null;        // CYLINDER
   material: string | null;        // paper material, spelt as on the dies (migration 109)
+  direction: string | null;       // way the labels unwind, one of DIRECTIONS (migration 112)
+  roll_sheet: 'ROLL' | 'SHEET' | null; // how its labels are supplied (migration 112)
   plate_id: string | null;        // PLATE ID — identifier etched on the plate
   plate_date: string | null;      // PLATE DATE — ISO date string
   label_per_round: number | null; // LABEL PER ROUND

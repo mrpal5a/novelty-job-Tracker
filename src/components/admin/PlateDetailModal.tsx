@@ -16,7 +16,7 @@ import { DieHover } from './DiePicker';
 import type { Die, Plate } from '@/lib/types';
 import { dieListQuery, flatbedDieListQuery } from '@/lib/listQueries';
 import { dieItem } from '@/lib/related';
-import { dieUpsFor, flatbedDiesFor, layoutPair, sameMaterial } from '@/lib/plateDie';
+import { FORMS, dieUpsFor, flatbedDiesFor, layoutPair, sameMaterial } from '@/lib/plateDie';
 
 type MatchedDie = {
   id: string;
@@ -102,6 +102,8 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
             <Detail label="Size (height × width)" value={size} mono />
             <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
             <Detail label="Material" value={plate.material} />
+            <Detail label="Roll / sheet" value={FORMS.find((f) => f.value === plate.roll_sheet)?.label} />
+            <Detail label="Unwind" value={plate.direction} mono />
             <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
             <Detail label="Total colours" value={plate.total_colors?.toString()} mono />
             {plate.colors && (

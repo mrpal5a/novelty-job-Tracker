@@ -69,7 +69,7 @@ async function loadLine(db: SupabaseClient, id: string) {
   return line ? { line, cards: rows<JobCardRow>(cardRes) } : null;
 }
 
-const nothing = { plates: [], dies: [], flatbedDies: [], shadeCards: [], bom: [], stockWidths: [], lastCards: [], artworks: [], papers: [], linkable: [] };
+const nothing = { plates: [], dies: [], flatbedDies: [], shadeCards: [], bom: [], lastCards: [], artworks: [], papers: [], linkable: [] };
 
 /** For departments that only look: the line and its issued cards. */
 export async function loadIssuedCards(db: SupabaseClient, id: string): Promise<JobCardSources | null> {
@@ -107,7 +107,7 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
   const shadeFilter = anyOf(ids(cards.map((c) => c.shade_card_id)));
   const bomFilter = anyOf(line.id ? [line.id] : []);
 
-  const [plateRes, shadeRes, bomRes, rollRes, flatRes, paperRes] = await Promise.all([
+  const [plateRes, shadeRes, bomRes, flatRes, paperRes] = await Promise.all([
     plateFilter ? db.from('plates').select('*').or(plateFilter).order('created_at', { ascending: false }) : null,
     shadeFilter ? db.from('shade_cards').select('id, product_name, shade_card_number, status, making_status')
       .eq('is_current', true).or(shadeFilter).order('updated_at', { ascending: false }) : null,
@@ -116,7 +116,6 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
       .select('job_separation_id, material_id, material_width_mm, bom_materials(name), job_separations!inner(pm_code)')
       .or(bomFilter, { referencedTable: 'job_separations' })
       .not('material_id', 'is', null).order('updated_at', { ascending: false }).limit(20) : null,
-    db.from('paper_rolls').select('width_mm'),
     db.from('flatbed_dies').select('*'),
     db.from('bom_materials').select('name, specification').eq('is_active', true).order('name'),
   ]);
@@ -157,6 +156,5 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
     flatbedDies: rows<FlatbedDie>(flatRes),
     papers: rows<JobCardSources['papers'][number]>(paperRes),
     shadeCards: shadeRes ? rows<JobCardSources['shadeCards'][number]>(shadeRes) : [],
-    stockWidths: Array.from(new Set(rows<{ width_mm: number }>(rollRes).map((r) => Number(r.width_mm)))),
   };
 }

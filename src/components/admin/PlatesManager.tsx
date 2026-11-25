@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button';
 import { csvDate, csvTimestamp, type CsvColumn } from '@/lib/export/csv';
 import type { SortDir } from '@/lib/sort';
 import type { Plate } from '@/lib/types';
+import { FORMS } from '@/lib/plateDie';
 import CsvExportButton from './CsvExportButton';
 import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
@@ -105,6 +106,8 @@ const PLATE_EXPORT_COLUMNS: CsvColumn<Plate>[] = [
   { header: 'Width',           value: (p) => p.around_size },
   { header: 'Cylinder',        value: (p) => p.cylinder },
   { header: 'Material',        value: (p) => p.material },
+  { header: 'Roll / Sheet',    value: (p) => p.roll_sheet },
+  { header: 'Unwind',          value: (p) => p.direction },
   { header: 'Label Per Round', value: (p) => p.label_per_round },
   { header: 'Location',        value: (p) => p.location },
   { header: 'Plate Date',      value: (p) => csvDate(p.plate_date) },
@@ -346,6 +349,8 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                         <SpecField label="Size" value={sizeOf(plate)} mono />
                         <SpecField label="Cylinder" value={plate.cylinder?.toString()} mono />
                         <SpecField label="Material" value={plate.material} />
+                        <SpecField label="Roll / sheet" value={FORMS.find((f) => f.value === plate.roll_sheet)?.label} />
+                        <SpecField label="Unwind" value={plate.direction} mono />
                         <SpecField label="Labels / round" value={plate.label_per_round?.toString()} mono />
                         <SpecField label="Location" value={plate.location} />
                         <SpecField label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />

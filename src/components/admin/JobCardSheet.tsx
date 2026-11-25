@@ -53,6 +53,8 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
   const inks = (p.colors as (string | null)[] | null) ?? [];
   const boxes = Array.from({ length: Math.max(MIN_COLOR_BOXES, inks.length) }, (_, i) => inks[i] ?? '');
   const inkSize = boxes.length > 10 ? 'text-[9px]' : 'text-[11px]';
+  // A line's only card has the line's own number: it isn't printed twice.
+  const ownNumber = number !== p.sepLine;
   const perRoll = [p.labelsPerRoll, p.rollMetres].filter((v) => v != null).join(' / ');
 
   return (
@@ -64,9 +66,9 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
             {branding.returnAddress.split('\n').map((l) => l.trim()).filter(Boolean).join(' ')}
           </p>
         </div>
-        <Cell span="col-span-2" label="Prepared by" value={p.preparedBy} valueClass="uppercase" />
-        <Cell span="col-span-2" label="Job card number" value={number} />
-        <Cell span="col-span-2" label="Sep. line no" value={p.sepLine} />
+        <Cell span={ownNumber ? 'col-span-2' : 'col-span-3'} label="Prepared by" value={p.preparedBy} valueClass="uppercase" />
+        {ownNumber && <Cell span="col-span-2" label="Job card number" value={number} />}
+        <Cell span={ownNumber ? 'col-span-2' : 'col-span-3'} label="Sep. line no" value={p.sepLine} />
         <Cell span="col-span-4" label="PO number" value={p.poNumber} />
         <Cell span="col-span-2" label="PO date" value={p.poDate} />
         <Cell span="col-span-4" label="Party" value={p.party} />

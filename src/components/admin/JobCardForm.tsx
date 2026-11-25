@@ -23,7 +23,7 @@ import PlateFinder from '@/components/admin/PlateFinder';
 import ArtworkBox from '@/components/admin/ArtworkBox';
 import { inkColor } from '@/lib/pantone';
 import { useParties } from '@/hooks/useReferenceData';
-import { colorBoxes, MAX_COLORS } from '@/lib/plateDie';
+import { colorBoxes, DIRECTIONS, FORMS, MAX_COLORS } from '@/lib/plateDie';
 import {
   JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, materialForPlate, materialOptions, plateUpdates, resolveJobCard,
   type Field, type JobCardInput, type JobCardRow, type JobCardSources, type Layout, type ManualOrder, type OverrideKey, type PrintedCard,
@@ -181,6 +181,9 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
   // A plate with no material learns it from the card: a pick or the last card's, never a suggestion.
   const newMaterial = canEditPlates && basePlate && !basePlate.material?.trim() && (d.material.source === 'picked' || d.material.source === 'last_card')
     ? materialForPlate(d.material.value, sources) : null;
+  const newDirection = canEditPlates && basePlate && !basePlate.direction && d.direction.value && DIRECTIONS.includes(d.direction.value) ? d.direction.value : null;
+  const newRollSheet = canEditPlates && basePlate && !basePlate.roll_sheet ? d.rollSheet.value : null;
+  const noteOf = (f: Field<unknown>, toPlate: unknown) => [sourceNote(f), toPlate && 'Also saved on the plate'].filter(Boolean).join('. ') || undefined;
   const numberBox = !input.manual ? null : card?.card_number ? <Read label="Job card number" f={{ value: card.card_number, source: 'auto' }} />
     : <Typed label="Job card number" f={{ value: input.manual.number, source: 'auto', note: 'Yours to choose, but not like NOV26-55: those are Job Separation’s' }} onCommit={(v) => setManual({ number: v.toUpperCase() || null })} />;
   const dirty = JSON.stringify(input) !== JSON.stringify(saved) || stations !== null || acrossGap !== null;
@@ -218,7 +221,7 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
     // Without the plate permission the card keeps its own die; the plate is left alone.
     if (basePlate && canEditPlates) {
       const pickedDie = d.die.source === 'picked' ? d.die.value : null;
-      const updates = plateUpdates(basePlate, pickedDie, { colors: stations ?? undefined, acrossGap, material: newMaterial });
+      const updates = plateUpdates(basePlate, pickedDie, { colors: stations ?? undefined, acrossGap, material: newMaterial, direction: newDirection, rollSheet: newRollSheet });
       for (const body of updates) await send(`/api/plates/${basePlate.id}`, 'PATCH', body);
       if (updates.length) queryClient.invalidateQueries({ queryKey: ['plates'] });
     }
@@ -251,8 +254,18 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
       <header className="flex flex-wrap items-start justify-between gap-3 px-4 sm:px-6 py-4 border-b border-black/[0.08]">
         <div className="min-w-0">
           <p className="text-xs text-brand-muted">Job card</p>
-          <h1 className="text-[22px] leading-7 sm:text-[28px] sm:leading-9 font-semibold font-mono text-brand-ink">{number}</h1>
-          <p className="text-sm text-brand-muted break-words">{[d.party.value, d.jobName.value].filter(Boolean).join(' · ')}</p>
+          {/* A line's only card has the Sep. line number: the job names it instead. Parts (-1, -2) and manual cards have their own. */}
+          {!input.manual && number === d.sepLine.value && d.jobName.value ? (
+            <>
+              <h1 className="text-lg sm:text-xl font-semibold text-brand-ink break-words">{d.jobName.value}</h1>
+              <p className="text-sm text-brand-muted break-words">{d.party.value}</p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-[22px] leading-7 sm:text-[28px] sm:leading-9 font-semibold font-mono text-brand-ink">{number}</h1>
+              <p className="text-sm text-brand-muted break-words">{[d.party.value, d.jobName.value].filter(Boolean).join(' · ')}</p>
+            </>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StateChip label={state.label} dot={state.color} className="mr-1" />
@@ -354,10 +367,12 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
             )}
             <Typed label="Material width" type="number" f={d.materialWidth} onCommit={(v) => set({ material_width_mm: v ? Number(v) : null })} />
             <Typed label="Meter" f={d.metres} onCommit={override('metres')} />
-            <Choose label="Roll / sheet" note={sourceNote(d.rollSheet)} value={d.rollSheet.value ?? ''} empty="Roll or sheet?"
-              options={[{ id: 'ROLL', text: 'ROLL' }, { id: 'SHEET', text: 'SHEET' }]}
+            <Choose label="Roll / sheet" note={noteOf(d.rollSheet, newRollSheet)} value={d.rollSheet.value ?? ''} empty="Roll or sheet?"
+              options={FORMS.map((f) => ({ id: f.value, text: f.label }))}
               onPick={(v) => set({ roll_sheet: (v || null) as JobCardInput['roll_sheet'] })} />
-            <Typed label="Direction" f={d.direction} list={Array.from({ length: 8 }, (_, i) => `UNWIND#${i + 1}`)} onCommit={(v) => set({ direction: v.toUpperCase() || null })} />
+            <Choose label="Direction" note={noteOf(d.direction, newDirection)} value={d.direction.value ?? ''} empty="Which unwind?"
+              options={Array.from(new Set([...DIRECTIONS, ...(d.direction.value ? [d.direction.value] : [])]), (v) => ({ id: v, text: v }))}
+              onPick={(v) => set({ direction: v || null })} />
             <Typed label="Labels per roll" type="number" f={d.labelsPerRoll} onCommit={(v) => set({ labels_per_roll: v ? Number(v) : null })} />
             <Typed label="Metres per roll" f={d.rollMetres} optional onCommit={override('rollMetres')} />
           </Group>

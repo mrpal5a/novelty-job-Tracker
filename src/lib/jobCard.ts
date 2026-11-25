@@ -14,7 +14,7 @@ import type { ArtworkRow } from '@/lib/artwork';
 import { repeatLengthMm } from '@/lib/cylinders';
 import { isIsoDate } from '@/lib/jobViews';
 import { round2 } from '@/lib/meterCalculator';
-import { LAYOUT_KEYS, colorsFrom, commonValues, dieUpsFor, flatbedDiesFor, isPlaceholderPm, materialKey, metresFromPlates, sameMaterial } from '@/lib/plateDie';
+import { DIRECTIONS, LAYOUT_KEYS, colorsFrom, commonValues, dieUpsFor, flatbedDiesFor, isPlaceholderPm, materialKey, metresFromPlates, sameMaterial } from '@/lib/plateDie';
 
 export type Source =
   | 'auto'      // saved on a linked record
@@ -62,7 +62,6 @@ export type JobCardSources = {
   flatbedDies: FlatbedDie[];
   shadeCards:  Pick<ShadeCard, 'id' | 'product_name' | 'shade_card_number' | 'status' | 'making_status'>[]; // current, same PM code
   bom:         BomHint[];        // this line's costing first, then same PM code
-  stockWidths: number[];         // paper roll widths, mm
   papers:      { name: string; specification: string | null }[]; // the paper list in use; never its rates
   cards:       JobCardRow[];     // this line's cards, by part
   lastCards:   JobCardRow[];     // issued cards of these plates, newest first
@@ -95,10 +94,13 @@ export const OVERRIDE_KEYS = ['plateNo', 'labelSize', 'cylinder', 'gap', 'metres
   'shadeCardNumber', 'rollMetres', 'varnish'] as const;
 export type OverrideKey = (typeof OVERRIDE_KEYS)[number];
 
-/** Widest believable paper roll: one roll is saved as 2060 mm, a typo. */
-const MAX_WEB_MM = 1000;
 /** Trim allowance on the material width, both edges together. */
 const WIDTH_MARGIN_MM = 12;
+/** Widths are cut in steps of this. */
+const WIDTH_STEP_MM = 5;
+/** A finished roll never holds more than this, counted in full steps of labels. */
+const MAX_ROLL_METRES = 400;
+const ROLL_LABEL_STEP = 100;
 /** Largest gap around the cylinder that still reads as a gap. ponytail: a
  *  heuristic; a real gap above this comes back "missing" and is typed. */
 const MAX_GAP_MM = 12;
@@ -142,19 +144,25 @@ export function layoutsFor(p: Plate): Layout[] {
   return out;
 }
 
-/** Height × ups + a gap between each pair + 12, then up to a width we stock. */
-export function materialWidth(across: number, ups: number, gap: number | null, stock: number[]):
+/** Height × ups + a gap between each pair + 12, then up to a multiple of 5: 207 → 210. */
+export function materialWidth(across: number, ups: number, gap: number | null):
   { exact: number; width: number } | null {
   if (ups > 1 && gap == null) return null;
   const exact = round2(across * ups + (gap ?? 0) * (ups - 1) + WIDTH_MARGIN_MM);
-  const fits = stock.filter((w) => w >= exact && w <= MAX_WEB_MM);
-  return { exact, width: fits.length ? Math.min(...fits) : Math.ceil(exact) };
+  return { exact, width: Math.ceil(exact / WIDTH_STEP_MM) * WIDTH_STEP_MM };
 }
 
 /** Metres on one finished roll (one lane): 3000 labels, 2 ups, 88T → 419.1. */
 export function rollMetres(labelsPerRoll: number, aroundUps: number, cylinder: number): number | null {
   if (!(labelsPerRoll > 0 && aroundUps > 0 && cylinder > 0)) return null;
   return round2((labelsPerRoll / aroundUps) * repeatLengthMm(cylinder) / 1000);
+}
+
+/** Most labels, in hundreds, a roll holds within 400 m: 2 ups, 88T → 2800 (391.16 m). */
+export function labelsPerRollFor(aroundUps: number, cylinder: number): number | null {
+  if (!(aroundUps > 0 && cylinder > 0)) return null;
+  const labels = (MAX_ROLL_METRES * 1000 * aroundUps) / repeatLengthMm(cylinder);
+  return Math.floor(labels / ROLL_LABEL_STEP) * ROLL_LABEL_STEP || null;
 }
 
 /** Station list → colour boxes and the Varnish box. Order kept; stations not
@@ -329,13 +337,32 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
   const metres = plate && line.quantity
     ? metresFromPlates([{ ...plate, pm_code: 'this' }], 'this', line.quantity).options[0]?.metres : null;
   const width = layout
-    ? materialWidth(layout.across, layout.acrossUps, plate?.across_gap ?? rotoDie?.across_gap ?? null, s.stockWidths) : null;
+    ? materialWidth(layout.across, layout.acrossUps, plate?.across_gap ?? rotoDie?.across_gap ?? null) : null;
   // Typed here, else as on this plate's last card.
   const typed = <K extends 'roll_sheet' | 'direction' | 'labels_per_roll' | 'material_width_mm'>(k: K): Field<NonNullable<JobCardInput[K]>> =>
     card[k] != null ? field(card[k], 'picked') : field(last?.[k], 'last_card', last?.card_number ?? undefined);
-  const labelsPerRoll = typed('labels_per_roll');
-  const perRoll = labelsPerRoll.value && layout && plate?.cylinder
-    ? rollMetres(labelsPerRoll.value, layout.aroundUps, plate.cylinder) : null;
+  const metresOf = (labels: number | null) => labels && layout && plate?.cylinder
+    ? rollMetres(labels, layout.aroundUps, plate.cylinder) : null;
+  // Picked on this card, else the plate's own, else the last card's.
+  const ofPlate = <K extends 'direction' | 'roll_sheet'>(k: K): Field<NonNullable<JobCardInput[K]>> => {
+    const own = plate?.[k] as JobCardInput[K] | undefined, f = typed(k);
+    if (!own || f.value === own && f.source === 'picked') return f;
+    if (f.source !== 'picked') return field(own, 'auto', 'From the plate');
+    return { ...f, note: `For this card only. The plate says ${own}` };
+  };
+  const direction = ofPlate('direction');
+  const rollSheet = ofPlate('roll_sheet');
+  const fullRoll = layout && plate?.cylinder && rollSheet.value !== 'SHEET'
+    ? labelsPerRollFor(layout.aroundUps, plate.cylinder) : null;
+  // Typed here stands, over 400 m too (and says so); a last card's is followed only within it.
+  let labelsPerRoll = typed('labels_per_roll');
+  const tooLong = fullRoll != null && (labelsPerRoll.value ?? 0) > fullRoll && (metresOf(labelsPerRoll.value) ?? 0) > MAX_ROLL_METRES;
+  if (fullRoll != null && (labelsPerRoll.value == null || (tooLong && labelsPerRoll.source === 'last_card'))) {
+    labelsPerRoll = field(fullRoll, 'calc', `Most that fit in ${MAX_ROLL_METRES} m`);
+  } else if (tooLong) {
+    labelsPerRoll.note = `Over ${MAX_ROLL_METRES} m a roll: ${fullRoll} fit`;
+  }
+  const perRoll = metresOf(labelsPerRoll.value);
   const typedWidth = typed('material_width_mm');
   // Material: typed on this card, else the plate's own, else the last card's;
   // the BOM's only as a suggestion. What the plate overrules is said.
@@ -388,8 +415,8 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
       : plateMaterial ? field(plateMaterial, 'auto', `From the plate${overruled ? ` (${overruled})` : ''}`)
       : field(bom?.material_name, 'suggested',
       bom && (bom.same_line ? 'From this line’s BOM costing' : 'From BOM costing of the same PM code')),
-    rollSheet:     typed('roll_sheet'),
-    direction:     typed('direction'),
+    rollSheet,
+    direction,
     labelsPerRoll,
     deliveryDate:  field(card.delivery_date, 'picked'),
     partName:      field(card.part_name, 'picked'),
@@ -449,12 +476,12 @@ export function freezeCard(d: JobCardDraft, preparedBy: string, edited = false, 
       flatbed_die_id: die?.type === 'FLATBED' ? die.id : null,
       shade_card_id:  d.shadeCard.value?.id ?? null,
       layout:         d.layout.value,
-      roll_sheet:     d.rollSheet.value,
-      direction:      d.direction.value,
-      labels_per_roll: d.labelsPerRoll.value,
-      // The plate's is read again next time, so a correction there is followed.
+      // Only what someone typed: a calculated count or width is worked out again next time.
+      labels_per_roll: d.labelsPerRoll.source === 'calc' ? null : d.labelsPerRoll.value,
+      // The plate's own are read again next time, so a correction there is followed.
+      roll_sheet:     d.rollSheet.source === 'auto' ? null : d.rollSheet.value,
+      direction:      d.direction.source === 'auto' ? null : d.direction.value,
       material:       d.material.source === 'auto' ? null : final('material') as string | null,
-      // Only a width someone typed: a calculated one is worked out again next time.
       material_width_mm: d.materialWidth.source === 'calc' ? null : d.materialWidth.value,
     },
   };
@@ -464,7 +491,7 @@ export function freezeCard(d: JobCardDraft, preparedBy: string, edited = false, 
  *  for /api/plates, in order. The database copies layout between a plate and
  *  its die (migration 101), blanks included, so a die is linked only when one
  *  side has no layout to lose or both say the same, and on its own before the gap is saved. */
-export function plateUpdates(plate: Plate, die: DieRef | null, typed: { colors?: string[]; acrossGap?: number | null; material?: string | null }):
+export function plateUpdates(plate: Plate, die: DieRef | null, typed: { colors?: string[]; acrossGap?: number | null; material?: string | null; direction?: string | null; rollSheet?: string | null }):
   Record<string, unknown>[] {
   const out: Record<string, unknown>[] = [];
   const blank = (r: Pick<Plate, 'around_ups' | 'around_gap' | 'across_ups' | 'across_gap'>) =>
@@ -473,6 +500,8 @@ export function plateUpdates(plate: Plate, die: DieRef | null, typed: { colors?:
     out.push({ colors: typed.colors, total_colors: typed.colors.length });
   }
   if (typed.material && !plate.material?.trim()) out.push({ material: typed.material });
+  if (typed.direction && !plate.direction && DIRECTIONS.includes(typed.direction)) out.push({ direction: typed.direction });
+  if (typed.rollSheet && !plate.roll_sheet) out.push({ roll_sheet: typed.rollSheet });
   if (!plate.die_id && die?.type === 'ROTO' && (blank(plate) || blank(die.die) || LAYOUT_KEYS.every((k) => plate[k] === die.die[k]))) out.push({ die_id: die.id });
   if (typed.acrossGap != null && typed.acrossGap >= 0 && typed.acrossGap !== plate.across_gap) out.push({ across_gap: typed.acrossGap });
   return out;

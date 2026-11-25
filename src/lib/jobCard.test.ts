@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { artworkRow, resolveJobCard, layoutsFor, materialWidth, rollMetres, splitColors, dieLabel, jobCardFrom, freezeCard, lineOfManual, manualFrom, materialForPlate, materialOptions, namesMaterial, cardNumberOf, plateUpdates, lineCardState, type JobCardRow, type JobCardSources } from './jobCard';
+import { artworkRow, resolveJobCard, layoutsFor, materialWidth, rollMetres, labelsPerRollFor, splitColors, dieLabel, jobCardFrom, freezeCard, lineOfManual, manualFrom, materialForPlate, materialOptions, namesMaterial, cardNumberOf, plateUpdates, lineCardState, type JobCardRow, type JobCardSources } from './jobCard';
 import type { Die, Plate } from '@/lib/types';
 
 // CENTURION EZ-100 ML, as saved on 2026-11-25, against the printed card.
 const plate = (over: Partial<Plate> = {}): Plate => ({
   id: 'p1', die_id: null, total_colors: null, colors: null, party: 'UPL Ltd. A/c [Unit - 3]',
   pm_code: '2000000081', item_name: 'CENTURION EZ-100 ML BOTTLE LABEL_IN - 2000000081',
-  across_size: '132', around_size: '70', cylinder: 88, material: null, plate_id: '26AG06159', plate_date: '2026-03-16',
+  across_size: '132', around_size: '70', cylinder: 88, material: null, direction: null, roll_sheet: null, plate_id: '26AG06159', plate_date: '2026-03-16',
   label_per_round: 6, location: '3008', created_by: null, created_at: '', updated_at: '',
   around_ups: null, around_gap: null, across_ups: null, across_gap: null, ...over,
 });
@@ -19,13 +19,12 @@ const die = (id: string, ups: number | null, over: Partial<Die> = {}): Die => ({
 const shade = (id: string, number: string, status: 'Approved' | 'Pending Approval' = 'Approved') =>
   ({ id, product_name: 'CENTURION', shade_card_number: number, status, making_status: 'Already Made' as const });
 
-const STOCK = [160, 170, 220, 235, 250, 2060];
 const centurion = (over: Partial<JobCardSources> = {}): JobCardSources => ({
   line: { id: 'l1', sr_no: 'APR26-113', party: 'UPL 03', po_no: '5000430643', po_date: '2026-04-06',
     pm_code: '2000000081', material_name: 'CENTURION EZ-100 ML BOTTLE LABEL_IN', quantity: 631010, cancelled_at: null },
   plates: [plate()],
   dies: [die('four', 4, { across_gap: 5 }), die('spare', 2, { status: 'EXTRA', location: null }), die('three', 3)],
-  flatbedDies: [], shadeCards: [shade('s1', '2592')], bom: [], stockWidths: STOCK, cards: [], lastCards: [], artworks: [], papers: [], linkable: [], ...over,
+  flatbedDies: [], shadeCards: [shade('s1', '2592')], bom: [], cards: [], lastCards: [], artworks: [], papers: [], linkable: [], ...over,
 });
 
 describe('CENTURION job card', () => {
@@ -51,7 +50,7 @@ describe('CENTURION job card', () => {
     expect(resolveJobCard(centurion(), { die_id: 'three' }).dieNumber.value).toBe('ROTO - 93');
   });
 
-  it('leaves the width blank until a gap is known, then gives 235', () => {
+  it('leaves the width blank until a gap is known, then rounds it up', () => {
     expect(resolveJobCard(centurion(), { die_id: 'three' }).materialWidth.value).toBeNull();
     const c = resolveJobCard(centurion({ plates: [plate({ across_gap: 5 })] }));
     expect(c.materialWidth).toMatchObject({ value: 235, note: 'Needs 232 mm' });
@@ -125,13 +124,30 @@ describe('links', () => {
 });
 
 describe('worked-out boxes', () => {
-  it('material width: gaps between labels + 12, up to a stocked width', () => {
-    expect(materialWidth(20, 6, 5, STOCK)).toEqual({ exact: 157, width: 160 });  // MIARCO
-    expect(materialWidth(105, 2, 5, STOCK)).toEqual({ exact: 227, width: 235 }); // 203232
-    expect(materialWidth(220, 1, null, STOCK)).toEqual({ exact: 232, width: 235 });
-    expect(materialWidth(70, 3, null, STOCK)).toBeNull();
-    // Wider than any real roll: the exact need, never the 2060 typo.
-    expect(materialWidth(400, 1, null, STOCK)).toEqual({ exact: 412, width: 412 });
+  it('material width: gaps between labels + 12, up to a multiple of 5', () => {
+    expect(materialWidth(20, 6, 5)).toEqual({ exact: 157, width: 160 });  // MIARCO
+    expect(materialWidth(195, 1, null)).toEqual({ exact: 207, width: 210 });
+    expect(materialWidth(198, 1, null)).toEqual({ exact: 210, width: 210 });
+    expect(materialWidth(198.1, 1, null)).toEqual({ exact: 210.1, width: 215 });
+    expect(materialWidth(70, 3, null)).toBeNull();
+  });
+
+  it('labels per roll: the most hundreds within 400 m', () => {
+    expect(labelsPerRollFor(2, 88)).toBe(2800);
+    for (let cyl = 60; cyl <= 180; cyl++) for (let ups = 1; ups <= 6; ups++) {
+      const n = labelsPerRollFor(ups, cyl)!;
+      expect(n % 100).toBe(0);
+      expect(rollMetres(n, ups, cyl)!).toBeLessThanOrEqual(400);
+      expect(rollMetres(n + 100, ups, cyl)!).toBeGreaterThan(400);
+    }
+    const auto = resolveJobCard(centurion());
+    expect(auto.labelsPerRoll).toMatchObject({ value: 2800, source: 'calc' });
+    expect(auto.rollMetres.value).toBe(391.16);
+    expect(resolveJobCard(centurion(), { roll_sheet: 'SHEET' }).labelsPerRoll.value).toBeNull();
+    // Typed over 400 m stands, but says so.
+    expect(resolveJobCard(centurion(), { labels_per_roll: 3000 }).labelsPerRoll)
+      .toMatchObject({ value: 3000, source: 'picked', note: 'Over 400 m a roll: 2800 fit' });
+    expect(resolveJobCard(centurion({ plates: [] })).labelsPerRoll.value).toBeNull();
   });
 
   it('splits varnish out of the stations and keeps unfilled ones', () => {
@@ -161,9 +177,33 @@ describe('saving and repeating', () => {
     expect(c.direction.value).toBe('UNWIND#3');
     expect(c.material.value).toBe('AM89240 (80GSM CHROMO)');
     expect(c.materialWidth.value).toBe(235);
-    expect(c.rollMetres.value).toBe(419.1);
+    // 3000 is 419.1 m: past the limit, so not followed.
+    expect(c.labelsPerRoll).toMatchObject({ value: 2800, source: 'calc' });
+    expect(resolveJobCard(centurion({ lastCards: [last({ labels_per_roll: 2000 })] })).labelsPerRoll)
+      .toMatchObject({ value: 2000, source: 'last_card', note: 'OCT26-9' });
     expect(c.deliveryDate.value).toBeNull();
     expect(c.plateNo.value).toBe('3008');
+  });
+
+  it('direction: this card’s pick, then the plate’s, then the last card’s; roll or sheet the same way', () => {
+    const s = centurion({ plates: [plate({ direction: 'UNWIND#1', roll_sheet: 'SHEET' })], lastCards: [last()] }); // last says #3
+    const c = resolveJobCard(s);
+    expect(c.direction).toMatchObject({ value: 'UNWIND#1', source: 'auto', note: 'From the plate' });
+    expect(c.rollSheet).toMatchObject({ value: 'SHEET', source: 'auto', note: 'From the plate' });
+    expect(c.labelsPerRoll).toMatchObject({ value: 3000, source: 'last_card' });
+    const f = freezeCard(c, 'x');
+    if ('error' in f) throw new Error(f.error);
+    expect(f.details).toMatchObject({ direction: 'UNWIND#1', rollSheet: 'SHEET' });
+    expect(f.columns).toMatchObject({ direction: null, roll_sheet: null }); // read from the plate again
+    expect(resolveJobCard(s, { direction: 'UNWIND#2', roll_sheet: 'ROLL' })).toMatchObject({
+      direction: { value: 'UNWIND#2', source: 'picked', note: 'For this card only. The plate says UNWIND#1' }, rollSheet: { value: 'ROLL', note: 'For this card only. The plate says SHEET' } });
+    expect(resolveJobCard(centurion()).rollSheet.value).toBeNull();
+    // A plate without one learns it; a saved one, or one that isn't used, is left alone.
+    expect(plateUpdates(plate(), null, { direction: 'UNWIND#3' })).toEqual([{ direction: 'UNWIND#3' }]);
+    expect(plateUpdates(plate({ direction: 'UNWIND#1' }), null, { direction: 'UNWIND#3' })).toEqual([]);
+    expect(plateUpdates(plate(), null, { direction: 'UNWIND#7' })).toEqual([]);
+    expect(plateUpdates(plate(), null, { rollSheet: 'ROLL' })).toEqual([{ roll_sheet: 'ROLL' }]);
+    expect(plateUpdates(plate({ roll_sheet: 'ROLL' }), null, { rollSheet: 'SHEET' })).toEqual([]);
   });
 
   it('never copies another plate’s card, and typing wins', () => {
@@ -179,7 +219,8 @@ describe('saving and repeating', () => {
     const f = freezeCard(resolveJobCard(centurion({ bom, dies: [die('three', 3)], plates: [plate({ across_gap: 5 })] }), { direction: 'UNWIND#3' }), 'vibhuti');
     if ('error' in f) throw new Error(f.error);
     expect(f.details).toMatchObject({ gap: 7.7, metres: '29385+', dieNumber: 'ROTO - 93', materialWidth: 235, material: null, plateId: '26AG06159', preparedBy: 'vibhuti' });
-    expect(f.columns).toMatchObject({ plate_id: 'p1', die_id: 'three', direction: 'UNWIND#3', material: null, material_width_mm: null });
+    expect(f.columns).toMatchObject({ plate_id: 'p1', die_id: 'three', direction: 'UNWIND#3', material: null, material_width_mm: null, labels_per_roll: null });
+    expect(f.details).toMatchObject({ labelsPerRoll: 2800, rollMetres: 391.16 });
     expect(freezeCard(resolveJobCard(centurion({ plates: [plate(), plate({ id: 'p2' })] })), 'x')).toEqual({ error: 'Pick the plate first' });
   });
 

@@ -21,7 +21,7 @@ import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import { dieListQuery } from '@/lib/listQueries';
 import DiePicker from './DiePicker';
 import PartySuggestInput from './PartySuggestInput';
-import { colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, commonValues, LAYOUT_KEYS } from '@/lib/plateDie';
+import { DIRECTIONS, FORMS, colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, commonValues, LAYOUT_KEYS } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { useAutoFill } from '@/hooks/useAutoFill';
 
@@ -52,6 +52,8 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const [aroundSize,    setAroundSize]    = useState(editing?.around_size ?? '');
   const [cylinder,      setCylinder]      = useState(editing?.cylinder?.toString() ?? '');
   const [material,      setMaterial]      = useState(editing?.material ?? '');
+  const [direction,     setDirection]     = useState(editing?.direction ?? '');
+  const [rollSheet,     setRollSheet]     = useState<string>(editing?.roll_sheet ?? '');
   const [plateId,       setPlateId]       = useState(editing?.plate_id ?? '');
   const [plateDate,     setPlateDate]     = useState(editing?.plate_date ?? '');
   const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
@@ -110,6 +112,8 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     around_size:     aroundSize.trim(),
     cylinder,
     material:        material.trim(),
+    direction,
+    roll_sheet:      rollSheet,
     plate_id:        plateIdNormalized,
     plate_date:      plateDate,
     label_per_round: labelPerRound,
@@ -212,7 +216,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
           </div>
 
           {/* What the plate runs on comes first: the gap below is worked out from it. */}
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.7fr_1fr] gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-3">
             <div>
               <PlateLabel>Cylinder</PlateLabel>
               <WithUnit unit="teeth">
@@ -240,6 +244,32 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
               </WithExample>
               <datalist id={listId}>{materials.map((m) => <option key={m} value={m} />)}</datalist>
             </div>
+          </div>
+
+          {/* How its job cards are supplied, and how many colours it prints. */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="block">
+              <PlateLabel>Roll / sheet</PlateLabel>
+              <select
+                value={rollSheet}
+                onChange={(e) => setRollSheet(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">Not set</option>
+                {FORMS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
+              </select>
+            </label>
+            <label className="block">
+              <PlateLabel>Unwind</PlateLabel>
+              <select
+                value={direction}
+                onChange={(e) => setDirection(e.target.value)}
+                className={cn(inputCls, 'font-mono')}
+              >
+                <option value="">Not set</option>
+                {DIRECTIONS.map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
             <label className="block">
               <PlateLabel>Total colours</PlateLabel>
               <select

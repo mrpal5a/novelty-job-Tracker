@@ -129,6 +129,11 @@ export function metresFromPlates(plates: Plate[], pmCode: string, qty: number):
   return { found: same.length, options: Array.from(byPair.values()).sort((a, b) => b.plates.length - a.plates.length) };
 }
 
+// The unwind directions in use; the table's CHECK holds the same four (migration 112).
+export const DIRECTIONS = ['UNWIND#1', 'UNWIND#2', 'UNWIND#3', 'UNWIND#4'];
+/** How labels are supplied, as the forms word it; the card prints the value. */
+export const FORMS = [{ value: 'ROLL', label: 'Roll form' }, { value: 'SHEET', label: 'Sheet form' }] as const;
+
 // ── Plate colours (migration 103) ───────────────────────────────
 // One entry per colour, in station order. A new list starts as process
 // colours — the first four boxes CYAN, MAGENTA, YELLOW, BLACK — and the
