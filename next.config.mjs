@@ -41,6 +41,10 @@ const config = {
   },
 
   images: {
+    // No resizing server: only logos use next/image, and the resizer in
+    // Next 14 has open critical advisories (fixed in 15.5.28). Pictures are
+    // sent as they are; /_next/image answers 404.
+    unoptimized: true,
     remotePatterns: [
       {
         protocol: 'https',

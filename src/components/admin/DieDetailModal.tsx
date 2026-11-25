@@ -10,6 +10,7 @@ import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
 import { ModalShell } from './modals';
+import RelatedRecords from './RelatedRecords';
 import type { Die, DieStatus } from '@/lib/types';
 import { layoutPair } from '@/lib/plateDie';
 
@@ -90,6 +91,8 @@ export default function DieDetailModal({ die, srNo, onClose, onEdit }: Props) {
               <p className="mt-1 text-sm text-[var(--glass-muted)]">Not damaged</p>
             )}
           </section>
+
+          <div className="pt-4 border-t border-black/[0.08]"><RelatedRecords kind="die" id={die.id} onNavigate={onClose} /></div>
         </div>
 
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-black/[0.08] shrink-0">

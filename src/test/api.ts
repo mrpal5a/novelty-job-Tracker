@@ -83,7 +83,7 @@ const DEPARTMENTS = [
   dept('Prepress'), dept('Dispatch'), dept('QC'), dept('Production'),
 ];
 const FEATURES: Record<string, string[]> = {
-  Prepress: ['job_separation_edit'],
+  Prepress: ['job_separation_edit', 'job_card_edit'],
   Dispatch: ['dispatch_notifications'],
   QC:       ['shade_card_manage'],
 };

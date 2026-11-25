@@ -11,13 +11,17 @@ import { Pencil, X } from 'lucide-react';
 import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
-import type { Plate } from '@/lib/types';
+import RelatedRecords from './RelatedRecords';
+import { DieHover } from './DiePicker';
+import type { Die, Plate } from '@/lib/types';
 import { dieListQuery, flatbedDieListQuery } from '@/lib/listQueries';
-import { dieUpsFor, flatbedDiesFor, layoutPair } from '@/lib/plateDie';
+import { dieItem } from '@/lib/related';
+import { dieUpsFor, flatbedDiesFor, layoutPair, sameMaterial } from '@/lib/plateDie';
 
 type MatchedDie = {
   id: string;
   kind: 'Roto' | 'Flatbed';
+  die?: Die;          // roto: its record, shown on hover
   location: string | null;
   detail: (string | number | false | null)[];
   status: 'Damaged' | 'Extra' | null;
@@ -39,23 +43,26 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
     : null;
 
   // The dies this plate can run with: roto dies of the same cylinder and
-  // whole-mm size either way round (the label-per-round rule), and flatbed
-  // dies of the same size (they have no cylinder).
+  // whole-mm size (either way round), its linked die first and then those cut
+  // for its material, and flatbed dies of the same size (they have no cylinder).
   const across = plate.across_size ?? '', around = plate.around_size ?? '';
   const rotoQuery    = useQuery(dieListQuery());
   const flatbedQuery = useQuery(flatbedDieListQuery());
   const loading = rotoQuery.isLoading || flatbedQuery.isLoading;
   const failed  = rotoQuery.isError || flatbedQuery.isError;
+  const roto = dieUpsFor(rotoQuery.data ?? [], across, around, plate.cylinder?.toString() ?? '', plate.material);
+  const linkedDie = rotoQuery.data?.find((d) => d.id === plate.die_id);
   const dies: MatchedDie[] = [
-    ...dieUpsFor(rotoQuery.data ?? [], across, around, plate.cylinder?.toString() ?? '').dies.map((d) => ({
+    ...(linkedDie ? [linkedDie, ...roto.dies.filter((d) => d.id !== linkedDie.id)] : roto.dies).map((d) => ({
       id: d.id,
       kind: 'Roto' as const,
+      die: d,
       location: d.location,
-      detail: [d.serial_no, d.job_name, d.ups != null && `${d.ups} ups`],
+      detail: [d.serial_no, d.job_name, d.material, sameMaterial(d.material, plate.material) && 'Same material', d.ups != null && `${d.ups} ups`],
       status: d.status === 'DAMAGE' ? 'Damaged' as const : d.status === 'EXTRA' ? 'Extra' as const : null,
       linked: d.id === plate.die_id,
-      href: `/admin/dies?q=${encodeURIComponent(d.serial_no || d.job_name)}`,
-    })).sort((x, y) => Number(!!y.linked) - Number(!!x.linked)),
+      href: dieHref(d),
+    })),
     ...flatbedDiesFor(flatbedQuery.data ?? [], across, around).map((d) => ({
       id: d.id,
       kind: 'Flatbed' as const,
@@ -94,6 +101,7 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
             <Detail label="Location" value={plate.location} />
             <Detail label="Size (height × width)" value={size} mono />
             <Detail label="Cylinder" value={plate.cylinder?.toString()} mono />
+            <Detail label="Material" value={plate.material} />
             <Detail label="Labels / round" value={plate.label_per_round?.toString()} mono />
             <Detail label="Total colours" value={plate.total_colors?.toString()} mono />
             {plate.colors && (
@@ -103,7 +111,19 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
                 value={plate.colors.map((c, i) => `${i + 1} ${c ?? '—'}`).join(' · ')}
               />
             )}
-            <Detail label="Roto die" value={plate.die_id ? 'Linked' : 'Not linked'} />
+            {linkedDie ? (
+              <div className="min-w-0">
+                <dt className="text-xs font-medium text-[var(--glass-muted)]">Roto die (linked)</dt>
+                <dd>
+                  <DieHover die={linkedDie}>
+                    <Link href={dieHref(linkedDie)} className="flex flex-wrap items-center gap-x-2 min-h-11 -my-2.5 text-sm font-semibold text-[var(--glass-ink)] underline decoration-dotted underline-offset-4">
+                      Location {linkedDie.location || 'not recorded'}
+                      {linkedDie.serial_no && <span className="font-mono text-xs">{linkedDie.serial_no.toUpperCase()}</span>}
+                    </Link>
+                  </DieHover>
+                </dd>
+              </div>
+            ) : <Detail label="Roto die" value={plate.die_id ? 'Linked' : 'Not linked'} />}
             <Detail label="Width" value={layoutPair(plate.around_ups, plate.around_gap)} mono />
             <Detail label="Height" value={layoutPair(plate.across_ups, plate.across_gap)} mono />
             <Detail label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />
@@ -125,33 +145,22 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
               <ul className="mt-1.5 rounded-lg border border-black/[0.08] divide-y divide-black/[0.06]">
                 {dies.map((d) => (
                   <li key={`${d.kind}-${d.id}`}>
-                    <Link
-                      href={d.href}
-                      className="flex items-start gap-3 min-h-11 px-3 py-2 hover:bg-black/[0.03] transition-colors"
-                    >
-                      <span className="shrink-0 w-[60px] pt-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--glass-muted)]">
-                        {d.kind}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-[var(--glass-ink)]">
-                          Location: {d.location || 'not recorded'}
-                        </span>
-                        <span className="block text-xs text-[var(--glass-muted)] break-words">
-                          {d.detail.filter(Boolean).join(' · ')}
-                          {d.linked && <span className="ml-1 font-semibold text-emerald-700">· Linked</span>}
-                          {d.status && (
-                            <span className={cn('ml-1 font-semibold', d.status === 'Damaged' ? 'text-red-700' : 'text-amber-700')}>
-                              · {d.status}
-                            </span>
-                          )}
-                        </span>
-                      </span>
-                    </Link>
+                    {d.die ? <DieHover die={d.die}><DieRow d={d} /></DieHover> : <DieRow d={d} />}
                   </li>
                 ))}
               </ul>
             )}
           </section>
+
+          <div className="pt-4 border-t border-black/[0.08]">
+            <RelatedRecords
+              kind="plate" id={plate.id} onNavigate={onClose}
+              wrapDie={(dieId, row) => {
+                const die = rotoQuery.data?.find((d) => d.id === dieId);
+                return die ? <DieHover die={die}>{row}</DieHover> : row;
+              }}
+            />
+          </div>
 
           {/* Last: a set can carry a dozen IDs, and the specs above shouldn't
               be pushed out of view by them. */}
@@ -179,6 +188,35 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
         </div>
       </div>
     </ModalShell>
+  );
+}
+
+const dieHref = (d: Die) => dieItem(d).href;
+
+function DieRow({ d }: { d: MatchedDie }) {
+  return (
+    <Link
+      href={d.href}
+      className="flex items-start gap-3 min-h-11 px-3 py-2 hover:bg-black/[0.03] transition-colors"
+    >
+      <span className="shrink-0 w-[60px] pt-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--glass-muted)]">
+        {d.kind}
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-semibold text-[var(--glass-ink)]">
+          Location: {d.location || 'not recorded'}
+        </span>
+        <span className="block text-xs text-[var(--glass-muted)] break-words">
+          {d.detail.filter(Boolean).join(' · ')}
+          {d.linked && <span className="ml-1 font-semibold text-emerald-700">· Linked</span>}
+          {d.status && (
+            <span className={cn('ml-1 font-semibold', d.status === 'Damaged' ? 'text-red-700' : 'text-amber-700')}>
+              · {d.status}
+            </span>
+          )}
+        </span>
+      </span>
+    </Link>
   );
 }
 

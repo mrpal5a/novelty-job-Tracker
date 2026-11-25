@@ -20,6 +20,7 @@ const TEXT_FIELDS = [
   'item_name',
   'across_size',
   'around_size',
+  'material',
   'plate_id',
   'plate_date',
   'location',

@@ -90,6 +90,7 @@ const PLATE_SEARCH_FIELDS: { value: string; label: string; placeholder: string }
   { value: 'pm_code',         label: 'PM code',          placeholder: 'Search by PM code' },
   { value: 'item_name',       label: 'Item name',        placeholder: 'Search by item name' },
   { value: 'location',        label: 'Location',         placeholder: 'Search by location' },
+  { value: 'material',        label: 'Material',         placeholder: 'Search by material' },
   { value: 'size',            label: 'Size',             placeholder: 'Search by height or width' },
   { value: 'cylinder',        label: 'Cylinder',         placeholder: 'Search by cylinder' },
   { value: 'label_per_round', label: 'Labels / round',   placeholder: 'Search by labels per round' },
@@ -103,6 +104,7 @@ const PLATE_EXPORT_COLUMNS: CsvColumn<Plate>[] = [
   { header: 'Height',          value: (p) => p.across_size },
   { header: 'Width',           value: (p) => p.around_size },
   { header: 'Cylinder',        value: (p) => p.cylinder },
+  { header: 'Material',        value: (p) => p.material },
   { header: 'Label Per Round', value: (p) => p.label_per_round },
   { header: 'Location',        value: (p) => p.location },
   { header: 'Plate Date',      value: (p) => csvDate(p.plate_date) },
@@ -343,6 +345,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-3 mt-3 pt-3 border-t border-black/[0.06]">
                         <SpecField label="Size" value={sizeOf(plate)} mono />
                         <SpecField label="Cylinder" value={plate.cylinder?.toString()} mono />
+                        <SpecField label="Material" value={plate.material} />
                         <SpecField label="Labels / round" value={plate.label_per_round?.toString()} mono />
                         <SpecField label="Location" value={plate.location} />
                         <SpecField label="Plate date" value={plate.plate_date ? formatNumericDate(plate.plate_date) : null} mono />

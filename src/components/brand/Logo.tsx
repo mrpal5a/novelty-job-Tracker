@@ -23,6 +23,9 @@ export function Logo({ onDark = false, width = 150, height = 47, priority = fals
       height={height}
       priority={priority}
       className={cn('h-auto w-auto object-contain', className)}
+      // The file comes at its own size (images.unoptimized): held to the
+      // widths the resizer used to send.
+      style={{ maxWidth: width <= 128 ? 128 : 256 }}
     />
   );
   // Uploaded logos aren't guaranteed to have a transparent background, so on

@@ -175,6 +175,7 @@ function fieldsFor(kind: PreviewTarget['kind'], d: Data): Field[] {
         ['PM code', str(d.pm_code), true],
         ['Size', size(d.across_size, d.around_size), true],
         ['Cylinder', d.cylinder != null ? `${d.cylinder}T` : null, true],
+        ['Material', str(d.material)],
         ['Labels / round', str(d.label_per_round), true],
         ['Plate ID', str(d.plate_id), true],
         ['Plate date', date(d.plate_date), true],

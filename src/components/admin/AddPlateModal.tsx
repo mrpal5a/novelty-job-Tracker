@@ -7,21 +7,25 @@
 // the party is required — a plate is often entered before its serial is
 // etched or its rack decided.
 
-import React, { useState, useId, useRef, useEffect } from 'react';
+import React, { useState, useId, useRef, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
-import type { Plate } from '@/lib/types';
+import type { Die, Plate } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
+import { dieListQuery } from '@/lib/listQueries';
+import DiePicker from './DiePicker';
 import PartySuggestInput from './PartySuggestInput';
-import { colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, LAYOUT_KEYS, type DieUps } from '@/lib/plateDie';
+import { colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, commonValues, LAYOUT_KEYS } from '@/lib/plateDie';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { useAutoFill } from '@/hooks/useAutoFill';
 
+const NO_DIES: Die[] = [];
 const COLOR_COUNTS = Array.from({ length: 12 }, (_, i) => i + 1);
 
 const inputCls = cn(
@@ -39,6 +43,7 @@ type Props = {
 
 export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const titleId = useId();
+  const listId  = useId();
 
   const [party,         setParty]         = useState(editing?.party ?? '');
   const [pmCode,        setPmCode]        = useState(editing?.pm_code ?? '');
@@ -46,6 +51,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   const [acrossSize,    setAcrossSize]    = useState(editing?.across_size ?? '');
   const [aroundSize,    setAroundSize]    = useState(editing?.around_size ?? '');
   const [cylinder,      setCylinder]      = useState(editing?.cylinder?.toString() ?? '');
+  const [material,      setMaterial]      = useState(editing?.material ?? '');
   const [plateId,       setPlateId]       = useState(editing?.plate_id ?? '');
   const [plateDate,     setPlateDate]     = useState(editing?.plate_date ?? '');
   const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
@@ -68,27 +74,16 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     setItemName(fillIfUntouched(itemName, prev.item, lastFill.current.item));
   });
 
-  // Sizes + cylinder → the dies cut for them, offered in the Roto die list.
-  const [dieUps, setDieUps] = useState<DieUps | null>(null);
-  useEffect(() => {
-    const a = parseFloat(acrossSize), b = parseFloat(aroundSize), cyl = parseFloat(cylinder);
-    if (!(a > 0 && b > 0 && cyl > 0)) { setDieUps(null); return; }
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      try {
-        const params = new URLSearchParams({ search: String(Math.trunc(a)), field: 'size' });
-        const res = await fetch(`/api/dies?${params.toString()}`);
-        if (!res.ok || cancelled) return;
-        const found = dieUpsFor((await res.json()).dies ?? [], acrossSize, aroundSize, cylinder);
-        if (cancelled) return;
-        setDieUps(found);
-      } catch {
-        // Best-effort: a die can still be linked from another plate's size.
-      }
-    }, 400);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [acrossSize, aroundSize, cylinder]);
-  const matchedDie = dieUps?.dies[0];
+  // Sizes + cylinder + material → the dies cut for them. The die library is
+  // cached by the list page; it also gives the material spellings in use.
+  const diesQuery = useQuery(dieListQuery());
+  const allDies = diesQuery.data ?? NO_DIES;
+  const materials = useMemo(() => commonValues(allDies, 'material'), [allDies]);
+  const dieUps = useMemo(
+    () => dieUpsFor(allDies, acrossSize, aroundSize, cylinder, material),
+    [allDies, acrossSize, aroundSize, cylinder, material],
+  );
+  const sized = parseFloat(acrossSize) > 0 && parseFloat(aroundSize) > 0 && parseFloat(cylinder) > 0;
 
   // Width gap follows cylinder, width ups and width size; label per round
   // is height ups × width ups. A value typed by hand stays (useAutoFill).
@@ -96,13 +91,10 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   useAutoFill(autoGap, layout.around_gap, (v) => setLayout((l) => ({ ...l, around_gap: v })));
   const autoLpr = labelsPerRound(layout.across_ups, layout.around_ups);
   useAutoFill(autoLpr, labelPerRound, setLabelPerRound);
-  const dieChoices = dieUps?.dies ?? [];
-
   // Picking a die brings its layout in, when it has one; the database then
   // keeps plate and die in step (migration 101).
-  function pickDie(id: string) {
-    setDieId(id);
-    const die = dieChoices.find((d) => d.id === id);
+  function pickDie(die: Die | null) {
+    setDieId(die?.id ?? '');
     if (die && LAYOUT_KEYS.some((k) => die[k] != null)) setLayout(layoutState(die));
   }
 
@@ -117,6 +109,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
     across_size:     acrossSize.trim(),
     around_size:     aroundSize.trim(),
     cylinder,
+    material:        material.trim(),
     plate_id:        plateIdNormalized,
     plate_date:      plateDate,
     label_per_round: labelPerRound,
@@ -219,7 +212,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
           </div>
 
           {/* What the plate runs on comes first: the gap below is worked out from it. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1.7fr_1fr] gap-3">
             <div>
               <PlateLabel>Cylinder</PlateLabel>
               <WithUnit unit="teeth">
@@ -232,6 +225,20 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                   className={cn(inputCls, 'font-mono')}
                 />
               </WithUnit>
+            </div>
+            <div>
+              <PlateLabel>Material</PlateLabel>
+              <WithExample example="80GSM CHROMO + LAMINATION">
+                <input
+                  value={material}
+                  onChange={(e) => setMaterial(e.target.value)}
+                  list={listId}
+                  autoComplete="off"
+                  aria-label="Material"
+                  className={inputCls}
+                />
+              </WithExample>
+              <datalist id={listId}>{materials.map((m) => <option key={m} value={m} />)}</datalist>
             </div>
             <label className="block">
               <PlateLabel>Total colours</PlateLabel>
@@ -292,34 +299,26 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
             </>}
           />
 
-          {/* Found from the sizes and cylinder above. */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block">
-              <PlateLabel>Roto die</PlateLabel>
-              <select
-                value={dieId}
-                onChange={(e) => pickDie(e.target.value)}
-                className={inputCls}
-              >
-                <option value="">Not linked</option>
-                {dieId && !dieChoices.some((d) => d.id === dieId) && (
-                  <option value={dieId}>Current die (other size)</option>
-                )}
-                {dieChoices.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {[d.serial_no || d.job_name, d.location ? `location ${d.location}` : 'no location', d.status !== 'IN USE' && d.status]
-                      .filter(Boolean).join(' · ')}
-                  </option>
-                ))}
-              </select>
-              {!dieId && (
-                <span className="block text-[11px] text-[var(--glass-muted)] mt-1">
-                  {!dieUps
-                    ? 'Enter both sizes and the cylinder to list its dies.'
-                    : !matchedDie && 'No die of this size and cylinder.'}
-                </span>
-              )}
-            </label>
+          {/* Found from the sizes, cylinder and material above. */}
+          <fieldset>
+            <legend><PlateLabel>Roto die</PlateLabel></legend>
+            <DiePicker
+              found={dieUps}
+              material={material}
+              value={dieId}
+              linked={allDies.find((d) => d.id === dieId)}
+              onPick={pickDie}
+            />
+            <p className="text-[11px] text-[var(--glass-muted)] mt-1" aria-live="polite">
+              {!sized ? 'Enter both sizes and the cylinder to list its dies.'
+                : diesQuery.isLoading ? 'Looking for the die…'
+                : diesQuery.isError ? 'Couldn’t load the dies. Close and open this form to try again.'
+                : dieUps.dies.length === 0 ? 'No die of this size and cylinder.'
+                : `All dies of this size and cylinder${material.trim() ? ', same material first' : ''}. Hover to see a die, click to link it.`}
+            </p>
+          </fieldset>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <PlateLabel>Label per round</PlateLabel>
               <input
@@ -338,9 +337,6 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                     : `Typed by hand; height ups × width ups is ${autoLpr}.`}
               </p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <PlateLabel>Location</PlateLabel>
               <WithExample example="Rack B2">

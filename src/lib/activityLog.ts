@@ -25,7 +25,7 @@ export type ActivityEntry = {
 
 // Every table the trigger watches, grouped the way the header groups the app.
 export const ACTIVITY_SECTIONS: { key: string; label: string; tables: Record<string, string> }[] = [
-  { key: 'separation', label: 'Job Separation', tables: { job_separations: 'order line' } },
+  { key: 'separation', label: 'Job Separation', tables: { job_separations: 'order line', job_cards: 'job card', plate_artworks: 'artwork' } },
   { key: 'jobs', label: 'Jobs', tables: {
     jobs: 'job', print_runs: 'print run', stage_comments: 'job note', job_status_requests: 'status request',
   } },

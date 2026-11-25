@@ -40,6 +40,7 @@ const PLATE_SEARCH_FIELDS: Record<string, PlateSearchField> = {
   pm_code_exact:   { column: 'pm_code',         type: 'exact' },
   item_name:       { column: 'item_name',       type: 'text' },
   location:        { column: 'location',        type: 'text' },
+  material:        { column: 'material',        type: 'text' },
   // One "Size" option, as on dies: a number read off either side of the plate.
   size:            { column: 'size',            type: 'size' },
   cylinder:        { column: 'cylinder',        type: 'int' },
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
       across_size:     optionalText(body.across_size),
       around_size:     optionalText(body.around_size),
       cylinder:        optionalInt(body.cylinder),
+      material:        optionalText(body.material),
       plate_id:        optionalText(body.plate_id),
       plate_date:      optionalText(body.plate_date),
       label_per_round: optionalInt(body.label_per_round),

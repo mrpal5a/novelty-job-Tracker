@@ -9,6 +9,7 @@ import type { Stage } from './constants/stages';
 import type { Department } from './constants/departments';
 import type { RunStage } from './constants/runStages';
 import type { ShadeCardStatus, MakingStatus } from './constants/shadeCards';
+import type { JobCardState } from './jobCard';
 
 // ── team ─────────────────────────────────────────────────────
 // A login account, not a database row — Supabase Auth is the source of
@@ -205,6 +206,7 @@ export interface Plate extends DieLayout {
   across_size: string | null;     // ACROSS SIZE (H)
   around_size: string | null;     // AROUND SIZE (W)
   cylinder: number | null;        // CYLINDER
+  material: string | null;        // paper material, spelt as on the dies (migration 109)
   plate_id: string | null;        // PLATE ID — identifier etched on the plate
   plate_date: string | null;      // PLATE DATE — ISO date string
   label_per_round: number | null; // LABEL PER ROUND
@@ -272,6 +274,9 @@ export interface JobSeparation {
   // against this line (counted dispatch entries, lib/dispatchLedger.ts);
   // null when none, absent on rows returned by a save.
   dispatched?: number | null;
+  // Not a column either: the state of the line's job cards (lib/jobCard.ts);
+  // absent on rows returned by a save, or when it couldn't be read.
+  job_card?: JobCardState;
 }
 
 // Master list of party names — feeds the Job Separation Party typeahead

@@ -22,8 +22,9 @@ import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useRefetchOnChange } from '@/hooks/useRefetchOnChange';
 import Link from 'next/link';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, ClipboardPen, ClipboardX, Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { JOB_CARD_STATE } from '@/lib/jobCard';
 import { cn, formatQty, formatNumericDate, formatJobCardNumber } from '@/lib/utils';
 import { compareValues, type SortDir, type SortKind } from '@/lib/sort';
 import { Button } from '@/components/ui/Button';
@@ -207,6 +208,35 @@ function DispatchedFigure({ row }: { row: JobSeparation }) {
         </p>
       )}
     </>
+  );
+}
+
+// The line's job card, its state in colour, icon and words: green issued, red
+// not issued, amber edited. Grey when the line needs none (Job Card Status
+// N/A) or the state couldn't be read.
+const CARD_ICON = { none: ClipboardX, draft: ClipboardX, issued: ClipboardCheck, reopened: ClipboardPen, edited: ClipboardPen };
+
+function JobCardLink({ row, withText }: { row: JobSeparation; withText?: boolean }) {
+  const notNeeded = /^n\/?a$/i.test(row.jc_status?.trim() ?? '') && row.job_card === 'none';
+  const state = row.job_card && !notNeeded ? row.job_card : null;
+  const Icon = state ? CARD_ICON[state] : ClipboardList;
+  const mark = state ? JOB_CARD_STATE[state] : null;
+  const label = mark?.label ?? (notNeeded ? 'Not needed' : '');
+  return (
+    <Link
+      href={`/admin/job-separation/${row.id}/job-card`}
+      aria-label={`Job card for ${row.sr_no ?? row.party}${label ? `: ${label}` : ''}`}
+      title={label ? `Job Card: ${label}` : 'Job Card'}
+      style={mark ? { color: mark.color, borderColor: `${mark.color}66` } : undefined}
+      className={cn(
+        'inline-flex items-center justify-center gap-1.5 min-h-11 rounded-lg border border-black/[0.12]',
+        'text-xs font-medium text-[var(--glass-muted)] hover:bg-black/[0.04] transition-colors',
+        withText ? 'px-3' : 'min-w-11',
+      )}
+    >
+      <Icon className="w-4 h-4" aria-hidden="true" />
+      {withText && <>Job Card{label && ` · ${label}`}</>}
+    </Link>
   );
 }
 
@@ -742,8 +772,9 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                       </div>
                     </div>
 
-                    {(canManage || canDispatch) && !isCancelled && (
+                    {!isCancelled && (
                       <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <JobCardLink row={row} withText />
                         {canDispatch && (
                           <button
                             onClick={() => setDispatchingRow(row)}
@@ -969,8 +1000,10 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                               <Ban className="w-3.5 h-3.5" aria-hidden="true" />
                               Cancelled
                             </span>
-                          ) : canManage && (
+                          ) : (
                             <div className="inline-flex items-center gap-1.5">
+                              <JobCardLink row={row} />
+                              {canManage && <>
                               <button
                                 onClick={() => { setEditing(null); setDuplicateSource(row); setAdding(true); }}
                                 aria-label={`Duplicate the job separation row for ${row.party}`}
@@ -1020,6 +1053,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                               >
                                 <Ban className="w-3.5 h-3.5" aria-hidden="true" />
                               </button>
+                              </>}
                             </div>
                           )}
                         </td>

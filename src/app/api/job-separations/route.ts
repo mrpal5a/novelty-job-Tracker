@@ -6,6 +6,7 @@
 // POST /api/job-separations  — add a row (Prepress or Admin)
 // ============================================================
 
+import { lineCardState, type CardStateRow, type JobCardState } from '@/lib/jobCard';
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
@@ -15,7 +16,7 @@ import { parseDateRange, rangeOrClause, parseLimit, type DateRange } from '@/lib
 import { containsPattern, orContains, onSearchText, searchAsPhrase, searchTerms } from '@/lib/search';
 import { deptKeyOf } from '@/lib/identity';
 import { allPages } from '@/lib/api/allPages';
-import { dispatchedByLine } from '@/lib/dispatchLedger';
+import { dispatchedPerLine } from '@/lib/api/dispatchedPerLine';
 import { isIsoDate } from '@/lib/jobViews';
 
 // Optional free text: blank means "not recorded", not an empty string.
@@ -141,6 +142,7 @@ export async function GET(request: NextRequest) {
   const perms = await getDeptPermissions(deptKeyOf(user));
   const dispatchedPromise = canDeptSeeDispatchedQty(perms) ? dispatchedPerLine() : null;
   dispatchedPromise?.catch(() => {}); // reported below; never an unhandled rejection
+  const cardsPromise = jobCardStates();
 
   // limit + 1 rows, to know whether more exist. PostgREST hands back at most
   // 1000 rows a request, so past that it is read in slices — one request used
@@ -172,12 +174,14 @@ export async function GET(request: NextRequest) {
       totalOrderValue = values.reduce((sum, r) => sum + (Number(r.order_value) || 0), 0);
     }
 
+    const cards = await cardsPromise;
+    const marked = cards ? rows.map((r) => ({ ...r, job_card: cards.get(r.id) ?? 'none' })) : rows;
     if (!rows.length || !dispatchedPromise) {
-      return NextResponse.json({ job_separations: rows, hasMore, totalOrderValue });
+      return NextResponse.json({ job_separations: marked, hasMore, totalOrderValue });
     }
     const dispatched = await dispatchedPromise;
     return NextResponse.json({
-      job_separations: rows.map((r) => ({ ...r, dispatched: dispatched.get(r.id) ?? null })),
+      job_separations: marked.map((r) => ({ ...r, dispatched: dispatched.get(r.id) ?? null })),
       hasMore,
       totalOrderValue,
     });
@@ -186,22 +190,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Dispatched labels per line: the counted dispatch entries (confirmed, not
-// removed) matched by their link or PO + PM code, the same way Reports matches
-// them (lib/dispatchLedger.ts). Matched against every live line, so a PO + PM
-// code shared by two lines stays unmatched instead of guessed.
-// ponytail: reads the live lines' keys and every counted entry per request
-// (~500 lines and a few hundred entries a month); cache or filter by PO
-// past ~20k lines.
-async function dispatchedPerLine(): Promise<Map<string, number>> {
-  const admin = createAdminClient();
-  const [lines, entries] = await Promise.all([
-    allPages<{ id: string; po_no: string | null; pm_code: string | null }>((from, to) => admin.from('job_separations')
-      .select('id, po_no, pm_code').is('cancelled_at', null).order('id').range(from, to)),
-    allPages<{ po_number: string; pm_code: string | null; qty: number | null; line_id: string | null }>((from, to) => admin.from('pending_dispatch_notifications')
-      .select('po_number, pm_code, qty, line_id').not('confirmed_at', 'is', null).is('removed_at', null).order('id').range(from, to)),
-  ]);
-  return dispatchedByLine(lines, entries);
+// Each line's job card state. Null when it can't be read: the worksheet still
+// opens, its cards unmarked, rather than every line wrongly shown red.
+// ponytail: reads every card's state per request (a few hundred a month);
+// filter by the page's lines past ~20k cards.
+async function jobCardStates(): Promise<Map<string, JobCardState> | null> {
+  try {
+    const admin = createAdminClient();
+    const cards = await allPages<CardStateRow & { job_separation_id: string }>((from, to) => admin.from('job_cards')
+      .select('job_separation_id, card_number, issued_at, edited:details->>edited').not('job_separation_id', 'is', null).order('id').range(from, to));
+    const byLine = new Map<string, CardStateRow[]>();
+    for (const c of cards) byLine.set(c.job_separation_id, [...(byLine.get(c.job_separation_id) ?? []), c]);
+    return new Map(Array.from(byLine, ([id, list]) => [id, lineCardState(list)]));
+  } catch (err) {
+    console.error('[GET /api/job-separations] job card states', err);
+    return null;
+  }
 }
 
 // ── POST ──────────────────────────────────────────────────────

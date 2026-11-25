@@ -11,6 +11,7 @@ import { getBranding } from '@/lib/branding';
 import BrandingSettingsForm from '@/components/admin/BrandingSettingsForm';
 import PrintingUnitsManager from '@/components/admin/PrintingUnitsManager';
 import OverdueAlertsCard from '@/components/admin/OverdueAlertsCard';
+import ArtworkStorageCard from '@/components/admin/ArtworkStorageCard';
 import AdminSectionNav from '@/components/admin/AdminSectionNav';
 import SettingsToc from '@/components/admin/SettingsToc';
 import { deptKeyOf } from '@/lib/identity';
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: 'company', label: 'Company & branding' },
   { id: 'units',   label: 'Printing units' },
   { id: 'alerts',  label: 'Overdue alerts' },
+  { id: 'artwork', label: 'Artwork storage' },
 ];
 
 export default async function SettingsPage() {
@@ -54,6 +56,7 @@ export default async function SettingsPage() {
             <PrintingUnitsManager />
           </div>
           <OverdueAlertsCard />
+          <ArtworkStorageCard />
         </div>
       </div>
     </div>

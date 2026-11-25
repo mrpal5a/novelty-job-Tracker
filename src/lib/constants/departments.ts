@@ -170,6 +170,12 @@ export function canDeptManageJobSeparation(perms: DeptPermissions | null): boole
   return hasFeature(perms, 'job_separation_edit');
 }
 
+/** Who may make, change, issue and reopen a job card. Everyone can see issued
+ *  ones; removing one is Admin's alone (isSuperAdmin). */
+export function canDeptEditJobCards(perms: DeptPermissions | null): boolean {
+  return hasFeature(perms, 'job_card_edit');
+}
+
 /** Who may add/complete/log entries on the Prepress-Todo checklist. */
 export function canDeptManagePrepressTodo(perms: DeptPermissions | null): boolean {
   return hasFeature(perms, 'prepress_todo_manage');

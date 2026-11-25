@@ -39,6 +39,7 @@ const FEATURES: { key: string; label: string }[] = [
   { key: 'cylinders_edit',                 label: 'Manage cylinders' },
   { key: 'shade_card_manage',              label: 'Manage shade cards' },
   { key: 'job_separation_edit',            label: 'Manage job separation' },
+  { key: 'job_card_edit',                  label: 'Make & edit job cards (everyone can view; only Admin deletes)' },
   { key: 'job_separation_total_view',      label: 'See money totals (Job Separation total, BOM totals, paper stock value)' },
   { key: 'prepress_todo_manage',           label: 'Manage Prepress Todo checklist' },
   { key: 'meter_calculator_use',           label: 'Use Meter Calculator' },

@@ -88,6 +88,9 @@ docs/printing-reference/**
 /Address slip.jpeg
 /Job Sep.jpeg
 
+# Customer artwork and job cards dropped at the repo root for reference.
+/*.pdf
+
 # Hollow copy of the shade card tracker, kept on disk only. It carries no
 # source code — the real project lives at mrpal5a/novelty-shade-card-tracker —
 # but it does hold a .env.local with live Supabase credentials, and one of

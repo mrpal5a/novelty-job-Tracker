@@ -3,8 +3,8 @@
 // GET /api/search?q=riverline — the Ctrl K palette's "search everything".
 // ============================================================
 //
-// One request, eight small lists: jobs, Job Separation lines, shade cards,
-// plates, roto and flatbed dies, label stock on the shelf, and parties. Each
+// One request, nine small lists: jobs, Job Separation lines, job cards (drafts
+// only for departments that make them), shade cards, plates, roto and flatbed dies, label stock on the shelf, and parties. Each
 // is capped, because the palette is for jumping to a thing, not browsing —
 // the page it opens has the full list.
 //
@@ -17,8 +17,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { PostgrestError } from '@supabase/supabase-js';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptViewStock } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptEditJobCards, canDeptViewStock } from '@/lib/constants/departments';
 import { containsPattern, escapeLike, exactFieldRegex, onSearchText, orContains, orMatch, orSizePair, parseSizePair, searchTerms } from '@/lib/search';
+import { JOB_CARD_LIST, type JobCardListRow } from '@/lib/jobCard';
 import { SHADE_CARD_SEARCH_COLUMNS } from '@/lib/constants/shadeCards';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -33,11 +34,12 @@ export async function GET(request: NextRequest) {
   const q = new URL(request.url).searchParams.get('q')?.trim() ?? '';
   // One letter matches half the database; wait for something specific.
   if (q.length < 2) {
-    return NextResponse.json({ jobs: [], separations: [], shadeCards: [], plates: [], dies: [], flatbed: [], stock: [], parties: [] });
+    return NextResponse.json({ jobs: [], separations: [], jobCards: [], shadeCards: [], plates: [], dies: [], flatbed: [], stock: [], parties: [] });
   }
 
   const perms = await getDeptPermissions(deptKeyOf(user));
   const canSeeStock = canDeptViewStock(perms);
+  const canSeeDrafts = canDeptEditJobCards(perms);
 
   // "210x60" is a size: dies and plates are matched on it either way round
   // (as the size boxes on their pages do). A lone number also matches die
@@ -80,7 +82,7 @@ export async function GET(request: NextRequest) {
   const toolTiers = <Q extends Runnable<Q>>(make: () => Q, match: string) =>
     Promise.all([atRack(make), ...bySize(make, ['length', 'width']), make().or(match)]).then(bestFirst);
 
-  const [jobs, separationRows, shadeCards, plates, dies, flatbed, stock, parties] = await Promise.all([
+  const [jobs, separationRows, jobCards, shadeCards, plates, dies, flatbed, stock, parties] = await Promise.all([
     ranked(
       () => supabase
         .from('jobs')
@@ -101,6 +103,14 @@ export async function GET(request: NextRequest) {
         .order('created_at', { ascending: false })
         .limit(LIMIT),
       ['sr_no', 'party', 'po_no', 'pm_code', 'material_name'],
+    ),
+    // Job cards, made from a line or by hand, newest first.
+    ranked(
+      () => {
+        const query = supabase.from('job_cards').select<string, JobCardListRow>(JOB_CARD_LIST);
+        return (canSeeDrafts ? query : query.not('issued_at', 'is', null)).order('created_at', { ascending: false }).limit(LIMIT);
+      },
+      ['card_number', 'party', 'job_name', 'pm_code', 'po_no'],
     ),
     // Shade cards: the live version of each card only, as on its page.
     ranked(
@@ -163,7 +173,7 @@ export async function GET(request: NextRequest) {
       .limit(LIMIT),
   ]);
 
-  const failed = [jobs, separationRows, shadeCards, plates, dies, flatbed, stock, parties].find((r) => r.error);
+  const failed = [jobs, separationRows, jobCards, shadeCards, plates, dies, flatbed, stock, parties].find((r) => r.error);
   if (failed?.error) {
     console.error('[GET /api/search]', failed.error);
     return NextResponse.json({ error: failed.error.message }, { status: 500 });
@@ -172,6 +182,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     jobs:    jobs.data    ?? [],
     separations: separationRows.data ?? [],
+    jobCards:    jobCards.data    ?? [],
     shadeCards:  shadeCards.data  ?? [],
     plates:  plates.data  ?? [],
     dies:    dies.data    ?? [],

@@ -20,6 +20,16 @@ describe('label per round from the die', () => {
     expect(r.dies[0].status).toBe('IN USE'); // in-use die named first
   });
 
+  it('puts the plate’s material first, however it is spaced, and drops no die', () => {
+    const m = (id: string, material: string | null, status = 'IN USE') =>
+      ({ id, length: '165', width: '48', cylinder: 110, ups: 8, status, material }) as unknown as Die;
+    const all = [m('none', null), m('lam', '80GSM CHROMO + LAMINATION'), m('damaged', '80GSM CHROMO', 'DAMAGE'), m('same', '80GSM CHROMO')];
+    const ids = (material: string) => dieUpsFor(all, '165', '48', '110', material).dies.map((d) => d.id);
+    expect(ids(' 80 gsm chromo')).toEqual(['same', 'none', 'lam', 'damaged']);
+    expect(ids('')).toEqual(['none', 'lam', 'same', 'damaged']); // as listed, damaged last
+    expect(ids('PP WHITE')).toEqual(['none', 'lam', 'same', 'damaged']);
+  });
+
   it('leaves it blank when dies disagree or none match', () => {
     expect(dieUpsFor([...dies, die('165', '48', 110, 4)], '165', '48', '110')).toMatchObject({ ups: null, options: [8, 4] });
     expect(dieUpsFor(dies, '165', '48', '97').dies).toHaveLength(0);

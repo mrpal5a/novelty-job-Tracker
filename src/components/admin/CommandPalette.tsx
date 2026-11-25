@@ -14,9 +14,10 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search, FileText, Disc, Scissors, Package, Building2, CornerDownLeft, SplitSquareHorizontal, Palette, type LucideIcon } from 'lucide-react';
+import { Search, FileText, Disc, Scissors, Package, Building2, CornerDownLeft, SplitSquareHorizontal, Palette, ClipboardList, type LucideIcon } from 'lucide-react';
 import { cn, formatQty, formatNumericDate } from '@/lib/utils';
 import { STAGE_DOT } from '@/lib/constants/statusColors';
+import { JOB_CARD_STATE, cardState, listNumber, type JobCardListRow } from '@/lib/jobCard';
 import { matchRow } from '@/lib/search';
 import SearchPreview, { type PreviewTarget } from './SearchPreview';
 import { SEARCH_DEBOUNCE_MS } from '@/hooks/useDebouncedSearch';
@@ -36,11 +37,12 @@ export function warmSearch() {
   fetch('/api/search?q=').catch(() => { /* best effort */ });
 }
 
-type Filter = 'all' | 'jobs' | 'shade' | 'plates' | 'dies' | 'stock' | 'parties';
+type Filter = 'all' | 'jobs' | 'cards' | 'shade' | 'plates' | 'dies' | 'stock' | 'parties';
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all',     label: 'All' },
   { id: 'jobs',    label: 'Jobs' },
+  { id: 'cards',   label: 'Job cards' },
   { id: 'shade',   label: 'Shade cards' },
   { id: 'plates',  label: 'Plates' },
   { id: 'dies',    label: 'Dies' },
@@ -51,6 +53,7 @@ const FILTERS: { id: Filter; label: string }[] = [
 type SearchResponse = {
   jobs:    { id: string; job_card_number: string | null; po_number: string; party: string; job_name: string | null; pm_code: string | null; status: Stage; delivery_date: string | null; is_closed: boolean }[];
   separations: { id: string; sr_no: string | null; party: string; po_no: string | null; pm_code: string | null; material_name: string | null; quantity: number | null; cancelled_at: string | null }[];
+  jobCards:    JobCardListRow[];
   shadeCards:  { id: string; shade_card_number: string | null; party: string | null; product_name: string | null; pm_code: string | null; status: string | null }[];
   plates:  { id: string; plate_id: string | null; party: string; pm_code: string | null; item_name: string | null; cylinder: number | null; location: string | null; across_size: string | null; around_size: string | null }[];
   dies:    { id: string; serial_no: string | null; job_name: string; length: string | null; width: string | null; status: string; location: string | null }[];
@@ -185,6 +188,21 @@ export default function CommandPalette({
           ? <span className="text-[13px] text-brand-muted">Cancelled</span>
           : s.quantity != null && <span className="font-mono text-[13px] text-brand-muted">{formatQty(s.quantity)} pcs</span>,
       });
+      for (const c of data.jobCards ?? []) {
+        const state = JOB_CARD_STATE[cardState(c)];
+        out.push({
+          key: `card-${c.id}`, group: 'Job cards', filter: 'cards', href: `/admin/job-cards/${c.id}`, icon: ClipboardList,
+          title: <>Job card <span className="font-mono">{hl(listNumber(c) ?? 'without a number', term)}</span>{c.party && <> · {hl(c.party, term)}</>}</>,
+          sub: sep(hl(c.job_name, term), c.part_name, c.po_no && <>PO <span className="font-mono">{hl(c.po_no, term)}</span></>,
+                   c.pm_code && <>PM <span className="font-mono">{hl(c.pm_code, term)}</span></>, c.manual && 'made by hand'),
+          aside: (
+            <span className="inline-flex items-center gap-2 whitespace-nowrap text-[13px] font-semibold text-brand-ink">
+              <span aria-hidden="true" className="h-2 w-2 rounded-full" style={{ background: state.color }} />
+              {state.label}
+            </span>
+          ),
+        });
+      }
       for (const c of data.shadeCards) out.push({
         key: `shade-${c.id}`, preview: { kind: 'shade', id: c.id }, group: 'Shade cards', filter: 'shade', href: `/admin/shade-cards/${c.id}`, icon: Palette,
         title: <>Shade card {c.shade_card_number && <span className="font-mono">{hl(c.shade_card_number, term)}</span>}{c.party && <> · {hl(c.party, term)}</>}</>,

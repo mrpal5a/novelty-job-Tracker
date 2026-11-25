@@ -3,7 +3,12 @@ import { describe, it, expect } from 'vitest';
 import { ACTIVITY_TABLES, changedFields, describeAction, fieldLabel, formatValue, tablesInSection } from './activityLog';
 
 const migration = readFileSync('supabase/migrations/089_activity_log.sql', 'utf8');
-const watched = Array.from(migration.matchAll(/^\s*\['([a-z_]+)',/gm), (m) => m[1]);
+// Tables added since bring their own trigger in their own migration.
+const later = ['107_job_cards', '110_plate_artworks'].map((f) => readFileSync(`supabase/migrations/${f}.sql`, 'utf8')).join('\n');
+const watched = [
+  ...Array.from(migration.matchAll(/^\s*\['([a-z_]+)',/gm), (m) => m[1]),
+  ...Array.from(later.matchAll(/ON public\.([a-z_]+)\s+FOR EACH ROW EXECUTE FUNCTION public\.log_activity/g), (m) => m[1]),
+];
 
 describe('what gets recorded', () => {
   it('names every table the trigger watches, and no others', () => {

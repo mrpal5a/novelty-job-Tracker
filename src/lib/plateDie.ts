@@ -1,5 +1,7 @@
 // src/lib/plateDie.ts
-// A plate's label per round is its die's "Ups / repeat": the die of the same
+// A plate's dies are those of the same size and cylinder; the ones cut for its
+// paper material come first, and the team picks.
+// Its label per round is its die's "Ups / repeat": the die of the same
 // size and cylinder (either way round — the two sheets don't agree on which
 // side is "across"). Measured on the live data: 88% of plates with such a
 // die carry exactly its ups. Sizes compare on the whole millimetre, the
@@ -53,17 +55,26 @@ const mm = (v: string | number | null | undefined): number | null => {
 };
 
 export type DieUps = {
-  dies: Die[];          // matching dies, ones in use first
+  dies: Die[];          // matching dies: damaged last, the plate's material first
   ups: number | null;   // set only when every matching die agrees
   options: number[];    // the distinct ups values found
 };
 
-export function dieUpsFor(dies: Die[], sizeA: string, sizeB: string, cylinder: string): DieUps {
+// "80 GSM CHROMO" and "80GSM CHROMO" are one material, as are "TC60 RP37" and
+// "TC 60 RP37"; "80GSM CHROMO + LAMINATION" is another.
+export const materialKey = (v: string | null | undefined) => (v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+export const sameMaterial = (a: string | null | undefined, b: string | null | undefined) =>
+  materialKey(a) !== '' && materialKey(a) === materialKey(b);
+
+// Material orders the dies, it never rules one out: same material, then none
+// recorded (about half of them), then another material.
+export function dieUpsFor(dies: Die[], sizeA: string, sizeB: string, cylinder: string, material?: string | null): DieUps {
   const a = mm(sizeA), b = mm(sizeB), cyl = mm(cylinder);
   if (a === null || b === null || cyl === null) return { dies: [], ups: null, options: [] };
+  const byMaterial = (d: Die) => (!materialKey(material) || sameMaterial(d.material, material) ? 0 : materialKey(d.material) ? 2 : 1);
   const matched = dies
     .filter((d) => mm(d.cylinder) === cyl && sameSize(d, a, b))
-    .sort((x, y) => Number(x.status === 'DAMAGE') - Number(y.status === 'DAMAGE'));
+    .sort((x, y) => Number(x.status === 'DAMAGE') - Number(y.status === 'DAMAGE') || byMaterial(x) - byMaterial(y));
   const options = Array.from(new Set(matched.map((d) => d.ups).filter((u): u is number => u != null && u > 0)));
   return { dies: matched, ups: options.length === 1 ? options[0] : null, options };
 }

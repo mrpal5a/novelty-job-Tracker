@@ -14,16 +14,22 @@
 // derived server-side from quantity × rate.
 
 import React, { useState, useEffect, useRef, useId } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useParties } from '@/hooks/useReferenceData';
 import { findParties } from '@/lib/search';
-import { Check, X } from 'lucide-react';
+import { Check, ExternalLink, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
 import { useUnchanged, NOTHING_CHANGED } from '@/hooks/useUnchanged';
-import type { JobSeparation, Party, Plate } from '@/lib/types';
-import { isPlaceholderPm, metresFromPlates } from '@/lib/plateDie';
+import type { Die, FlatbedDie, JobSeparation, Party, Plate } from '@/lib/types';
+import { StateChip } from '@/components/ui/StateChip';
+import { type ShadeCardStatus, type MakingStatus, SHADE_CARD_STATUS_DOT, MAKING_STATUS_DOT } from '@/lib/constants/shadeCards';
+import { dieListQuery, flatbedDieListQuery } from '@/lib/listQueries';
+import { dieUpsFor, flatbedDiesFor, isPlaceholderPm, metresFromPlates, sameMaterial } from '@/lib/plateDie';
+import { layoutsFor } from '@/lib/jobCard';
+import { dieItem, plateItem, shadeItem } from '@/lib/related';
 import { formatNum } from '@/lib/meterCalculator';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
@@ -141,7 +147,8 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
   const [pmPlates, setPmPlates] = useState<Plate[] | null>(null);
   useEffect(() => {
     const code = pmCode.trim();
-    if (!code || isPlaceholderPm(code)) { setPmPlates(null); return; }
+    setPmPlates(null); // never the previous code's plates while this one loads
+    if (!code || isPlaceholderPm(code)) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
       try {
@@ -423,6 +430,8 @@ export default function AddJobSeparationModal({ editing, prefill, onClose, onSav
 
           <RequiredMetres pmCode={pmCode.trim()} qty={quantity.trim()} meter={meter} loading={!!pmCode.trim() && !isPlaceholderPm(pmCode) && pmPlates === null} />
 
+          <LinkedRecords pmCode={pmCode.trim()} plates={pmPlates} />
+
           <div>
             <JsLabel>Artwork Status</JsLabel>
             <input
@@ -537,5 +546,124 @@ function RequiredMetres({ pmCode, qty, meter, loading }: {
       <JsLabel>Required metres</JsLabel>
       {body}
     </div>
+  );
+}
+
+// What the PM code leads to: its plates, the die each runs with, and its
+// shade cards, so Prepress needn't look each one up. Read-only; every link
+// opens in a new tab, as leaving the form would drop what's typed.
+const PLATES_SHOWN = 4, DIES_SHOWN = 3;
+
+function LinkedRecords({ pmCode, plates }: { pmCode: string; plates: Plate[] | null }) {
+  const usable = !!pmCode && !isPlaceholderPm(pmCode);
+  const ready = usable && plates !== null;
+  const rotoQuery    = useQuery({ ...dieListQuery(), enabled: ready && plates.length > 0 });
+  const flatbedQuery = useQuery({ ...flatbedDieListQuery(), enabled: ready && plates.length > 0 });
+  const shadeQuery = useQuery<{ cards: LinkedShade[] }>({
+    queryKey: ['shade-card-of-pm', pmCode.toLowerCase()],
+    queryFn: async () => {
+      const res = await fetch(`/api/shade-cards/for-job?pm_code=${encodeURIComponent(pmCode)}`);
+      if (!res.ok) throw new Error('Failed to load shade cards');
+      return res.json();
+    },
+    enabled: ready,
+    staleTime: 60_000,
+  });
+
+  if (!usable) return null; // Required metres above already says what's needed
+  const shades = shadeQuery.data?.cards ?? [];
+  const muted = 'px-3 py-2 text-xs text-[var(--glass-muted)]';
+  return (
+    <div aria-live="polite">
+      <JsLabel>Linked records</JsLabel>
+      <div className="rounded-lg border border-black/[0.08] divide-y divide-black/[0.06]">
+        {plates === null ? <p className={muted}>Looking for the plate, die and shade card…</p> : (
+          <>
+            {plates.length === 0 && <p className={muted}>No plate with PM code {pmCode}, so no die either.</p>}
+            {plates.slice(0, PLATES_SHOWN).map((p) => (
+              <PlateAndDie key={p.id} plate={p} dies={rotoQuery.data} flatbeds={flatbedQuery.data} failed={rotoQuery.isError} />
+            ))}
+            {plates.length > PLATES_SHOWN && (
+              <RecordLink kind="Plates" href={`/admin/plates?q=${encodeURIComponent(pmCode)}`} title={`${plates.length - PLATES_SHOWN} more plates of this PM code`} />
+            )}
+            {shadeQuery.isLoading ? <p className={muted}>Looking for the shade card…</p>
+              : shadeQuery.isError ? <p className={muted}>Couldn’t load the shade card.</p>
+              : shades.length === 0 ? <p className={muted}>No shade card with PM code {pmCode}.</p>
+              : shades.map((c) => {
+                const r = shadeItem(c);
+                return (
+                  <RecordLink key={c.id} kind="Shade" href={r.href} title={c.shade_card_number ?? 'No number yet'} detail={r.detail}>
+                    <StateChip label={c.status} dot={SHADE_CARD_STATUS_DOT[c.status]} />
+                    <StateChip label={c.making_status} dot={MAKING_STATUS_DOT[c.making_status]} />
+                  </RecordLink>
+                );
+              })}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+type LinkedShade = {
+  id: string; shade_card_number: string | null; product_name: string; party: string; status: ShadeCardStatus; making_status: MakingStatus;
+};
+
+function PlateAndDie({ plate, dies, flatbeds, failed }: { plate: Plate; dies: Die[] | undefined; flatbeds: FlatbedDie[] | undefined; failed: boolean }) {
+  // Older plates have the two sizes either way round; shown as the job card
+  // prints it when the cylinder settles it, else as saved.
+  const layouts = layoutsFor(plate);
+  const size = layouts.length === 1 ? `${layouts[0].across} X ${layouts[0].around}` : `${plate.across_size ?? '—'} × ${plate.around_size ?? '—'}`;
+  const inks = plate.colors?.filter(Boolean).join(', ');
+  const p = plateItem(plate);
+
+  const linked = dies?.find((d) => d.id === plate.die_id);
+  const matches = linked ? [linked]
+    : dieUpsFor(dies ?? [], plate.across_size ?? '', plate.around_size ?? '', String(plate.cylinder ?? ''), plate.material).dies;
+  const rotos = matches.slice(0, DIES_SHOWN);
+  const flats = rotos.length ? [] : flatbedDiesFor(flatbeds ?? [], plate.across_size ?? '', plate.around_size ?? '').slice(0, 2);
+  return (
+    <>
+      <RecordLink kind="Plate" href={p.href} title={plate.location ? `Location ${plate.location}` : 'No location'}
+        detail={[plate.item_name, size, plate.cylinder && `${plate.cylinder}T`, plate.label_per_round && `${plate.label_per_round} per round`,
+          inks || (plate.total_colors ? `${plate.total_colors} colours` : 'colours not saved')].filter(Boolean).join(' · ')} />
+      {rotos.map((d) => {
+        const r = dieItem(d, d.id === linked?.id);
+        return <RecordLink key={d.id} kind="Die" href={r.href} title={`Roto - ${d.location || 'no location'}`}
+          detail={[r.detail, r.tag ?? (sameMaterial(d.material, plate.material) ? 'same size, cylinder and material' : 'same size and cylinder')].filter(Boolean).join(' · ')} />;
+      })}
+      {matches.length > DIES_SHOWN && (
+        <RecordLink kind="Dies" href={`/admin/dies?field=size&q=${encodeURIComponent(plate.across_size ?? '')}`}
+          title={`${matches.length - DIES_SHOWN} more of this size and cylinder`} />
+      )}
+      {flats.map((d) => (
+        <RecordLink key={d.id} kind="Die" href={`/admin/dies?tab=flatbed&field=size&q=${encodeURIComponent(d.length ?? '')}`}
+          title={`Flatbed - ${d.location || 'no location'}`} detail={[`${d.length} × ${d.width}`, d.ups && `${d.ups} ups`, 'same size'].filter(Boolean).join(' · ')} />
+      ))}
+      {rotos.length === 0 && flats.length === 0 && (
+        <p className="px-3 py-2 text-xs text-[var(--glass-muted)]">
+          {failed ? 'Couldn’t load the dies.' : dies ? 'No die of this size and cylinder on record.' : 'Looking for the die…'}
+        </p>
+      )}
+    </>
+  );
+}
+
+function RecordLink({ kind, href, title, detail, children }: {
+  kind: string; href: string; title: string; detail?: string; children?: React.ReactNode;
+}) {
+  return (
+    <a href={href} target="_blank" rel="noopener" className="flex min-h-11 items-start gap-3 px-3 py-2 hover:bg-black/[0.03] transition-colors">
+      <span className="w-[44px] shrink-0 pt-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[var(--glass-muted)]">{kind}</span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-sm font-semibold font-mono text-[var(--glass-ink)]">{title}</span>
+          {children}
+        </span>
+        {detail && <span className="block text-xs text-[var(--glass-muted)] break-words">{detail}</span>}
+      </span>
+      <ExternalLink className="mt-1 h-3.5 w-3.5 shrink-0 text-[var(--glass-muted)]" aria-hidden="true" />
+      <span className="sr-only">, opens in a new tab</span>
+    </a>
   );
 }

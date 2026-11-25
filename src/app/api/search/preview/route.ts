@@ -22,7 +22,7 @@ const KINDS = {
   },
   plate: {
     table: 'plates',
-    columns: 'id, party, pm_code, item_name, across_size, around_size, cylinder, plate_id, plate_date, label_per_round, location',
+    columns: 'id, party, pm_code, item_name, across_size, around_size, cylinder, material, plate_id, plate_date, label_per_round, location',
   },
   die: {
     table: 'dies',

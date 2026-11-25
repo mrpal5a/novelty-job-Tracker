@@ -206,6 +206,7 @@ const PLATE_COLUMNS: CsvColumn<Plate>[] = [
   { header: 'Height',                value: (p) => p.across_size },
   { header: 'Width',                 value: (p) => p.around_size },
   { header: 'Cylinder',              value: (p) => p.cylinder },
+  { header: 'Material',              value: (p) => p.material },
   { header: 'Label Per Round',       value: (p) => p.label_per_round },
   { header: 'Location',              value: (p) => p.location },
   { header: 'Plate Date',            value: (p) => csvDate(p.plate_date) },

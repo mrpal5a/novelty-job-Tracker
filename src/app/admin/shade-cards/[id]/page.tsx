@@ -17,6 +17,7 @@ import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { SHADE_CARD_STATUS_DOT, MAKING_STATUS_DOT } from '@/lib/constants/shadeCards';
 import { StateChip } from '@/components/ui/StateChip';
 import type { ShadeCard, ShadeCardStatusHistoryEntry } from '@/lib/types';
+import RelatedRecords from '@/components/admin/RelatedRecords';
 
 export const dynamic = 'force-dynamic';
 
@@ -137,6 +138,8 @@ export default async function ShadeCardDetailPage(
           {' — '}last updated by {card.updated_by_name ?? 'unknown'} · {formatAdminDate(card.updated_at)}
         </p>
       </div>
+
+      <div className="glass rounded-xl p-5"><RelatedRecords kind="shade_card" id={card.id} /></div>
 
       {/* ── approval trail ───────────────────────────────────── */}
       <div className="glass rounded-xl p-5">

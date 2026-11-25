@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/overdue-check",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/artwork-cleanup",
+      "schedule": "0 21 * * *"
     }
   ]
 }

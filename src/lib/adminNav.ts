@@ -83,6 +83,7 @@ export function buildNavGroups(dept: DeptPermissions, counts: NavCounts = {}): N
       // their edit features change them (enforced in their API routes).
       key: 'production', label: 'Production', icon: Cpu,
       items: [
+        { href: '/admin/job-cards', label: 'Job Cards', icon: ClipboardList },
         { href: '/admin/machines', label: 'Machines', icon: Cpu },
         { href: '/admin/plates',   label: 'Plates',   icon: Disc },
         { href: '/admin/dies',     label: 'Dies',     icon: Scissors },
