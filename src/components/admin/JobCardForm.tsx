@@ -12,7 +12,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Plus, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -54,7 +54,8 @@ async function send(url: string, method: string, body?: unknown) {
 type Can = {
   canManage: boolean;      // job_card_edit: make, issue, reopen
   canEditPlates: boolean;  // dies_plates_edit: colours, gap and die link go to the plate
-  canDelete: boolean;      // Admin
+  canAccept: boolean;      // job_card_accept: Production
+  canDelete: boolean;      // Admin: also cancels an acceptance
 };
 
 /** `lineId`: the line's cards. `cardId`: one card, from the Job Cards page;
@@ -133,7 +134,7 @@ export default function JobCardForm({ lineId, cardId, ...can }: { lineId?: strin
   );
 }
 
-function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtra, isNew, onSaved, onArtwork, onTyped }: Can & {
+function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, card, isExtra, isNew, onSaved, onArtwork, onTyped }: Can & {
   isNew: boolean; onTyped: (t: { pm?: string; plate?: string }) => void; // a manual card: not saved yet; its PM code or plate changed
   sources: JobCardSources; card: JobCardRow | undefined; isExtra: boolean; onSaved: (id: string | null) => Promise<void>;
   onArtwork: () => Promise<unknown>; // reloads the records; what's typed stays
@@ -145,7 +146,7 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
   const [stations, setStations] = useState<string[] | null>(null); // null: as on the plate
   const [acrossGap, setAcrossGap] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<'issue' | 'reopen' | 'delete' | 'print' | null>(null);
+  const [confirm, setConfirm] = useState<'issue' | 'reopen' | 'accept' | 'unaccept' | 'delete' | 'print' | null>(null);
 
   // Set once created, so a retry after a failed plate save doesn't make a second card.
   const createdId = useRef(card?.id);
@@ -174,6 +175,7 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
   const setManual = (patch: Partial<ManualOrder>) => setInput((c) => ({ ...c, manual: { ...c.manual!, ...patch } }));
   const plate = d.plate.value;
   const issued = card?.issued_at ? card.details : null;
+  const toAccept = canAccept && !!issued && !card?.accepted_at && !line.cancelled_at;
   const state = JOB_CARD_STATE[card ? cardState({ ...card, edited: card.details?.edited ?? null }) : 'none'];
   const number = card
     ? cardNumberOf(line.sr_no, card, sources.cards.length)
@@ -269,11 +271,13 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StateChip label={state.label} dot={state.color} className="mr-1" />
-          {canDelete && card && <Button intent="danger" onClick={() => setConfirm('delete')} disabled={!!busy}>Delete</Button>}
+          {canDelete && card && !card.accepted_at && <Button intent="danger" onClick={() => setConfirm('delete')} disabled={!!busy}>Delete</Button>}
           {issued ? (
             <>
-              {canManage && <Button onClick={() => setConfirm('reopen')} disabled={!!busy}>Reopen</Button>}
-              <Button intent="primary" icon={Printer} onClick={async () => { if (await artworkReady(issued)) window.print(); else setConfirm('print'); }} disabled={!!busy}>Print</Button>
+              {canManage && !card!.accepted_at && <Button onClick={() => setConfirm('reopen')} disabled={!!busy}>Reopen</Button>}
+              {canDelete && card!.accepted_at && <Button onClick={() => setConfirm('unaccept')} disabled={!!busy}>Cancel acceptance</Button>}
+              {toAccept && <Button intent="primary" icon={Check} onClick={() => setConfirm('accept')} disabled={!!busy}>Accept</Button>}
+              <Button intent={toAccept ? undefined : 'primary'} icon={Printer} onClick={async () => { if (await artworkReady(issued)) window.print(); else setConfirm('print'); }} disabled={!!busy}>Print</Button>
             </>
           ) : (
             <>
@@ -398,6 +402,18 @@ function CardEditor({ canManage, canEditPlates, canDelete, sources, card, isExtr
           message="The artwork couldn't be loaded: it may have expired, or the connection dropped. To get it back, reload the page, or reopen the card and attach it again."
           onCancel={() => setConfirm(null)}
           onConfirm={() => { setConfirm(null); setTimeout(() => window.print(), 300); }} />
+      )}
+      {confirm === 'accept' && card && (
+        <ConfirmModal title={`Accept job card ${number}?`} confirmLabel="Accept for production" busy={busy === 'accept'}
+          message="Check every box first. Once accepted, nobody can change, reopen or delete this card. Only Admin can cancel the acceptance."
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => run('accept', async () => { await send(`/api/job-cards/${card.id}`, 'PATCH', { action: 'accept', issued_at: card.issued_at }); return card.id; }, 'Job card accepted')} />
+      )}
+      {confirm === 'unaccept' && card && (
+        <ConfirmModal title={`Cancel the acceptance of ${number}?`} confirmLabel="Cancel acceptance" busy={busy === 'unaccept'}
+          message="Tell Production first: the job may already be running. Prepress can then reopen and change the card, and Production has to accept it again."
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => run('unaccept', async () => { await send(`/api/job-cards/${card.id}`, 'PATCH', { action: 'unaccept' }); return card.id; }, 'Acceptance cancelled')} />
       )}
       {confirm === 'reopen' && card && (
         <ConfirmModal title={`Reopen ${number}?`} confirmLabel="Reopen" busy={busy === 'reopen'}
@@ -677,7 +693,10 @@ function IssuedCard({ details, card, number }: { details: PrintedCard; card: Job
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <p className="text-sm text-brand-muted">
-        Issued {card.issued_at ? formatNumericDate(card.issued_at) : ''} by {details.preparedBy}. Later changes to the plate, die or shade card don’t alter it.
+        Issued {card.issued_at ? formatNumericDate(card.issued_at) : ''} by {details.preparedBy}.{' '}
+        {card.accepted_at
+          ? <strong className="font-semibold text-brand-ink">Accepted {formatNumericDate(card.accepted_at)} by {card.accepted_by}. It can no longer be changed.</strong>
+          : 'Later changes to the plate, die or shade card don’t alter it.'}
       </p>
       {/* A fixed-width sheet: it scrolls sideways inside its own box on a phone. */}
       <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Job card sheet">

@@ -13,7 +13,7 @@ import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useIsDesk } from '@/hooks/useIsDesk';
 import { plateListQuery, plateListParams, PLATE_PAGE_SIZE } from '@/lib/listQueries';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { Search, Plus, Pencil, Trash2, Layers, X } from 'lucide-react';
+import { Copy, Search, Plus, Pencil, Trash2, Layers, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -43,11 +43,11 @@ type PlateColumn = typeof PLATE_COLUMNS[number];
 
 // table-fixed widths. Every column has one, so no column soaks up the spare
 // width on a wide screen — it's shared out in proportion instead. Sized to
-// fit the 1232px table at a 1280px window (21% + 22% + 688px). Party · item
+// fit the 1232px table at a 1280px window (18% + 22% + 732px). Party · item
 // wraps onto more lines rather than widening; other long text truncates,
 // with the full value on hover and in the plate's detail dialog.
 const COLUMN_WIDTH: Record<PlateColumn, string> = {
-  'Plate ID':       'w-[21%]',
+  'Plate ID':       'w-[18%]',
   'Party · item':   'w-[22%]',
   'PM code':        'w-[120px]',
   'Size':           'w-[104px]',
@@ -55,7 +55,7 @@ const COLUMN_WIDTH: Record<PlateColumn, string> = {
   'Labels / round': 'w-[76px]',
   'Location':       'w-[88px]',
   'Plate date':     'w-[104px]',
-  'Actions':        'w-[120px]',
+  'Actions':        'w-[164px]',
 };
 const NUMERIC_COLUMNS: PlateColumn[] = ['Cylinder', 'Labels / round'];
 
@@ -122,6 +122,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
   useUrlSearch(setSearch, undefined, sizes.setSize, setSearchField);
   const [adding,      setAdding]      = useState(false);
   const [editing,     setEditing]     = useState<Plate | null>(null);
+  const [copying,     setCopying]     = useState<Plate | null>(null);
   const [viewing,     setViewing]     = useState<Plate | null>(null);
   // Actions only exist for Prepress/Admin; everyone else gets the space back.
   const columns = canManage ? PLATE_COLUMNS : PLATE_COLUMNS.filter((c) => c !== 'Actions');
@@ -358,7 +359,7 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                     </div>
 
                     {canManage && (
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <button
                           onClick={() => setEditing(plate)}
                           aria-label={`Edit plate for ${plate.party || plate.item_name || 'this plate'}`}
@@ -370,6 +371,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                         >
                           <Pencil className="w-4 h-4" aria-hidden="true" />
                           Edit
+                        </button>
+                        <button
+                          onClick={() => setCopying(plate)}
+                          aria-label={`Duplicate plate for ${plate.party || plate.item_name || 'this plate'}`}
+                          className={cn(
+                            'inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-lg',
+                            'text-xs font-medium border border-black/[0.12] text-[var(--glass-muted)]',
+                            'hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors',
+                          )}
+                        >
+                          <Copy className="w-4 h-4" aria-hidden="true" />
+                          Duplicate
                         </button>
 
                         {confirmId === plate.id ? (
@@ -501,6 +514,18 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
                                   <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
                                 </button>
                                 <button
+                                  onClick={() => setCopying(plate)}
+                                  aria-label={`Duplicate plate for ${plate.party || plate.item_name || 'this plate'}`}
+                                  title="Duplicate"
+                                  className={cn(
+                                    'inline-flex items-center justify-center min-h-11 min-w-11 rounded-lg',
+                                    'border border-black/[0.12] text-[var(--glass-muted)]',
+                                    'hover:bg-black/[0.04] hover:text-[var(--glass-ink)] transition-colors',
+                                  )}
+                                >
+                                  <Copy className="w-3.5 h-3.5" aria-hidden="true" />
+                                </button>
+                                <button
                                   onClick={() => setConfirmId(plate.id)}
                                   aria-label={`Delete plate for ${plate.party || plate.item_name || 'this plate'}`}
                                   title="Delete"
@@ -544,13 +569,15 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
           plateIds={plateIdsOf(viewing)}
           onClose={() => setViewing(null)}
           onEdit={canManage ? () => { setEditing(viewing); setViewing(null); } : undefined}
+          onDuplicate={canManage ? () => { setCopying(viewing); setViewing(null); } : undefined}
         />
       )}
-      {(adding || editing) && (
+      {(adding || editing || copying) && (
         <AddPlateModal
           editing={editing ?? undefined}
-          onClose={() => { setAdding(false); setEditing(null); }}
-          onSaved={() => { setAdding(false); setEditing(null); queryClient.invalidateQueries({ queryKey: ['plates'] }); }}
+          copyOf={copying ?? undefined}
+          onClose={() => { setAdding(false); setEditing(null); setCopying(null); }}
+          onSaved={() => { setAdding(false); setEditing(null); setCopying(null); queryClient.invalidateQueries({ queryKey: ['plates'] }); }}
         />
       )}
     </div>

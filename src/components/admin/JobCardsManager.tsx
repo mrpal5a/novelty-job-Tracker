@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ClipboardList, Plus, Search } from 'lucide-react';
 import { cn, formatNumericDate } from '@/lib/utils';
@@ -25,7 +26,9 @@ const fieldCls = cn(
 
 export default function JobCardsManager({ canManage }: { canManage: boolean }) {
   const [search, setSearch] = useState('');
-  const [only, setOnly] = useState('');
+  // Job Separation links here with ?only=draft.
+  const asked = useSearchParams().get('only');
+  const [only, setOnly] = useState(canManage && asked === 'draft' ? asked : '');
   const [limit, setLimit] = useState(PAGE);
   useUrlSearch(setSearch);
   const debounced = useDebouncedSearch(search);
@@ -60,7 +63,8 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
         <select value={only} onChange={(e) => setOnly(e.target.value)} aria-label="Which cards" className={cn(fieldCls, 'w-auto rounded-xl')}>
           <option value="">All cards</option>
           <option value="manual">Made by hand</option>
-          {canManage && <option value="draft">Not issued</option>}
+          <option value="waiting">Waiting for Production</option>
+          {canManage && <option value="draft">Open, not issued</option>}
         </select>
         {canManage && (
           <Link href="/admin/job-cards/new" className={cn(buttonClass('primary'), 'max-sm:ml-auto')}><Plus className="w-4 h-4" aria-hidden="true" /> New manual card</Link>
@@ -151,7 +155,9 @@ function State({ card }: { card: JobCardListRow }) {
   return (
     <span className="inline-flex flex-col">
       <StateChip label={s.label} dot={s.color} className="text-xs" />
-      {card.issued_at && <span className="text-xs font-mono text-[var(--glass-muted)]">{formatNumericDate(card.issued_at)}</span>}
+      <span className="text-xs font-mono text-[var(--glass-muted)]">
+        {card.issued_at ? formatNumericDate(card.accepted_at ?? card.issued_at) : <><span className="font-sans">made </span>{formatNumericDate(card.created_at)}</>}
+      </span>
     </span>
   );
 }

@@ -45,4 +45,41 @@ describe('job cards: who may do what', () => {
     expect((await patch({ action: 'reopen' })).status).toBe(200);
     expect(writes('job_cards')[0].payload).toEqual({ details: null, issued_at: null, issued_by: null });
   });
+
+  it('Production accepts the issue it looked at, and makes no other change', async () => {
+    const issued_at = '2026-11-25T10:00:00.000+00:00';
+    const accept = (seen: unknown = issued_at) => patch({ action: 'accept', issued_at: seen });
+    expect((await accept()).status).toBe(401);
+    for (const dept of ['Prepress', 'QC', 'Viewer']) { signIn(dept); expect((await accept()).status).toBe(403); }
+
+    signIn('Production'); respond(() => ({ data: { ...CARD, issued_at } }));
+    expect((await patch({ direction: 'X' })).status).toBe(403);
+    expect((await patch({ action: 'reopen' })).status).toBe(403);
+    expect((await accept('2026-11-25T09:00:00Z')).status).toBe(409); // issued again since
+    expect((await accept(null)).status).toBe(409);
+    expect(writes('job_cards')).toHaveLength(0);
+    expect((await accept()).status).toBe(200);
+    expect(writes('job_cards')[0].payload).toEqual({ accepted_at: expect.any(String), accepted_by: 'production' });
+
+    respond(() => ({ data: CARD })); // a draft
+    expect((await accept()).status).toBe(409);
+  });
+
+  it('only Admin cancels an acceptance', async () => {
+    respond(() => ({ data: { ...CARD, issued_at: '2026-11-25', accepted_at: '2026-11-25' } }));
+    for (const dept of ['Prepress', 'Production', 'Viewer']) { signIn(dept); expect((await patch({ action: 'unaccept' })).status).toBe(403); }
+    signIn('Admin');
+    expect((await patch({ action: 'unaccept' })).status).toBe(200);
+    expect(writes('job_cards')[0].payload).toEqual({ accepted_at: null, accepted_by: null });
+    respond(() => ({ data: { ...CARD, issued_at: '2026-11-25' } }));
+    expect((await patch({ action: 'unaccept' })).status).toBe(409);
+  });
+
+  it('an accepted card is closed to everyone, Admin included', async () => {
+    signIn('Admin'); respond(() => ({ data: { ...CARD, issued_at: '2026-11-25', accepted_at: '2026-11-25' } }));
+    for (const body of [{ direction: 'X' }, { action: 'issue' }, { action: 'reopen' }, { action: 'accept', issued_at: '2026-11-25' }]) {
+      expect((await patch(body)).status).toBe(409);
+    }
+    expect(writes('job_cards')).toHaveLength(0);
+  });
 });

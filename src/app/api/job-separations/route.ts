@@ -198,7 +198,7 @@ async function jobCardStates(): Promise<Map<string, JobCardState> | null> {
   try {
     const admin = createAdminClient();
     const cards = await allPages<CardStateRow & { job_separation_id: string }>((from, to) => admin.from('job_cards')
-      .select('job_separation_id, card_number, issued_at, edited:details->>edited').not('job_separation_id', 'is', null).order('id').range(from, to));
+      .select('job_separation_id, card_number, issued_at, accepted_at, edited:details->>edited').not('job_separation_id', 'is', null).order('id').range(from, to));
     const byLine = new Map<string, CardStateRow[]>();
     for (const c of cards) byLine.set(c.job_separation_id, [...(byLine.get(c.job_separation_id) ?? []), c]);
     return new Map(Array.from(byLine, ([id, list]) => [id, lineCardState(list)]));

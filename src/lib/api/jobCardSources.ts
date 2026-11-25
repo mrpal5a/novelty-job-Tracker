@@ -9,24 +9,28 @@ import type { Die, FlatbedDie, Plate } from '@/lib/types';
 import { lineOfManual, type BomHint, type CardLine, type JobCardRow, type JobCardSources } from '@/lib/jobCard';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptEditJobCards } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptAcceptJobCards, canDeptEditJobCards } from '@/lib/constants/departments';
 import { appMetaOf, deptKeyOf } from '@/lib/identity';
 import { usernameOf } from '@/lib/username';
 import type { ArtworkRow } from '@/lib/artwork';
 import { isPlaceholderPm } from '@/lib/plateDie';
 import { escapeLike } from '@/lib/search';
 
-/** Who is making the card (job_card_edit) or deleting one (Admin only), or the
+/** Who is making the card (job_card_edit), accepting one (job_card_accept), or cancelling that or deleting one (Admin only), or the
  *  response that refuses them. */
-export async function jobCardWriter(need: 'edit' | 'admin' = 'edit'): Promise<{ name: string; username: string } | { denied: NextResponse }> {
+export async function jobCardWriter(need: 'edit' | 'accept' | 'admin' = 'edit', refusal = 'Only Admin can delete a job card'): Promise<{ name: string; username: string } | { denied: NextResponse }> {
   const user = await getClaimsUser(await createServerSupabaseClient());
   if (!user) return { denied: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   const perms = await getDeptPermissions(deptKeyOf(user));
+  if (need === 'accept') {
+    if (!canDeptAcceptJobCards(perms)) return { denied: NextResponse.json({ error: 'Your department cannot accept job cards' }, { status: 403 }) };
+    return { name: user.email ?? perms!.key, username: usernameOf(appMetaOf(user), user.email) };
+  }
   if (!perms || !canDeptEditJobCards(perms)) {
     return { denied: NextResponse.json({ error: 'Your department cannot make job cards' }, { status: 403 }) };
   }
   if (need === 'admin' && !perms.isSuperAdmin) {
-    return { denied: NextResponse.json({ error: 'Only Admin can delete a job card' }, { status: 403 }) };
+    return { denied: NextResponse.json({ error: refusal }, { status: 403 }) };
   }
   return { name: user.email ?? perms.key, username: usernameOf(appMetaOf(user), user.email) };
 }

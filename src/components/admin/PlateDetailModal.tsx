@@ -7,7 +7,7 @@
 import { useId } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { Pencil, X } from 'lucide-react';
+import { Copy, Pencil, X } from 'lucide-react';
 import { cn, formatAdminDate, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { ModalShell } from './modals';
@@ -34,9 +34,10 @@ type Props = {
   plateIds: string[];
   onClose: () => void;
   onEdit?: () => void; // only for departments that can manage plates
+  onDuplicate?: () => void; // the same departments
 };
 
-export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: Props) {
+export default function PlateDetailModal({ plate, plateIds, onClose, onEdit, onDuplicate }: Props) {
   const titleId = useId();
   const size = plate.across_size || plate.around_size
     ? `${plate.across_size ?? '—'} × ${plate.around_size ?? '—'} mm`
@@ -186,6 +187,7 @@ export default function PlateDetailModal({ plate, plateIds, onClose, onEdit }: P
 
         <div className="flex justify-end gap-2 px-5 py-3 border-t border-black/[0.08] shrink-0">
           <Button intent="ghost" onClick={onClose}>Close</Button>
+          {onDuplicate && <Button icon={Copy} onClick={onDuplicate}>Duplicate</Button>}
           {onEdit && <Button intent="primary" icon={Pencil} onClick={onEdit}>Edit plate</Button>}
         </div>
       </div>

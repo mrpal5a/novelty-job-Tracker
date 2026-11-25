@@ -167,7 +167,7 @@ describe('saving and repeating', () => {
     manual: null, plate_id: 'p1', die_id: 'three', flatbed_die_id: null, shade_card_id: null, material_id: null, layout: null,
     roll_sheet: 'ROLL', direction: 'UNWIND#3', material: 'AM89240 (80GSM CHROMO)', material_width_mm: 235,
     labels_per_roll: 3000, delivery_date: '2026-10-01', overrides: { plateNo: 'NEW R' }, details: null,
-    issued_at: '2026-10-01', issued_by: null, created_by: null, created_at: '', updated_at: '', ...over,
+    issued_at: '2026-10-01', issued_by: null, accepted_at: null, accepted_by: null, created_by: null, created_at: '', updated_at: '', ...over,
   });
 
   it('a repeat order fills itself from the last card, but not its date or typed-over boxes', () => {
@@ -252,16 +252,19 @@ describe('saving and repeating', () => {
   });
 
   it('a line is green only when every card is issued, amber once edited, red before', () => {
-    const none = { card_number: null, issued_at: null, edited: null };
-    const issued = { card_number: 'N-1', issued_at: 'x', edited: null };
-    const reopened = { card_number: 'N-1', issued_at: null, edited: null };
-    const edited = { card_number: 'N-1', issued_at: 'x', edited: 'true' }; // as Postgres hands it back
+    const none = { card_number: null, issued_at: null, accepted_at: null, edited: null };
+    const issued = { card_number: 'N-1', issued_at: 'x', accepted_at: null, edited: null };
+    const reopened = { card_number: 'N-1', issued_at: null, accepted_at: null, edited: null };
+    const edited = { card_number: 'N-1', issued_at: 'x', accepted_at: null, edited: 'true' }; // as Postgres hands it back
     expect(lineCardState([])).toBe('none');
     expect(lineCardState([issued])).toBe('issued');
     expect(lineCardState([issued, issued])).toBe('issued');
     expect(lineCardState([issued, none])).toBe('draft');
     expect(lineCardState([issued, edited])).toBe('edited');
     expect(lineCardState([edited, reopened])).toBe('reopened');
+    const accepted = { ...edited, accepted_at: 'y' };
+    expect(lineCardState([accepted, accepted])).toBe('accepted');
+    expect(lineCardState([accepted, issued])).toBe('issued');
   });
 
   it('marks a card issued again as edited, the first issue not', () => {

@@ -22,9 +22,10 @@ import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useRefetchOnChange } from '@/hooks/useRefetchOnChange';
 import Link from 'next/link';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, ClipboardPen, ClipboardX, Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, ClipboardPen, ClipboardX, Lock, MoreHorizontal, Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { JOB_CARD_STATE } from '@/lib/jobCard';
+import { StateChip } from '@/components/ui/StateChip';
+import { JOB_CARD_STATE, isOpenCard, listNumber, type JobCardListRow } from '@/lib/jobCard';
 import { cn, formatQty, formatNumericDate, formatJobCardNumber } from '@/lib/utils';
 import { compareValues, type SortDir, type SortKind } from '@/lib/sort';
 import { Button } from '@/components/ui/Button';
@@ -192,7 +193,7 @@ const JOB_SEPARATION_EXPORT_COLUMNS: CsvColumn<JobSeparation>[] = [
   { header: 'Added',          value: (j) => csvTimestamp(j.created_at) },
 ];
 
-type Props = { canManage: boolean; canManageTodo: boolean; canUseMeterCalculator: boolean; canSeeTotal: boolean; canSeePrices: boolean; canSeeDispatched: boolean; canDispatch: boolean; dept: Department | null };
+type Props = { canManage: boolean; canMakeCards: boolean; canManageTodo: boolean; canUseMeterCalculator: boolean; canSeeTotal: boolean; canSeePrices: boolean; canSeeDispatched: boolean; canDispatch: boolean; dept: Department | null };
 
 /** "3,000" over "7,000 left" / "Done" / "+500 over" — what's gone out against the order. */
 function DispatchedFigure({ row }: { row: JobSeparation }) {
@@ -212,16 +213,72 @@ function DispatchedFigure({ row }: { row: JobSeparation }) {
 }
 
 // The line's job card, its state in colour, icon and words: green issued, red
-// not issued, amber edited. Grey when the line needs none (Job Card Status
+// not made, purple open (made or reopened, not issued), amber edited, blue accepted by Production. Grey when the line needs none (Job Card Status
 // N/A) or the state couldn't be read.
-const CARD_ICON = { none: ClipboardX, draft: ClipboardX, issued: ClipboardCheck, reopened: ClipboardPen, edited: ClipboardPen };
+const CARD_ICON = { none: ClipboardX, draft: ClipboardPen, issued: ClipboardCheck, reopened: ClipboardPen, edited: ClipboardPen, accepted: Lock };
 
-function JobCardLink({ row, withText }: { row: JobSeparation; withText?: boolean }) {
+function cardMark(row: JobSeparation) {
   const notNeeded = /^n\/?a$/i.test(row.jc_status?.trim() ?? '') && row.job_card === 'none';
   const state = row.job_card && !notNeeded ? row.job_card : null;
-  const Icon = state ? CARD_ICON[state] : ClipboardList;
   const mark = state ? JOB_CARD_STATE[state] : null;
-  const label = mark?.label ?? (notNeeded ? 'Not needed' : '');
+  return { Icon: state ? CARD_ICON[state] : ClipboardList, mark, label: mark?.label ?? (notNeeded ? 'Not needed' : '') };
+}
+
+// Cards someone started and didn't issue, whichever month their line is in.
+function OpenCards() {
+  const { data } = useQuery<{ cards: JobCardListRow[]; total: number }>({
+    queryKey: ['job-cards', 'open'], // refreshed with the rest when a card is saved
+    queryFn: async () => {
+      const res = await fetch('/api/job-cards?only=draft&limit=3');
+      if (!res.ok) throw new Error('Failed to load open job cards');
+      return res.json();
+    },
+  });
+  if (!data?.total) return null;
+  const numbers = data.cards.map((c) => listNumber(c) ?? c.job_name ?? 'No number yet');
+  return (
+    <Link
+      href={data.total === 1 ? `/admin/job-cards/${data.cards[0].id}` : '/admin/job-cards?only=draft'}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-11 rounded-xl border border-black/[0.12] bg-white px-4 py-2 hover:bg-black/[0.03] transition-colors"
+    >
+      <StateChip dot={JOB_CARD_STATE.draft.color} label={data.total === 1 ? '1 job card is open, not issued' : `${data.total} job cards are open, not issued`} />
+      <span className="min-w-0 font-mono text-[13px] text-brand-muted [overflow-wrap:anywhere]">
+        {numbers.join(', ')}{data.total > numbers.length && ` and ${data.total - numbers.length} more`}
+      </span>
+      <span className="ml-auto text-[13px] font-semibold text-brand-primary underline underline-offset-2">{data.total === 1 ? 'Open card' : 'Show them'}</span>
+    </Link>
+  );
+}
+
+// A row's actions behind one button, shown to its left on hover, on a tap or
+// on keyboard focus. The button keeps the job card's state in view. Beside the
+// button, never over it, so a tap can't land on an action; `has`, not
+// focus-within, so it closes after a click. Not `invisible`: Tab must reach the
+// actions.
+function RowActions({ row, children }: { row: JobSeparation; children: React.ReactNode }) {
+  const { Icon, mark, label } = cardMark(row);
+  return (
+    <div className="group relative inline-flex">
+      <button
+        type="button"
+        aria-label={`Actions for ${row.sr_no ?? row.party}${label ? `, job card: ${label}` : ''}`}
+        style={mark ? { color: mark.color, borderColor: `${mark.color}66` } : undefined}
+        className="inline-flex items-center justify-center gap-1 min-h-11 px-2 rounded-lg border border-black/[0.12] text-[var(--glass-muted)] hover:bg-black/[0.04] transition-colors"
+      >
+        <Icon className="w-4 h-4" aria-hidden="true" />
+        {isOpenCard(row.job_card) && mark
+          ? <span className="text-xs font-semibold">Open</span>
+          : <MoreHorizontal className="w-4 h-4 text-[var(--glass-muted)]" aria-hidden="true" />}
+      </button>
+      <div className="pointer-events-none absolute right-full top-1/2 z-[5] -translate-y-1/2 pr-1.5 opacity-0 transition-opacity duration-100 motion-reduce:transition-none group-hover:pointer-events-auto group-hover:opacity-100 group-has-[:focus-visible]:pointer-events-auto group-has-[:focus-visible]:opacity-100">
+        <div className="flex items-center gap-1.5 rounded-xl border border-black/[0.12] bg-white p-1 shadow-md">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function JobCardLink({ row, withText }: { row: JobSeparation; withText?: boolean }) {
+  const { Icon, mark, label } = cardMark(row);
   return (
     <Link
       href={`/admin/job-separation/${row.id}/job-card`}
@@ -240,7 +297,7 @@ function JobCardLink({ row, withText }: { row: JobSeparation; withText?: boolean
   );
 }
 
-export default function JobSeparationManager({ canManage, canManageTodo, canUseMeterCalculator, canSeeTotal, canSeePrices, canSeeDispatched, canDispatch, dept }: Props) {
+export default function JobSeparationManager({ canManage, canMakeCards, canManageTodo, canUseMeterCalculator, canSeeTotal, canSeePrices, canSeeDispatched, canDispatch, dept }: Props) {
   // Viewer: no Order Value column, and Qty / Rate shows the qty alone.
   const columns = (canSeeDispatched ? JOB_SEPARATION_COLUMNS : WITHOUT_DISPATCHED)
     .filter((c) => canSeePrices || c !== 'Order Value');
@@ -612,6 +669,8 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
           </Button>
         )}
       </div>
+
+      {canMakeCards && <OpenCards />}
 
       {!loading && sortedRows.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -1000,10 +1059,9 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                               <Ban className="w-3.5 h-3.5" aria-hidden="true" />
                               Cancelled
                             </span>
-                          ) : (
-                            <div className="inline-flex items-center gap-1.5">
+                          ) : !canManage ? <JobCardLink row={row} /> : (
+                            <RowActions row={row}>
                               <JobCardLink row={row} />
-                              {canManage && <>
                               <button
                                 onClick={() => { setEditing(null); setDuplicateSource(row); setAdding(true); }}
                                 aria-label={`Duplicate the job separation row for ${row.party}`}
@@ -1053,8 +1111,7 @@ export default function JobSeparationManager({ canManage, canManageTodo, canUseM
                               >
                                 <Ban className="w-3.5 h-3.5" aria-hidden="true" />
                               </button>
-                              </>}
-                            </div>
+                            </RowActions>
                           )}
                         </td>
                       </tr>

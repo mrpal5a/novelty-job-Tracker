@@ -37,39 +37,44 @@ const inputCls = cn(
 
 type Props = {
   editing?: Plate;
+  copyOf?: Plate; // "Duplicate": a new plate starting from this one's details
   onClose: () => void;
   onSaved: () => void;
 };
 
-export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
+export default function AddPlateModal({ editing, copyOf, onClose, onSaved }: Props) {
+  // A copy leaves out what belongs to one set of plates: its IDs, date and rack.
+  const from = editing ?? copyOf;
   const titleId = useId();
   const listId  = useId();
 
-  const [party,         setParty]         = useState(editing?.party ?? '');
-  const [pmCode,        setPmCode]        = useState(editing?.pm_code ?? '');
-  const [itemName,      setItemName]      = useState(editing?.item_name ?? '');
-  const [acrossSize,    setAcrossSize]    = useState(editing?.across_size ?? '');
-  const [aroundSize,    setAroundSize]    = useState(editing?.around_size ?? '');
-  const [cylinder,      setCylinder]      = useState(editing?.cylinder?.toString() ?? '');
-  const [material,      setMaterial]      = useState(editing?.material ?? '');
-  const [direction,     setDirection]     = useState(editing?.direction ?? '');
-  const [rollSheet,     setRollSheet]     = useState<string>(editing?.roll_sheet ?? '');
+  const [party,         setParty]         = useState(from?.party ?? '');
+  const [pmCode,        setPmCode]        = useState(from?.pm_code ?? '');
+  const [itemName,      setItemName]      = useState(from?.item_name ?? '');
+  const [acrossSize,    setAcrossSize]    = useState(from?.across_size ?? '');
+  const [aroundSize,    setAroundSize]    = useState(from?.around_size ?? '');
+  const [cylinder,      setCylinder]      = useState(from?.cylinder?.toString() ?? '');
+  const [material,      setMaterial]      = useState(from?.material ?? '');
+  const [direction,     setDirection]     = useState(from?.direction ?? '');
+  const [rollSheet,     setRollSheet]     = useState<string>(from?.roll_sheet ?? '');
   const [plateId,       setPlateId]       = useState(editing?.plate_id ?? '');
   const [plateDate,     setPlateDate]     = useState(editing?.plate_date ?? '');
-  const [labelPerRound, setLabelPerRound] = useState(editing?.label_per_round?.toString() ?? '');
+  const [labelPerRound, setLabelPerRound] = useState(from?.label_per_round?.toString() ?? '');
   const [location,      setLocation]      = useState(editing?.location ?? '');
-  const [totalColors,   setTotalColors]   = useState(editing?.total_colors?.toString() ?? '');
+  const [totalColors,   setTotalColors]   = useState(from?.total_colors?.toString() ?? '');
   // All 12 boxes live here; Total colours decides how many show and save.
-  const [colors,        setColors]        = useState(() => colorBoxes(editing?.colors));
+  const [colors,        setColors]        = useState(() => colorBoxes(from?.colors));
   const colorCount = Number(totalColors) || 0;
-  const [dieId,         setDieId]         = useState(editing?.die_id ?? '');
-  const [layout,        setLayout]        = useState<LayoutState>(() => layoutState(editing));
+  const [dieId,         setDieId]         = useState(from?.die_id ?? '');
+  const [layout,        setLayout]        = useState<LayoutState>(() => layoutState(from));
   const [saving,        setSaving]        = useState(false);
 
   // PM code → its Job Separation line: party and item name fill in, spelt
   // the way the worksheet and the party list spell them. New plates only.
-  const lastFill = useRef({ party: '', item: '' });
-  const pmMatch = usePmCodeLookup(pmCode, !editing, (row) => {
+  // A copy's are refilled only once its code is changed.
+  const lastFill = useRef({ party: copyOf?.party ?? '', item: copyOf?.item_name ?? '' });
+  const [pmTyped, setPmTyped] = useState(false);
+  const pmMatch = usePmCodeLookup(pmCode, !editing && (!copyOf || pmTyped), (row) => {
     const prev = lastFill.current;
     lastFill.current = { party: row.party ?? '', item: row.material_name ?? '' };
     setParty(fillIfUntouched(party, prev.party, lastFill.current.party));
@@ -93,6 +98,12 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
   useAutoFill(autoGap, layout.around_gap, (v) => setLayout((l) => ({ ...l, around_gap: v })));
   const autoLpr = labelsPerRound(layout.across_ups, layout.around_ups);
   useAutoFill(autoLpr, labelPerRound, setLabelPerRound);
+  // A copy of another size or cylinder doesn't run on the copied die, and its
+  // ups and gaps must not be shared with that die's plates.
+  const resize = (set: (v: string) => void) => (v: string) => {
+    set(v);
+    if (copyOf && dieId === copyOf.die_id) setDieId('');
+  };
   // Picking a die brings its layout in, when it has one; the database then
   // keeps plate and die in step (migration 101).
   function pickDie(die: Die | null) {
@@ -162,10 +173,10 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/12 shrink-0">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-[var(--glass-ink)]">
-              {editing ? 'Edit plate' : 'Add plate'}
+              {editing ? 'Edit plate' : copyOf ? 'Duplicate plate' : 'Add plate'}
             </h2>
             <p className="text-xs text-[var(--glass-muted)] mt-0.5">
-              Only the party is required — fill in the rest as it becomes known
+              {copyOf ? 'Change what differs. Plate ID, date and location are left blank for the new plate.' : 'Only the party is required — fill in the rest as it becomes known'}
             </p>
           </div>
           <button
@@ -184,7 +195,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
               <PlateLabel>PM code</PlateLabel>
               <input
                 value={pmCode}
-                onChange={(e) => setPmCode(e.target.value)}
+                onChange={(e) => { setPmCode(e.target.value); setPmTyped(true); }}
                 autoComplete="off"
                 autoFocus={!editing}
                 aria-label="PM code"
@@ -225,7 +236,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
                   inputMode="numeric"
                   aria-label="Cylinder in teeth"
                   value={cylinder}
-                  onChange={(e) => setCylinder(e.target.value)}
+                  onChange={(e) => resize(setCylinder)(e.target.value)}
                   className={cn(inputCls, 'font-mono')}
                 />
               </WithUnit>
@@ -317,7 +328,7 @@ export default function AddPlateModal({ editing, onClose, onSaved }: Props) {
             sizes={{
               across: acrossSize,
               around: aroundSize,
-              onChange: (side, v) => (side === 'across' ? setAcrossSize : setAroundSize)(v),
+              onChange: (side, v) => resize(side === 'across' ? setAcrossSize : setAroundSize)(v),
             }}
             note={<>
               {autoGap !== null && layout.around_gap === String(autoGap) && (

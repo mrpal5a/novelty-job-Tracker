@@ -7,10 +7,12 @@
 // PATCH  /api/job-cards/[id] — save a draft's fields, or { action: 'issue' }
 //        / 'reopen', or for a card made by hand 'link' { job_separation_id }
 //        / 'unlink'. Issuing fills the card here, on the server,
-//        from the records as they are now, and freezes it.
+//        from the records as they are now, and freezes it. { action: 'accept',
+//        issued_at } accepts the issue that was looked at: nothing changes it
+//        until Admin cancels that with { action: 'unaccept' }.
 // DELETE /api/job-cards/[id] — remove a card, issued or not. Admin only; the
 //        Activity Log keeps what it said, and its number is free again.
-// PATCH needs job_card_edit. The rules themselves are the database's (107, 108).
+// PATCH needs job_card_edit, accepting job_card_accept. The rules themselves are the database's (107, 108, 113).
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -53,10 +55,11 @@ export async function GET(request: NextRequest, { params }: Params) {
 
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params;
-  const writer = await jobCardWriter();
+  const body = await request.json().catch(() => null);
+  const writer = body?.action === 'accept' ? await jobCardWriter('accept')
+    : body?.action === 'unaccept' ? await jobCardWriter('admin', 'Only Admin can cancel an acceptance') : await jobCardWriter();
   if ('denied' in writer) return writer.denied;
 
-  const body = await request.json().catch(() => null);
   const db = createAdminClient();
   const { data: card, error } = await db.from('job_cards').select('*').eq('id', id).maybeSingle<JobCardRow>();
   if (error) return jobCardDbError(error);
@@ -64,7 +67,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
   let updates: Record<string, unknown>;
   const action = body?.action;
-  if (action === 'issue') {
+  if (action === 'accept') {
+    if (card.accepted_at) return refuse('This job card is already accepted', 409);
+    // Not a card reopened, or issued again, since it was looked at.
+    if (!card.issued_at || typeof body.issued_at !== 'string' || Date.parse(body.issued_at) !== Date.parse(card.issued_at)) {
+      return refuse('This job card has changed since you opened it. Reload and check it again', 409);
+    }
+    updates = { accepted_at: new Date().toISOString(), accepted_by: writer.username };
+  } else if (action === 'unaccept') {
+    if (!card.accepted_at) return refuse('This job card is not accepted', 409);
+    updates = { accepted_at: null, accepted_by: null };
+  } else if (card.accepted_at && action !== 'link' && action !== 'unlink') {
+    return refuse('Production has accepted this job card: it can no longer be changed', 409);
+  } else if (action === 'issue') {
     if (card.issued_at) return refuse('This job card is already issued', 409);
     try {
       const sources = await loadSourcesOfCard(db, id);

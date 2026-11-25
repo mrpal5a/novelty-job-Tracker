@@ -1,11 +1,12 @@
 // src/app/admin/job-cards/[id]/page.tsx
 // One job card, whichever way it was made. Departments with job_card_edit
 // edit it; every other one sees it once issued, read-only. Only Admin deletes.
+// Production accepts an issued card: locked until Admin cancels that.
 
 import { notFound } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptEditJobCards, canDeptManageDiesPlates } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptAcceptJobCards, canDeptEditJobCards, canDeptManageDiesPlates } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
 import JobCardForm from '@/components/admin/JobCardForm';
 
@@ -22,6 +23,7 @@ export default async function JobCardByIdPage({ params }: { params: Promise<{ id
       cardId={id}
       canManage={canDeptEditJobCards(perms)}
       canEditPlates={canDeptManageDiesPlates(perms)}
+      canAccept={canDeptAcceptJobCards(perms)}
       canDelete={perms.isSuperAdmin}
     />
   );

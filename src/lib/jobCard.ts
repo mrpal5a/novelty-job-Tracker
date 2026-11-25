@@ -85,6 +85,7 @@ export type JobCardInput = {
 export type JobCardRow = JobCardInput & {
   id: string; job_separation_id: string | null; part: number; card_number: string | null;
   details: PrintedCard | null; issued_at: string | null; issued_by: string | null;
+  accepted_at: string | null; accepted_by: string | null; // Production's: locked (migration 113)
   created_by: string | null; created_at: string; updated_at: string;
 };
 
@@ -508,30 +509,35 @@ export function plateUpdates(plate: Plate, die: DieRef | null, typed: { colors?:
 }
 
 // ── The state a line's cards are in ─────────────────────────────
-export type JobCardState = 'none' | 'draft' | 'issued' | 'reopened' | 'edited';
-export type CardStateRow = { card_number: string | null; issued_at: string | null; edited: string | boolean | null };
+export type JobCardState = 'none' | 'draft' | 'issued' | 'reopened' | 'edited' | 'accepted';
+export type CardStateRow = { card_number: string | null; issued_at: string | null; accepted_at: string | null; edited: string | boolean | null };
 
 /** One card: a number is kept from the first issue on, so a numbered card
  *  that isn't issued was reopened. */
 export function cardState(c: CardStateRow): JobCardState {
+  if (c.accepted_at) return 'accepted';
   if (!c.issued_at) return c.card_number ? 'reopened' : 'draft';
   return c.edited === true || c.edited === 'true' ? 'edited' : 'issued';
 }
 
-/** A line with front and back is issued only when all its cards are. */
+/** A line with front and back is issued, or accepted, only when all its cards are. */
 export function lineCardState(cards: CardStateRow[]): JobCardState {
   const states = cards.map(cardState);
-  return (['draft', 'reopened', 'edited', 'issued'] as const).find((s) => states.includes(s)) ?? 'none';
+  return (['draft', 'reopened', 'edited', 'issued', 'accepted'] as const).find((s) => states.includes(s)) ?? 'none';
 }
 
-const RED = '#DC2626', AMBER = '#D97706', GREEN = '#15803D';
+const RED = '#DC2626', AMBER = '#D97706', GREEN = '#15803D', BLUE = '#2563EB', PURPLE = '#9333EA';
 export const JOB_CARD_STATE: Record<JobCardState, { label: string; color: string }> = {
   none:     { label: 'Not issued',                 color: RED },
-  draft:    { label: 'Draft, not issued',          color: RED },
+  draft:    { label: 'Open, not issued',           color: PURPLE },
   issued:   { label: 'Issued',                     color: GREEN },
-  reopened: { label: 'Reopened, not issued again', color: AMBER },
+  reopened: { label: 'Reopened, not issued again', color: PURPLE },
   edited:   { label: 'Issued, edited',             color: AMBER },
+  accepted: { label: 'Accepted by Production',     color: BLUE },
 };
+
+/** Started but not (re)issued: easily forgotten, so it is pointed out. */
+export const isOpenCard = (s: JobCardState | null | undefined): boolean => s === 'draft' || s === 'reopened';
 
 // ── Request body → columns ──────────────────────────────────────
 const UUID = /^[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}$/i;
@@ -624,11 +630,11 @@ export function jobCardFrom(body: unknown): { columns: Partial<JobCardInput> } |
 export type JobCardListRow = {
   id: string; card_number: string | null; job_separation_id: string | null; manual: ManualOrder | null; part: number; part_name: string | null;
   party: string | null; pm_code: string | null; job_name: string | null; po_no: string | null;
-  issued_at: string | null; issued_by: string | null; created_at: string; edited: string | null;
+  issued_at: string | null; issued_by: string | null; accepted_at: string | null; created_at: string; edited: string | null;
   job_separations: { sr_no: string | null } | null;
 };
 export const JOB_CARD_LIST: string = 'id, card_number, job_separation_id, manual, part, part_name, party, pm_code, job_name, po_no, '
-  + 'issued_at, issued_by, created_at, edited:details->>edited, job_separations(sr_no)';
+  + 'issued_at, issued_by, accepted_at, created_at, edited:details->>edited, job_separations(sr_no)';
 
 /** The number in the list: the printed one, else the one it will get. */
 export function listNumber(c: Pick<JobCardListRow, 'card_number' | 'manual' | 'job_separations'>): string | null {

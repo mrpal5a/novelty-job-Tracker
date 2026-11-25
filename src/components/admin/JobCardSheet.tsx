@@ -106,7 +106,7 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
           text(p.plateId).split('\n').length > 4 ? 'mt-3 columns-2 text-[11px] leading-[15px]' : 'mt-6 text-[15px]')}>{text(p.plateId)}</p>
       )}
       <div className={cn('jc-artwork relative flex-1', p.artwork && 'mt-2')}>
-        {/* Out of the flow: it takes the space that's left and can't push the card to a second page. */}
+        {/* Out of the flow: it can’t push the card to a second page. At the foot, so any space left over is above it, for notes. */}
         {p.artwork && <Artwork key={p.artwork.id} {...p.artwork} />}
       </div>
     </article>
@@ -125,7 +125,7 @@ function Artwork({ id, width, height }: { id: string; width: number; height: num
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a private link next/image can't fetch
     <img src={`/api/artworks/${id}`} alt="Artwork" width={width} height={height} onError={() => setGone(true)}
-      className="absolute inset-0 h-full w-full object-contain object-top" />
+      className="absolute inset-0 h-full w-full object-contain object-bottom" />
   );
 }
 

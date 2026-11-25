@@ -176,6 +176,12 @@ export function canDeptEditJobCards(perms: DeptPermissions | null): boolean {
   return hasFeature(perms, 'job_card_edit');
 }
 
+/** Who may accept an issued job card for production. From then on nobody
+ *  changes it; only Admin can cancel the acceptance (migration 113). */
+export function canDeptAcceptJobCards(perms: DeptPermissions | null): boolean {
+  return hasFeature(perms, 'job_card_accept');
+}
+
 /** Who may add/complete/log entries on the Prepress-Todo checklist. */
 export function canDeptManagePrepressTodo(perms: DeptPermissions | null): boolean {
   return hasFeature(perms, 'prepress_todo_manage');

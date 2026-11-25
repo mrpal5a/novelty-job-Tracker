@@ -86,6 +86,7 @@ const FEATURES: Record<string, string[]> = {
   Prepress: ['job_separation_edit', 'job_card_edit'],
   Dispatch: ['dispatch_notifications'],
   QC:       ['shade_card_manage'],
+  Production: ['job_card_accept'],
 };
 const STAGES: Record<string, string[]> = {
   Dispatch:   ['Ready to Dispatch', 'Partial Dispatch', 'Dispatched'],
