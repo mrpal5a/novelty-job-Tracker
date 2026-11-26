@@ -143,6 +143,8 @@ describe('worked-out boxes', () => {
     const auto = resolveJobCard(centurion());
     expect(auto.labelsPerRoll).toMatchObject({ value: 2800, source: 'calc' });
     expect(auto.rollMetres.value).toBe(391.16);
+    const sheet = resolveJobCard(centurion(), { roll_sheet: 'SHEET', labels_per_roll: 500 });
+    expect([sheet.labelsPerRoll.value, sheet.rollMetres.value]).toEqual([500, '-']);
     expect(resolveJobCard(centurion(), { roll_sheet: 'SHEET' }).labelsPerRoll.value).toBeNull();
     // Typed over 400 m stands, but says so.
     expect(resolveJobCard(centurion(), { labels_per_roll: 3000 }).labelsPerRoll)
@@ -152,6 +154,7 @@ describe('worked-out boxes', () => {
 
   it('splits varnish out of the stations and keeps unfilled ones', () => {
     expect(splitColors(['CYAN', 'BLACK', 'WHITE', 'nvz-gl'], 4)).toEqual({ colors: ['CYAN', 'BLACK', 'WHITE'], varnish: 'nvz-gl' });
+    expect(splitColors(['NVZ MATT', 'FULL-UV', 'WHITE', 'FULL GL'], 4)).toEqual({ colors: ['WHITE'], varnish: 'NVZ MATT + FULL-UV + FULL GL' });
     expect(splitColors(['GLOSS', 'TEXTURE', 'RELEASE'], 4)).toEqual({ colors: ['TEXTURE', 'RELEASE', null], varnish: 'GLOSS' });
   });
 

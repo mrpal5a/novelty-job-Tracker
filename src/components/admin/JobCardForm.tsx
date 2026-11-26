@@ -377,7 +377,7 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
             <Choose label="Direction" note={noteOf(d.direction, newDirection)} value={d.direction.value ?? ''} empty="Which unwind?"
               options={Array.from(new Set([...DIRECTIONS, ...(d.direction.value ? [d.direction.value] : [])]), (v) => ({ id: v, text: v }))}
               onPick={(v) => set({ direction: v || null })} />
-            <Typed label="Labels per roll" type="number" f={d.labelsPerRoll} onCommit={(v) => set({ labels_per_roll: v ? Number(v) : null })} />
+            <Typed label={d.rollSheet.value === 'SHEET' ? 'Labels per pkt' : 'Labels per roll'} type="number" f={d.labelsPerRoll} onCommit={(v) => set({ labels_per_roll: v ? Number(v) : null })} />
             <Typed label="Metres per roll" f={d.rollMetres} optional onCommit={override('rollMetres')} />
           </Group>
 
@@ -626,7 +626,7 @@ function Colours({ locked, where, stations, onChange, varnish, onVarnish }: {
             ))}
             <Typed label="Varnish" f={varnish} optional onCommit={onVarnish} />
           </div>
-          <Note>{where === 'card' ? 'Saved on this card: its plate has none.' : locked ? 'From the plate: whoever manages plates can change them.' : 'Saved on the plate for the next order.'}{blanks ? ` ${blanks} still blank.` : ''} NVZ-GL, NVZ, FULL-GL and GLOSS print in the Varnish box. A known Pantone fills its box with a screen colour, close but not for matching.</Note>
+          <Note>{where === 'card' ? 'Saved on this card: its plate has none.' : locked ? 'From the plate: whoever manages plates can change them.' : 'Saved on the plate for the next order.'}{blanks ? ` ${blanks} still blank.` : ''} Anything starting NVZ or FULL, and GLOSS, prints in the Varnish box. A known Pantone fills its box with a screen colour, close but not for matching.</Note>
         </>
       )}
     </fieldset>

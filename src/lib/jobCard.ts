@@ -106,7 +106,8 @@ const ROLL_LABEL_STEP = 100;
  *  heuristic; a real gap above this comes back "missing" and is typed. */
 const MAX_GAP_MM = 12;
 
-const VARNISHES = ['NVZ-GL', 'NVZ', 'FULL-GL', 'GLOSS'];
+/** Varnish, not ink: anything starting NVZ or FULL (NVZ-GL, FULL-GL…), and GLOSS. */
+const isVarnish = (c: string | null) => c != null && /^(NVZ|FULL|GLOSS$)/.test(c.trim().toUpperCase());
 
 const num = (v: string | number | null | undefined): number => parseFloat(String(v ?? ''));
 
@@ -172,7 +173,6 @@ export function splitColors(colors: (string | null)[] | null, total: number | nu
   { colors: (string | null)[]; varnish: string | null } {
   const list: (string | null)[] = [...(colors ?? [])];
   while (list.length < (total ?? 0)) list.push(null);
-  const isVarnish = (c: string | null) => c != null && VARNISHES.includes(c.trim().toUpperCase());
   return { colors: list.filter((c) => !isVarnish(c)), varnish: list.filter(isVarnish).join(' + ') || null };
 }
 
@@ -409,7 +409,8 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
       ? { ...typedWidth, note: width ? `Needs ${width.exact} mm` : typedWidth.note }
       : field(width?.width, 'calc',
         width ? `Needs ${width.exact} mm` : layout ? 'Height gap not saved on the plate or die' : layoutHit.note),
-    rollMetres: field(perRoll, 'calc'),
+    // Sheet form goes out in packets: no metres a roll.
+    rollMetres: field(rollSheet.value === 'SHEET' ? '-' : perRoll, 'calc'),
     colors:     field(stations?.colors, 'auto', plateHit.note),
     varnish:    field(stations?.varnish, 'auto', plateHit.note),
     material:   typedMaterial.value != null && (typedMaterial.source === 'picked' || !plateMaterial) ? typedMaterial

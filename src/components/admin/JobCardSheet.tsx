@@ -90,7 +90,7 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
 
         <Cell span="col-span-2" label="Label qty" value={p.labelQty} />
         <Cell span="col-span-2" label="Meter" value={p.metres} />
-        <Cell span="col-span-4" label="Label per roll" value={perRoll} />
+        <Cell span="col-span-4" label={p.rollSheet === 'SHEET' ? 'Label per pkt' : 'Label per roll'} value={perRoll} />
         <Cell span="col-span-2" label="Die type - number" value={p.dieNumber} />
       </dl>
       <dl className="grid border-l border-[#1F2020]" style={{ gridTemplateColumns: `repeat(${boxes.length + 1}, minmax(0, 1fr))` }}>
