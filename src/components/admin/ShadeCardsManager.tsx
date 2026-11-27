@@ -25,7 +25,7 @@ import { SHADE_CARD_STATUSES, MAKING_STATUSES, SHADE_CARD_STATUS_COLORS, MAKING_
 import { StateChip } from '@/components/ui/StateChip';
 import type { ShadeCard } from '@/lib/types';
 import { shadeCardListQuery, shadeCardListParams } from '@/lib/listQueries';
-import { WITH_PARTY_LATE_DAYS, daysWithParty, withPartyLabel } from '@/lib/shadeCardView';
+import { WITH_PARTY_LATE_DAYS } from '@/lib/shadeCardView';
 import type { ShadeCardSummary } from '@/app/api/shade-cards/summary/route';
 import type { ShadeCardModalMode } from './AddShadeCardModal';
 import CsvExportButton from './CsvExportButton';
@@ -40,7 +40,7 @@ const AddShadeCardModal = dynamic(() => import('./AddShadeCardModal'), { ssr: fa
 
 const COLUMNS = [
   'Party', 'Product', 'Shade #', 'PM Code', 'Prepared', 'Approval',
-  'Status', 'Made', 'With party', 'Last updated', 'Actions',
+  'Status', 'Made', 'Notes', 'Last updated', 'Actions',
 ] as const;
 
 // Click-to-sort — unlike the other tables here, this list is paged on the
@@ -485,8 +485,12 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
                       <StateChip label={c.making_status} dot={MAKING_STATUS_DOT[c.making_status]} />
                     )}
                   </td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <WithParty card={c} />
+                  {/* Two lines at most so one long note can't stretch the row;
+                      the full text is on hover and on the card's page. */}
+                  <td className="px-4 py-3 min-w-[180px] max-w-[280px] text-xs text-[var(--glass-ink)]">
+                    {c.notes
+                      ? <p className="line-clamp-2 break-words" title={c.notes}>{c.notes}</p>
+                      : <span className="text-[var(--glass-muted)]">—</span>}
                   </td>
                   <td className="px-4 py-3 text-xs text-[var(--glass-muted)] whitespace-nowrap">
                     {c.updated_by_name ?? 'unknown'}
@@ -585,6 +589,10 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
                    <dd className="inline font-mono text-[var(--glass-ink)]">{formatNumericDate(c.approval_date)}</dd></div>
             </dl>
 
+            {c.notes && (
+              <p className="mt-2 text-xs text-[var(--glass-ink)] line-clamp-2 break-words">{c.notes}</p>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 mt-3">
               <StateChip label={c.making_status} dot={MAKING_STATUS_DOT[c.making_status]} />
               <span className="text-xs text-[var(--glass-muted)]">
@@ -634,20 +642,5 @@ export default function ShadeCardsManager({ canManage, canDelete, className }: P
         />
       )}
     </div>
-  );
-}
-
-/** Days the card has been with the party — red once it's late enough to chase. */
-function WithParty({ card }: { card: ShadeCard }) {
-  const days = daysWithParty(card);
-  if (days === null) return <span className="text-xs text-[var(--glass-muted)]">—</span>;
-  const late = days > WITH_PARTY_LATE_DAYS;
-  return (
-    <span
-      className={cn('font-mono text-xs', late ? 'font-semibold text-brand-danger' : 'text-[var(--glass-ink)]')}
-      title={`Sent ${formatNumericDate(card.sent_to_party_date)}${late ? ` — over ${WITH_PARTY_LATE_DAYS} days, worth a reminder` : ''}`}
-    >
-      {withPartyLabel(days)}
-    </span>
   );
 }
