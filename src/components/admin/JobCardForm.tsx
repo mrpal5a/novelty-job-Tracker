@@ -612,7 +612,7 @@ function Colours({ locked, where, stations, onChange, varnish, onVarnish }: {
             ))}
             <Typed label="Varnish" f={varnish} optional onCommit={onVarnish} />
           </div>
-          <Note>{where === 'card' ? 'Saved on this card: its plate has none.' : locked ? 'From the plate: whoever manages plates can change them.' : 'Saved on the plate for the next order.'}{blanks ? ` ${blanks} still blank.` : ''} Anything starting NVZ or FULL, and GLOSS, prints in the Varnish box. A known Pantone fills its box with a screen colour, close but not for matching.</Note>
+          <Note>{where === 'card' ? 'Saved on this card: its plate has none.' : locked ? 'From the plate: whoever manages plates can change them.' : 'Saved on the plate for the next order.'}{blanks ? ` ${blanks} still blank.` : ''} Anything starting NVZ or FULL, GLOSS and LAMINATION print in the Varnish box. A known Pantone fills its box with a screen colour, close but not for matching.</Note>
         </>
       )}
     </fieldset>

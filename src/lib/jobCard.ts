@@ -105,8 +105,8 @@ const ROLL_LABEL_STEP = 100;
  *  heuristic; a real gap above this comes back "missing" and is typed. */
 const MAX_GAP_MM = 12;
 
-/** Varnish, not ink: anything starting NVZ or FULL (NVZ-GL, FULL-GL…), and GLOSS. */
-const isVarnish = (c: string | null) => c != null && /^(NVZ|FULL|GLOSS$)/.test(c.trim().toUpperCase());
+/** Varnish, not ink: anything starting NVZ, FULL or LAMI (NVZ-GL, FULL-GL, LAMINATION…), and GLOSS. */
+const isVarnish = (c: string | null) => c != null && /^(NVZ|FULL|LAMI|GLOSS$)/.test(c.trim().toUpperCase());
 
 const num = (v: string | number | null | undefined): number => parseFloat(String(v ?? ''));
 

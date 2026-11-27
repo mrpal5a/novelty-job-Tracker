@@ -156,6 +156,7 @@ describe('worked-out boxes', () => {
     expect(splitColors(['CYAN', 'BLACK', 'WHITE', 'nvz-gl'], 4)).toEqual({ colors: ['CYAN', 'BLACK', 'WHITE'], varnish: 'nvz-gl' });
     expect(splitColors(['NVZ MATT', 'FULL-UV', 'WHITE', 'FULL GL'], 4)).toEqual({ colors: ['WHITE'], varnish: 'NVZ MATT + FULL-UV + FULL GL' });
     expect(splitColors(['GLOSS', 'TEXTURE', 'RELEASE'], 4)).toEqual({ colors: ['TEXTURE', 'RELEASE', null], varnish: 'GLOSS' });
+    expect(splitColors(['CYAN', 'Lamination', 'LAMINATE MATT'], 3)).toEqual({ colors: ['CYAN'], varnish: 'Lamination + LAMINATE MATT' });
   });
 
   it('roll metres and die label', () => {
