@@ -21,7 +21,8 @@ import { usePmCodeLookup, fillIfUntouched } from '@/hooks/usePmCodeLookup';
 import { dieListQuery } from '@/lib/listQueries';
 import DiePicker from './DiePicker';
 import PartySuggestInput from './PartySuggestInput';
-import { DIRECTIONS, FORMS, colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, commonValues, LAYOUT_KEYS } from '@/lib/plateDie';
+import { DIRECTIONS, FORMS, colorBoxes, dieUpsFor, widthGapMm, labelsPerRound, LAYOUT_KEYS } from '@/lib/plateDie';
+import MaterialSelect from '@/components/admin/MaterialSelect';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { useAutoFill } from '@/hooks/useAutoFill';
 
@@ -46,7 +47,6 @@ export default function AddPlateModal({ editing, copyOf, onClose, onSaved }: Pro
   // A copy leaves out what belongs to one set of plates: its IDs, date and rack.
   const from = editing ?? copyOf;
   const titleId = useId();
-  const listId  = useId();
 
   const [party,         setParty]         = useState(from?.party ?? '');
   const [pmCode,        setPmCode]        = useState(from?.pm_code ?? '');
@@ -85,7 +85,6 @@ export default function AddPlateModal({ editing, copyOf, onClose, onSaved }: Pro
   // cached by the list page; it also gives the material spellings in use.
   const diesQuery = useQuery(dieListQuery());
   const allDies = diesQuery.data ?? NO_DIES;
-  const materials = useMemo(() => commonValues(allDies, 'material'), [allDies]);
   const dieUps = useMemo(
     () => dieUpsFor(allDies, acrossSize, aroundSize, cylinder, material),
     [allDies, acrossSize, aroundSize, cylinder, material],
@@ -243,17 +242,7 @@ export default function AddPlateModal({ editing, copyOf, onClose, onSaved }: Pro
             </div>
             <div>
               <PlateLabel>Material</PlateLabel>
-              <WithExample example="80GSM CHROMO + LAMINATION">
-                <input
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value)}
-                  list={listId}
-                  autoComplete="off"
-                  aria-label="Material"
-                  className={inputCls}
-                />
-              </WithExample>
-              <datalist id={listId}>{materials.map((m) => <option key={m} value={m} />)}</datalist>
+              <MaterialSelect value={material} onChange={setMaterial} className={inputCls} />
             </div>
           </div>
 

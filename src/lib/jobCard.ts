@@ -205,44 +205,6 @@ export function namesMaterial(full: string, material: string): boolean {
 // "AM89240", "SMP2239NF-1", "AM21450(INT)F": one word with a run of digits; "80GSM" is a weight.
 const isPaperCode = (v: string) => /^[A-Z]*\d{3,}[A-Z0-9-]*(\([A-Z]+\)[A-Z0-9-]*)?$/i.test(v.trim()) && !/GSM$/i.test(v.trim());
 
-/** The material in a card's wording, as a plate records it: "AM89240 (80GSM
- *  CHROMO)" → "80GSM CHROMO". Null when it names only a paper, which would
- *  match no die, unless a die is recorded under that very name. */
-export function materialForPlate(full: string | null, s: Pick<JobCardSources, 'papers' | 'dies'>): string | null {
-  const v = full?.trim();
-  if (!v) return null;
-  if (s.dies.some((d) => sameMaterial(d.material, v))) return v;
-  const isPaper = (n: string) => isPaperCode(n) || s.papers.some((p) => sameMaterial(p.name, n));
-  if (isPaper(v)) return null;
-  const parts = v.match(/^\s*(.*?)\s*\(([^()]*)\)\s*$/);
-  if (parts) {
-    const [a, b] = [parts[1].trim(), parts[2].trim()];
-    return a && b && isPaper(a) ? (isPaper(b) ? null : b) : a && b && isPaper(b) ? a : v;
-  }
-  const [code, ...rest] = v.split(/\s+-?\s*/);
-  return rest.length && isPaperCode(code) ? rest.join(' ') : v;
-}
-
-/** What the Material box's list offers, grouped by where each comes from. A
- *  name is offered once, in the first group that has it. */
-export function materialOptions(s: Pick<JobCardSources, 'lastCards' | 'bom' | 'dies' | 'papers'>, plate: Plate | null, die: DieRef | null):
-  { group: string; names: string[] }[] {
-  const own = plate?.material?.trim() || null;
-  const seen = new Set<string>();
-  const once = (names: (string | null | undefined)[]) => names.map((n) => n?.trim() ?? '')
-    .filter((n) => n && !seen.has(n.toUpperCase()) && seen.add(n.toUpperCase()));
-  const bom = s.bom.map((b) => b.material_name);
-  return [
-    { group: 'Plate', names: once([own]) },
-    { group: 'Earlier job cards', names: once(s.lastCards.map((c) => c.material ?? (c.details?.material as string | null | undefined))) },
-    // With the plate's material, the full name as the cards print it.
-    { group: 'BOM costing', names: once([...(own ? bom.filter((n) => !materialKey(n).includes(materialKey(own))).map((n) => `${n} (${own})`) : []), ...bom]) },
-    { group: 'Linked die', names: once([die?.type === 'ROTO' ? die.die.material : null]) },
-    { group: 'Paper list', names: once(s.papers.map((p) => p.name)) },
-    { group: 'Used on dies', names: once(commonValues(s.dies, 'material', 1)) },
-  ].filter((g) => g.names.length > 0);
-}
-
 /** The exact die. A die linked to the plate is the answer; otherwise the ones
  *  of that size and cylinder, best first (ties: the plate's material). One match fills itself only when
  *  its ups agree with the plate (dies record them per round or across). */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { artworkRow, resolveJobCard, layoutsFor, materialWidth, rollMetres, labelsPerRollFor, splitColors, dieLabel, jobCardFrom, freezeCard, lineOfManual, manualFrom, materialForPlate, materialOptions, namesMaterial, cardNumberOf, plateUpdates, lineCardState, type JobCardRow, type JobCardSources } from './jobCard';
+import { artworkRow, resolveJobCard, layoutsFor, materialWidth, rollMetres, labelsPerRollFor, splitColors, dieLabel, jobCardFrom, freezeCard, lineOfManual, manualFrom, namesMaterial, cardNumberOf, plateUpdates, lineCardState, type JobCardRow, type JobCardSources } from './jobCard';
 import type { Die, Plate } from '@/lib/types';
 
 // CENTURION EZ-100 ML, as saved on 2026-11-25, against the printed card.
@@ -339,42 +339,8 @@ describe('the material’s full name', () => {
     expect(on({ details: { material: 'AM89240 (80GSM CHROMO)' } }).value).toBe('AM89240 (80GSM CHROMO)');
     expect(on({ material: 'PP WHITE' })).toMatchObject({ value: '80GSM CHROMO', note: 'From the plate (last card: PP WHITE)' });
   });
-  it('the list offers each name once, with where it is from', () => {
-    const die = { id: 'd', material: 'PP WHITE' } as unknown as Die;
-    expect(materialOptions({
-      lastCards: [{ material: 'AM89240 (80GSM CHROMO)' }, { material: null, details: { material: 'am89240 (80gsm chromo)' } }] as unknown as JobCardRow[],
-      bom: [{ material_id: 'm', material_name: 'AM89240F', width_mm: null, same_line: true }],
-      dies: [die, { material: '80GSM CHROMO' }, { material: 'TC60' }] as unknown as Die[],
-      papers: [{ name: 'AM89240F', specification: 'Paper' }, { name: 'BW8001', specification: 'Film' }],
-    }, plate({ material: '80GSM CHROMO' }), { type: 'ROTO', id: 'd', die })).toEqual([
-      { group: 'Plate', names: ['80GSM CHROMO'] },
-      { group: 'Earlier job cards', names: ['AM89240 (80GSM CHROMO)'] },
-      { group: 'BOM costing', names: ['AM89240F (80GSM CHROMO)', 'AM89240F'] },
-      { group: 'Linked die', names: ['PP WHITE'] },
-      { group: 'Paper list', names: ['BW8001'] },
-      { group: 'Used on dies', names: ['TC60'] },
-    ]);
-  });
 });
 
-describe('material saved back to a plate that has none', () => {
-  const s = { papers: [{ name: 'AM89240F', specification: null }, { name: 'AM21450(INT)F', specification: null }, { name: 'CAPRICOATING CHROMO WHITE', specification: null }, { name: 'PTA2450', specification: null }],
-    dies: [{ material: 'PTA2450' }, { material: '80GSM CHROMO (217 X 82 - 3 UPS)' }] as unknown as Die[] };
-  it('is without the paper code; a paper alone is not a material', () => {
-    const cases: [string, string | null][] = [
-      ['AM89240 (80GSM CHROMO)', '80GSM CHROMO'], ['AM89240F 80GSM CHROMO + LAMINATION', '80GSM CHROMO + LAMINATION'],
-      ['80GSM CHROMO (AM89240)', '80GSM CHROMO'], ['AM21450(INT)F (PP WHITE)', 'PP WHITE'],
-      ['80GSM CHROMO', '80GSM CHROMO'], ['80GSM CHROMO (217 X 82 - 3 UPS)', '80GSM CHROMO (217 X 82 - 3 UPS)'], ['TC60 RP37', 'TC60 RP37'],
-      ['AM89240F', null], ['AM21450(INT)F', null], ['CAPRICOATING CHROMO WHITE', null], ['BW9999', null], ['PTA2450', 'PTA2450'], ['', null],
-    ];
-    for (const [full, want] of cases) expect([full, materialForPlate(full, s)]).toEqual([full, want]);
-  });
-  it('never over one the plate has', () => {
-    expect(plateUpdates(plate(), null, { material: 'PP WHITE' })).toEqual([{ material: 'PP WHITE' }]);
-    expect(plateUpdates(plate({ material: '80GSM CHROMO' }), null, { material: 'PP WHITE' })).toEqual([]);
-    expect(plateUpdates(plate(), null, { material: null })).toEqual([]);
-  });
-});
 
 describe('cards made by hand', () => {
   const manual = (over = {}) => ({ number: 'JC-7', party: 'ACME', pm_code: '2000000081', job_name: 'NEW JOB', po_no: null, po_date: null, quantity: 1000, colors: null, ...over });

@@ -18,6 +18,7 @@ import { DIE_STATUSES, type Die, type DieStatus } from '@/lib/types';
 import { WithExample, WithUnit } from '@/components/ui/FieldAffix';
 import { dieListQuery } from '@/lib/listQueries';
 import { dieUpsFor, commonValues, labelsPerRound, widthGapMm } from '@/lib/plateDie';
+import MaterialSelect from '@/components/admin/MaterialSelect';
 import LayoutFields, { layoutState, type LayoutState } from './LayoutFields';
 import { istToday } from '@/lib/jobViews';
 import { useAutoFill } from '@/hooks/useAutoFill';
@@ -45,7 +46,6 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
   // and the "already have this die" check.
   const allDies = useQuery(dieListQuery()).data ?? NO_DIES;
   const picks = useMemo(() => ({
-    material: commonValues(allDies, 'material'),
     corner:   commonValues(allDies, 'corner'),
     shape:    commonValues(allDies, 'shape'),
   }), [allDies]);
@@ -197,15 +197,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
             </div>
             <div>
               <DieLabel required>Material</DieLabel>
-              <WithExample example="0.75 CHROMO SILVER">
-                  <input
-                  value={material}
-                  onChange={(e) => setMaterial(e.target.value)}
-                  list={`${listId}-material`}
-                  autoComplete="off"
-                  className={inputCls}
-                />
-              </WithExample>
+              <MaterialSelect value={material} onChange={setMaterial} className={inputCls} />
             </div>
           </div>
 
@@ -358,7 +350,7 @@ export default function AddDieModal({ editing, onClose, onSaved }: Props) {
           )}
         </div>
 
-        {(['material', 'corner', 'shape'] as const).map((k) => (
+        {(['corner', 'shape'] as const).map((k) => (
           <datalist key={k} id={`${listId}-${k}`}>
             {picks[k].map((v) => <option key={v} value={v} />)}
           </datalist>

@@ -21,11 +21,12 @@ import { ConfirmModal } from '@/components/admin/modals';
 import JobCardSheet, { JobCardPrint } from '@/components/admin/JobCardSheet';
 import PlateFinder from '@/components/admin/PlateFinder';
 import ArtworkBox from '@/components/admin/ArtworkBox';
+import { bomName } from '@/components/admin/MaterialSelect';
 import { inkColor } from '@/lib/pantone';
 import { useParties } from '@/hooks/useReferenceData';
 import { colorBoxes, DIRECTIONS, FORMS, MAX_COLORS } from '@/lib/plateDie';
 import {
-  JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, materialForPlate, materialOptions, plateUpdates, resolveJobCard,
+  JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, plateUpdates, resolveJobCard,
   type Field, type JobCardInput, type JobCardRow, type JobCardSources, type Layout, type ManualOrder, type OverrideKey, type PrintedCard,
 } from '@/lib/jobCard';
 
@@ -180,9 +181,10 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
   const number = card
     ? cardNumberOf(line.sr_no, card, sources.cards.length)
     : isNew ? input.manual?.number || 'New job card' : `${line.sr_no ?? ''}${isExtra ? `-${Math.max(0, ...sources.cards.map((c) => c.part)) + 1}` : ''}`;
+  const papers = sources.papers.map((p) => p.name); // the active BOM material list
   // A plate with no material learns it from the card: a pick or the last card's, never a suggestion.
   const newMaterial = canEditPlates && basePlate && !basePlate.material?.trim() && (d.material.source === 'picked' || d.material.source === 'last_card')
-    ? materialForPlate(d.material.value, sources) : null;
+    ? bomName(papers, d.material.value) : null;
   const newDirection = canEditPlates && basePlate && !basePlate.direction && d.direction.value && DIRECTIONS.includes(d.direction.value) ? d.direction.value : null;
   const newRollSheet = canEditPlates && basePlate && !basePlate.roll_sheet ? d.rollSheet.value : null;
   const noteOf = (f: Field<unknown>, toPlate: unknown) => [sourceNote(f), toPlate && 'Also saved on the plate'].filter(Boolean).join('. ') || undefined;
@@ -364,7 +366,7 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
 
           <Group title="Material and rolls">
             <MaterialBox f={d.material} auto={resolveJobCard(live, { ...input, material: null }, card?.id ?? null).material} picked={input.material}
-              toPlate={newMaterial} options={materialOptions(sources, plate, d.die.value)} onPick={(v) => set({ material: v })} />
+              toPlate={newMaterial} names={papers} onPick={(v) => set({ material: v })} />
             {canEditPlates && plate && plate.across_gap == null && acrossGap == null && d.layout.value && d.layout.value.acrossUps > 1 && d.materialWidth.source !== 'calc' && (
               <Typed label="Height gap, mm" f={{ value: null, source: 'missing', note: 'Works out the width; saved on the plate' }} type="number" optional
                 onCommit={(v) => setAcrossGap(v ? Number(v) : null)} />
@@ -518,46 +520,29 @@ function Typed({ label, f, onCommit, type = 'text', wide, optional, list, action
   );
 }
 
-const OTHER = '\u0000other';
-
-/** The material, picked from what the records say or typed. The first choice
- *  fills itself; another holds for this card only, unless the plate has none. */
-function MaterialBox({ f, auto, picked, toPlate, options, onPick }: {
+/** The material, picked from the BOM material list. The first choice fills
+ *  itself; another holds for this card only, unless the plate has none. A
+ *  value from before the list existed shows as "not in BOM list". */
+function MaterialBox({ f, auto, picked, toPlate, names, onPick }: {
   toPlate: string | null; // saved on the plate with the card
-  f: Field<string>; auto: Field<string>; picked: string | null; options: { group: string; names: string[] }[]; onPick: (v: string | null) => void;
+  f: Field<string>; auto: Field<string>; picked: string | null; names: string[]; onPick: (v: string | null) => void;
 }) {
-  const [typing, setTyping] = useState<string | null>(null);
   const filled = auto.source === 'suggested' ? null : auto.value;
-  const listed = options.some((g) => g.names.includes(picked ?? ''));
-  const commit = () => { if (typing?.trim()) onPick(typing.trim()); setTyping(null); };
+  const off = (v: string | null) => (v && !bomName(names, v) ? ' (not in BOM list)' : '');
+  const shown = f.value && !bomName(names, f.value) ? f.value : null;
   return (
     <div className="min-w-0 sm:col-span-2">
       <label className="block">
-        <Label needs={!picked && !filled}>Material (substrate)</Label>
-        <select className={boxCls} value={typing !== null ? OTHER : picked ?? ''}
-          onChange={(e) => {
-            if (e.target.value === OTHER) return setTyping(picked ?? filled ?? '');
-            setTyping(null);
-            onPick(e.target.value || null);
-          }}>
-          <option value="">{filled ?? 'Pick the material'}</option>
-          {picked && !listed && <option value={picked}>{picked}</option>}
-          {options.map((g) => {
-            // The one that fills itself is already the first choice.
-            const names = g.names.filter((n) => n !== filled || n === picked);
-            return names.length > 0 && (
-              <optgroup key={g.group} label={g.group}>{names.map((n) => <option key={n} value={n}>{n}</option>)}</optgroup>
-            );
-          })}
-          <option value={OTHER}>Type another…</option>
+        <Label needs={(!picked && !filled) || !!shown}>Material (substrate)</Label>
+        <select className={boxCls} value={picked ? bomName(names, picked) ?? picked : ''}
+          onChange={(e) => onPick(e.target.value || null)}>
+          <option value="">{filled ? `${filled}${off(filled)}` : 'Pick the material'}</option>
+          {picked && !bomName(names, picked) && <option value={picked}>{picked}{off(picked)}</option>}
+          {names.filter((n) => n !== filled || n === picked).map((n) => <option key={n} value={n}>{n}</option>)}
         </select>
       </label>
-      {typing !== null && (
-        <input className={cn(boxCls, 'mt-1')} aria-label="Type the material" autoFocus value={typing} maxLength={200}
-          onChange={(e) => setTyping(e.target.value)} onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') setTyping(null); }} />
-      )}
       <Note>{picked && filled && picked !== filled ? `Picked for this card. The first choice goes back to ${filled}` : sourceNote(f)}</Note>
+      {shown && <Note>{`${shown} is not in BOM → Materials. Pick one from the list, or ask Admin to add it.`}</Note>}
       {toPlate && <Note>{`Also saved on the plate as ${toPlate}`}</Note>}
       {f.source === 'suggested' && <Button size="sm" className="mt-1" onClick={() => onPick(f.value)}>Use {f.value}</Button>}
     </div>

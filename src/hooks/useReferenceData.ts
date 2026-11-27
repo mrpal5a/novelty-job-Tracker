@@ -96,3 +96,15 @@ export function useTeamDirectory() {
     return { people, departments, byEmail, options, nameOf, isLoading: q.isLoading };
   }, [data, q.isLoading]);
 }
+
+export const BOM_MATERIAL_NAMES_KEY = ['bom-material-names'] as const;
+
+/** Active BOM material names: the one list every Material field picks from.
+ *  Default staleTime so a material the owner has just added shows up the next
+ *  time a form opens. */
+export function useBomMaterialNames() {
+  return useQuery({
+    queryKey: BOM_MATERIAL_NAMES_KEY,
+    queryFn:  () => getJson('/api/bom-materials/names', (b) => (b.names ?? []) as string[]),
+  });
+}
