@@ -26,6 +26,7 @@ import SortableHeaderLabel from './SortableHeaderLabel';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import SizePairSearch, { useSizePair } from './SizePairSearch';
+import { ManageMaterialsButton } from './MaterialSelect';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 
 // Loaded on first open, not with the page — it only renders when open.
@@ -114,7 +115,7 @@ const PLATE_EXPORT_COLUMNS: CsvColumn<Plate>[] = [
   { header: 'Added',           value: (p) => csvTimestamp(p.created_at) },
 ];
 
-export default function PlatesManager({ canManage }: { canManage: boolean }) {
+export default function PlatesManager({ canManage, canManageMaterials = false }: { canManage: boolean; canManageMaterials?: boolean }) {
   const [search,      setSearch]      = useState('');
   const [searchField, setSearchField] = useState('all');
   const sizes = useSizePair();
@@ -273,6 +274,8 @@ export default function PlatesManager({ canManage }: { canManage: boolean }) {
         <SizePairSearch value={sizes.size} onChange={sizes.setSize} labels={['Height', 'Width']} />
 
         <CsvExportButton fetchRows={fetchAllPlates} count={total} columns={PLATE_EXPORT_COLUMNS} filename="plates" />
+
+        {canManageMaterials && <ManageMaterialsButton />}
 
         {canManage && (
           <Button intent="primary" icon={Plus} onClick={() => setAdding(true)} className="max-sm:ml-auto">

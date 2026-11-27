@@ -62,7 +62,6 @@ export type JobCardSources = {
   flatbedDies: FlatbedDie[];
   shadeCards:  Pick<ShadeCard, 'id' | 'product_name' | 'shade_card_number' | 'status' | 'making_status'>[]; // current, same PM code
   bom:         BomHint[];        // this line's costing first, then same PM code
-  papers:      { name: string; specification: string | null }[]; // the paper list in use; never its rates
   cards:       JobCardRow[];     // this line's cards, by part
   lastCards:   JobCardRow[];     // issued cards of these plates, newest first
   artworks:    ArtworkRow[];     // of these plates, newest first; a removed one has no file
@@ -328,19 +327,18 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
   const perRoll = metresOf(labelsPerRoll.value);
   const typedWidth = typed('material_width_mm');
   // Material: typed on this card, else the plate's own, else the last card's;
-  // the BOM's only as a suggestion. What the plate overrules is said.
+  // BOM keeps its own list, so its material is not offered. What the plate
+  // overrules is said.
   // The last card's fuller wording of the plate's material is the one printed.
   const lastMaterial = last && (last.material ?? (last.details?.material as string | null | undefined) ?? null);
   const typedMaterial: Field<string> = card.material != null ? field(card.material, 'picked')
     : field(lastMaterial, 'last_card', last?.card_number ?? undefined);
   const plateOwn = plate?.material?.trim() || null;
   const plateMaterial = plateOwn && lastMaterial && namesMaterial(lastMaterial, plateOwn) ? lastMaterial : plateOwn;
-  const overruled = [lastMaterial && `last card: ${lastMaterial}`, s.bom[0] && `BOM: ${s.bom[0].material_name}`]
-    .find((o) => o && !sameMaterial(o.slice(o.indexOf(':') + 1), plateMaterial));
+  const overruled = lastMaterial && !sameMaterial(lastMaterial, plateMaterial) ? `last card: ${lastMaterial}` : null;
   const cardColors = card.manual?.colors;
   const stations = plate?.colors ? splitColors(plate.colors, plate.total_colors)
     : cardColors?.length ? splitColors(cardColors, cardColors.length) : null;
-  const bom = s.bom[0];
   // The newest decides: once its file is removed, the plate has none.
   // With no plate it is the card's own.
   const artRow = artworkRow(s.artworks, plate?.id ?? null, cardId);
@@ -376,9 +374,7 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
     colors:     field(stations?.colors, 'auto', plateHit.note),
     varnish:    field(stations?.varnish, 'auto', plateHit.note),
     material:   typedMaterial.value != null && (typedMaterial.source === 'picked' || !plateMaterial) ? typedMaterial
-      : plateMaterial ? field(plateMaterial, 'auto', `From the plate${overruled ? ` (${overruled})` : ''}`)
-      : field(bom?.material_name, 'suggested',
-      bom && (bom.same_line ? 'From this line’s BOM costing' : 'From BOM costing of the same PM code')),
+      : field(plateMaterial, 'auto', plateMaterial ? `From the plate${overruled ? ` (${overruled})` : ''}` : undefined),
     rollSheet,
     direction,
     labelsPerRoll,

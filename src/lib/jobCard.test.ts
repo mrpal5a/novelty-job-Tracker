@@ -24,7 +24,7 @@ const centurion = (over: Partial<JobCardSources> = {}): JobCardSources => ({
     pm_code: '2000000081', material_name: 'CENTURION EZ-100 ML BOTTLE LABEL_IN', quantity: 631010, cancelled_at: null },
   plates: [plate()],
   dies: [die('four', 4, { across_gap: 5 }), die('spare', 2, { status: 'EXTRA', location: null }), die('three', 3)],
-  flatbedDies: [], shadeCards: [shade('s1', '2592')], bom: [], cards: [], lastCards: [], artworks: [], papers: [], linkable: [], ...over,
+  flatbedDies: [], shadeCards: [shade('s1', '2592')], bom: [], cards: [], lastCards: [], artworks: [], linkable: [], ...over,
 });
 
 describe('CENTURION job card', () => {
@@ -301,18 +301,17 @@ describe('material from the plate', () => {
   const on = (material: string | null, over: Partial<JobCardSources> = {}) => centurion({ plates: [plate({ material })], ...over });
   const lastCard = { plate_id: 'p1', material: 'AM89240 (80GSM CHROMO)', issued_at: 'x', card_number: 'OCT26-1' } as unknown as JobCardRow;
 
-  it('beats the last card and the BOM, and says what it overruled', () => {
+  it('beats the last card, says what it overruled, and never takes BOM’s material', () => {
     expect(resolveJobCard(on('80GSM CHROMO')).material).toMatchObject({ value: '80GSM CHROMO', source: 'auto', note: 'From the plate' });
     expect(resolveJobCard(on('PP WHITE', { lastCards: [lastCard], bom })).material).toMatchObject({ value: 'PP WHITE', note: 'From the plate (last card: AM89240 (80GSM CHROMO))' });
-    expect(resolveJobCard(on('PP WHITE', { bom })).material.note).toBe('From the plate (BOM: BMB1450)');
-    expect(resolveJobCard(on('bmb-1450', { bom })).material.note).toBe('From the plate'); // the same one
+    expect(resolveJobCard(on('PP WHITE', { bom })).material.note).toBe('From the plate');
   });
   it('gives way to one typed on the card', () => {
     expect(resolveJobCard(on('PP WHITE'), { material: 'TC60' }).material).toMatchObject({ value: 'TC60', source: 'picked' });
   });
   it('without one, all is as before', () => {
     expect(resolveJobCard(on(null, { lastCards: [lastCard], bom })).material).toMatchObject({ value: 'AM89240 (80GSM CHROMO)', source: 'last_card' });
-    expect(resolveJobCard(on('  ', { bom })).material).toMatchObject({ value: 'BMB1450', source: 'suggested' });
+    expect(resolveJobCard(on('  ', { bom })).material.value).toBeNull();
   });
   it('prints, but is not copied onto the card: a reopened one follows the plate', () => {
     const f = freezeCard(resolveJobCard(on('PP WHITE')), 'x');

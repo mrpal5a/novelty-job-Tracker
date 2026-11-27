@@ -18,7 +18,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: 'flatbed', label: 'Flatbed Dies' },
 ];
 
-export default function DiesTabs({ canManage }: { canManage: boolean }) {
+export default function DiesTabs({ canManage, canManageMaterials = false }: { canManage: boolean; canManageMaterials?: boolean }) {
   // ?tab=flatbed — the Ctrl K palette links a flatbed die straight to its sheet.
   const [tab, setTab] = useState<Tab>(useSearchParams().get('tab') === 'flatbed' ? 'flatbed' : 'roto');
 
@@ -46,7 +46,7 @@ export default function DiesTabs({ canManage }: { canManage: boolean }) {
       </div>
 
       {tab === 'roto'
-        ? <DiesManager canManage={canManage} />
+        ? <DiesManager canManage={canManage} canManageMaterials={canManageMaterials} />
         : <FlatbedDiesManager canManage={canManage} />}
     </div>
   );

@@ -26,6 +26,7 @@ import CsvExportButton from './CsvExportButton';
 import { SkeletonRows } from '@/components/ui/Skeleton';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
 import SizePairSearch, { useSizePair } from './SizePairSearch';
+import { ManageMaterialsButton } from './MaterialSelect';
 
 // Loaded on first open, not with the page — it only renders when open.
 const AddDieModal = dynamic(() => import('./AddDieModal'), { ssr: false });
@@ -149,7 +150,7 @@ function buildDieExportColumns(srNoMap: Map<string, number>): CsvColumn<Die>[] {
   ];
 }
 
-export default function DiesManager({ canManage }: { canManage: boolean }) {
+export default function DiesManager({ canManage, canManageMaterials = false }: { canManage: boolean; canManageMaterials?: boolean }) {
   const [search,      setSearch]      = useState('');
   const [searchField, setSearchField] = useState('all');
   const [nearSize,    setNearSize]    = useState(false);
@@ -311,6 +312,8 @@ export default function DiesManager({ canManage }: { canManage: boolean }) {
         <SizeToleranceToggle on={nearSize} onChange={setNearSize} enabled={canUseTolerance(search, searchField) || sizes.active} />
 
         <CsvExportButton rows={dies} columns={exportColumns} filename="dies" />
+
+        {canManageMaterials && <ManageMaterialsButton />}
 
         {canManage && (
           <Button intent="primary" icon={Plus} onClick={() => setAdding(true)} className="max-sm:ml-auto">

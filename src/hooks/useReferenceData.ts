@@ -97,14 +97,14 @@ export function useTeamDirectory() {
   }, [data, q.isLoading]);
 }
 
-export const BOM_MATERIAL_NAMES_KEY = ['bom-material-names'] as const;
+export const MATERIALS_KEY = ['materials'] as const;
 
-/** Active BOM material names: the one list every Material field picks from.
- *  Default staleTime so a material the owner has just added shows up the next
- *  time a form opens. */
-export function useBomMaterialNames() {
+/** Prepress's material list (Plates → Materials): what every Material field
+ *  picks from. Not BOM's list, which carries rates. Default staleTime so a
+ *  material just added shows up the next time a form opens. */
+export function useMaterials() {
   return useQuery({
-    queryKey: BOM_MATERIAL_NAMES_KEY,
-    queryFn:  () => getJson('/api/bom-materials/names', (b) => (b.names ?? []) as string[]),
+    queryKey: MATERIALS_KEY,
+    queryFn:  () => getJson('/api/materials', (b) => (b.materials ?? []) as { id: string; name: string }[]),
   });
 }

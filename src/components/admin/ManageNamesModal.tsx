@@ -1,21 +1,18 @@
 'use client';
-// src/components/admin/ManagePartiesModal.tsx
-// The master list of party names Job Separation's Party field picks
-// from. Prepress/Admin only — add a party the picker doesn't have yet,
-// or remove one that was mistyped.
+// src/components/admin/ManageNamesModal.tsx
+// A master list of names a field picks from, managed by Prepress/Admin: add
+// one the picker doesn't have yet, or remove one that was mistyped. Used for
+// Parties (Job Separation) and Materials (plates, dies, job cards).
 //
-// Removing a party here never touches a job separation row already
-// saved with that name — the row stores the name as free text, not a
-// reference to this table (see AddJobSeparationModal's Party picker).
+// Removing a name never touches a record already saved with it: records
+// store the name as text, not a reference to the list.
 
 import React, { useState, useEffect, useCallback, useId } from 'react';
-import { Trash2, Plus, Users, X } from 'lucide-react';
+import { Trash2, Plus, X, type LucideIcon } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 import { ModalShell } from './modals';
-import type { Party } from '@/lib/types';
 import { useQueryClient } from '@tanstack/react-query';
-import { PARTIES_KEY } from '@/hooks/useReferenceData';
 
 const inputCls = cn(
   'w-full min-h-11 px-3 py-2 rounded-lg text-sm bg-[var(--field-bg)] border border-[var(--field-border)]',
@@ -24,59 +21,66 @@ const inputCls = cn(
   'focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
 );
 
-export default function ManagePartiesModal({ onClose }: { onClose: () => void }) {
+type Item = { id: string; name: string };
+
+/** `url` serves GET { [plural]: Item[] }, POST { name } → { [singular]: Item },
+ *  DELETE `${url}/${id}`. */
+export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plural, singular, queryKey, onClose }: {
+  title: string; subtitle: string; icon: LucideIcon; url: string;
+  plural: string; singular: string; queryKey: readonly string[]; onClose: () => void;
+}) {
   const titleId = useId();
-  const [parties,    setParties]    = useState<Party[]>([]);
+  const [items,    setItems]    = useState<Item[]>([]);
   const [loading,    setLoading]    = useState(true);
   const [newName,    setNewName]    = useState('');
   const [adding,     setAdding]     = useState(false);
   const [confirming, setConfirming] = useState<string | null>(null);
   const [busyId,     setBusyId]     = useState<string | null>(null);
-  // The party boxes in the forms suggest from a cached list: refresh it.
+  // The forms pick from a cached list: refresh it.
   const queryClient = useQueryClient();
 
   const load = useCallback(async () => {
     try {
-      const res  = await fetch('/api/parties');
+      const res  = await fetch(url);
       const data = await res.json();
-      if (res.ok) setParties(data.parties ?? []);
-      else toast.error(data.error ?? 'Failed to load parties');
+      if (res.ok) setItems(data[plural] ?? []);
+      else toast.error(data.error ?? `Failed to load ${plural}`);
     } catch {
       toast.error('Network error');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [url, plural]);
 
   useEffect(() => { load(); }, [load]);
 
-  async function addParty(e: React.FormEvent) {
+  async function addItem(e: React.FormEvent) {
     e.preventDefault();
     const name = newName.trim();
     if (!name) return;
 
     setAdding(true);
     try {
-      const res  = await fetch('/api/parties', {
+      const res  = await fetch(url, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ name }),
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to add party');
+        toast.error(data.error ?? `Failed to add ${singular}`);
         return;
       }
-      setParties((prev) =>
-        prev.some((p) => p.id === data.party.id)
+      setItems((prev) =>
+        prev.some((p) => p.id === data[singular].id)
           ? prev
-          : [...prev, data.party].sort((a, b) =>
+          : [...prev, data[singular]].sort((a, b) =>
               a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
             )
       );
       setNewName('');
-      queryClient.invalidateQueries({ queryKey: PARTIES_KEY });
-      toast.success('Party added');
+      queryClient.invalidateQueries({ queryKey: [...queryKey] });
+      toast.success(`${data[singular].name} added`);
     } catch {
       toast.error('Network error');
     } finally {
@@ -84,18 +88,18 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
     }
   }
 
-  async function remove(party: Party) {
-    setBusyId(party.id);
+  async function remove(item: Item) {
+    setBusyId(item.id);
     try {
-      const res  = await fetch(`/api/parties/${party.id}`, { method: 'DELETE' });
+      const res  = await fetch(`${url}/${item.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? 'Failed to remove party');
+        toast.error(data.error ?? `Failed to remove ${singular}`);
         return;
       }
-      setParties((prev) => prev.filter((p) => p.id !== party.id));
-      queryClient.invalidateQueries({ queryKey: PARTIES_KEY });
-      toast.success('Party removed');
+      setItems((prev) => prev.filter((p) => p.id !== item.id));
+      queryClient.invalidateQueries({ queryKey: [...queryKey] });
+      toast.success(`${item.name} removed`);
     } catch {
       toast.error('Network error');
     } finally {
@@ -110,11 +114,11 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
         <div className="flex items-start justify-between gap-4 px-5 py-4 border-b border-white/12 shrink-0">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-[var(--glass-ink)] flex items-center gap-2">
-              <Users className="w-4 h-4" aria-hidden="true" />
-              Parties
+              <Icon className="w-4 h-4" aria-hidden="true" />
+              {title}
             </h2>
             <p className="text-xs text-[var(--glass-muted)] mt-0.5">
-              The master list Job Separation&apos;s Party field picks from
+              {subtitle}
             </p>
           </div>
           <button
@@ -127,11 +131,13 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
           </button>
         </div>
 
-        <form onSubmit={addParty} className="flex items-center gap-2 px-5 py-3 border-b border-white/12 shrink-0">
+        <form onSubmit={addItem} className="flex items-center gap-2 px-5 py-3 border-b border-white/12 shrink-0">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder="Add a party name…"
+            placeholder={`Add a ${singular} name…`}
+            aria-label={`New ${singular} name`}
+            maxLength={200}
             className={inputCls}
           />
           <button
@@ -155,13 +161,13 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
                 <div key={i} className="h-10 rounded-lg bg-black/[0.04]" />
               ))}
             </div>
-          ) : parties.length === 0 ? (
+          ) : items.length === 0 ? (
             <p className="text-sm text-[var(--glass-muted)] text-center py-6">
-              No parties yet. Add the first one above.
+              No {plural} yet. Add the first one above.
             </p>
           ) : (
             <ul className="divide-y divide-white/10">
-              {parties.map((p) => (
+              {items.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 py-2">
                   <span className="text-sm text-[var(--glass-ink)] truncate">{p.name}</span>
                   <button
@@ -169,6 +175,7 @@ export default function ManagePartiesModal({ onClose }: { onClose: () => void })
                     onClick={() => (confirming === p.id ? remove(p) : setConfirming(p.id))}
                     onBlur={() => setConfirming((id) => (id === p.id ? null : id))}
                     disabled={busyId === p.id}
+                    aria-label={`${confirming === p.id ? 'Confirm removing' : 'Remove'} ${p.name}`}
                     className={cn(
                       'inline-flex items-center gap-1.5 shrink-0 min-h-11 px-2.5 rounded-lg',
                       'text-xs font-medium border transition-colors disabled:opacity-50 whitespace-nowrap',

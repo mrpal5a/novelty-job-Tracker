@@ -73,7 +73,7 @@ async function loadLine(db: SupabaseClient, id: string) {
   return line ? { line, cards: rows<JobCardRow>(cardRes) } : null;
 }
 
-const nothing = { plates: [], dies: [], flatbedDies: [], shadeCards: [], bom: [], lastCards: [], artworks: [], papers: [], linkable: [] };
+const nothing = { plates: [], dies: [], flatbedDies: [], shadeCards: [], bom: [], lastCards: [], artworks: [], linkable: [] };
 
 /** For departments that only look: the line and its issued cards. */
 export async function loadIssuedCards(db: SupabaseClient, id: string): Promise<JobCardSources | null> {
@@ -111,7 +111,7 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
   const shadeFilter = anyOf(ids(cards.map((c) => c.shade_card_id)));
   const bomFilter = anyOf(line.id ? [line.id] : []);
 
-  const [plateRes, shadeRes, bomRes, flatRes, paperRes] = await Promise.all([
+  const [plateRes, shadeRes, bomRes, flatRes] = await Promise.all([
     plateFilter ? db.from('plates').select('*').or(plateFilter).order('created_at', { ascending: false }) : null,
     shadeFilter ? db.from('shade_cards').select('id, product_name, shade_card_number, status, making_status')
       .eq('is_current', true).or(shadeFilter).order('updated_at', { ascending: false }) : null,
@@ -121,7 +121,6 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
       .or(bomFilter, { referencedTable: 'job_separations' })
       .not('material_id', 'is', null).order('updated_at', { ascending: false }).limit(20) : null,
     db.from('flatbed_dies').select('*'),
-    db.from('bom_materials').select('name, specification').eq('is_active', true).order('name'),
   ]);
 
   const plates = plateRes ? rows<Plate>(plateRes) : [];
@@ -158,7 +157,6 @@ async function fill(db: SupabaseClient, line: CardLine, cards: JobCardRow[], pla
     linkable: (lineRes ? rows<LinkRow>(lineRes) : []).map(({ job_cards, ...l }) => ({ ...l, cards: job_cards.length })),
     artworks: artRes ? rows<ArtworkRow>(artRes) : [],
     flatbedDies: rows<FlatbedDie>(flatRes),
-    papers: rows<JobCardSources['papers'][number]>(paperRes),
     shadeCards: shadeRes ? rows<JobCardSources['shadeCards'][number]>(shadeRes) : [],
   };
 }

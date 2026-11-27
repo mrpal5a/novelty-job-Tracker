@@ -34,7 +34,8 @@ import type { JobSeparation, AddJobFormData, Job } from '@/lib/types';
 import type { Department } from '@/lib/constants/departments';
 import AddJobForm from './AddJobForm';
 import { PromptModal, ConfirmModal } from './modals';
-import ManagePartiesModal from './ManagePartiesModal';
+import ManageNamesModal from './ManageNamesModal';
+import { PARTIES_KEY } from '@/hooks/useReferenceData';
 import PrepressTodoPanel from './PrepressTodoPanel';
 import MeterCalculatorPanel from './MeterCalculatorPanel';
 import CsvExportButton from './CsvExportButton';
@@ -1168,7 +1169,8 @@ export default function JobSeparationManager({ canManage, canMakeCards, canManag
       )}
 
       {managingParties && (
-        <ManagePartiesModal onClose={() => setManagingParties(false)} />
+        <ManageNamesModal title="Parties" subtitle="The master list Job Separation's Party field picks from" icon={Users}
+          url="/api/parties" plural="parties" singular="party" queryKey={PARTIES_KEY} onClose={() => setManagingParties(false)} />
       )}
 
       {cancellingRow && (

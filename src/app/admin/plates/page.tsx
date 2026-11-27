@@ -8,7 +8,7 @@
 
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptManageDiesPlates } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptManageDiesPlates, canDeptManageJobSeparation } from '@/lib/constants/departments';
 import PlatesManager from '@/components/admin/PlatesManager';
 import { deptKeyOf } from '@/lib/identity';
 
@@ -33,7 +33,7 @@ export default async function PlatesPage() {
         </p>
       </div>
 
-      <PlatesManager canManage={canDeptManageDiesPlates(perms)} />
+      <PlatesManager canManage={canDeptManageDiesPlates(perms)} canManageMaterials={canDeptManageJobSeparation(perms)} />
     </div>
   );
 }
