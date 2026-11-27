@@ -89,7 +89,7 @@ export type ShadeCardSearchField = {
 };
 
 export const SHADE_CARD_SEARCH_FIELDS: ShadeCardSearchField[] = [
-  { value: 'all',               label: 'All fields',    placeholder: 'Search party, PM code, product, shade card # or docket #' },
+  { value: 'all',               label: 'All fields',    placeholder: 'Search party, PM code, product, shade card #, docket # or notes' },
   { value: 'party',             label: 'Party',         placeholder: 'Search by party',         column: 'party' },
   { value: 'product_name',      label: 'Product',       placeholder: 'Search by product name',  column: 'product_name' },
   { value: 'pm_code',           label: 'PM code',       placeholder: 'Search by PM code',       column: 'pm_code' },
@@ -99,10 +99,10 @@ export const SHADE_CARD_SEARCH_FIELDS: ShadeCardSearchField[] = [
   { value: 'updated_by_name',   label: 'Updated by',    placeholder: 'Search by who last changed it', column: 'updated_by_name' },
 ];
 
-/** The columns an "All fields" search spans. Deliberately narrower than the
- *  list above: notes are long free text and would swamp a general search with
- *  incidental word matches, and nobody scanning the register searches for a
- *  card by who touched it last. Both stay available as explicit choices. */
+/** The columns Ctrl K ranks shade cards by, and the page's fallback when only
+ *  punctuation is typed. The page's "All fields" search reads search_text,
+ *  which also covers notes (migration 114). Notes stay out of here so long
+ *  free text doesn't crowd Ctrl K. "Updated by" is only an explicit choice. */
 export const SHADE_CARD_SEARCH_COLUMNS = [
   'party', 'pm_code', 'product_name', 'shade_card_number', 'docket_number',
 ] as const;
