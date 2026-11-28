@@ -4,6 +4,10 @@
 // one the picker doesn't have yet, or remove one that was mistyped. Used for
 // Parties (Job Separation) and Materials (plates, dies, job cards).
 //
+// The add box searches the list as it is typed, ignoring case, spaces and
+// punctuation, so "80 GSM CHROMO" finds "80GSM CHROMO" before a second copy
+// is added; an exact match can't be added again.
+//
 // Removing a name never touches a record already saved with it: records
 // store the name as text, not a reference to the list.
 
@@ -23,6 +27,9 @@ const inputCls = cn(
 
 type Item = { id: string; name: string };
 
+/** What two names are compared by: "80 gsm-Chromo" = "80GSM CHROMO". */
+export const nameKey = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
 /** `url` serves GET { [plural]: Item[] }, POST { name } → { [singular]: Item },
  *  DELETE `${url}/${id}`. */
 export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plural, singular, queryKey, onClose }: {
@@ -38,6 +45,9 @@ export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plu
   const [busyId,     setBusyId]     = useState<string | null>(null);
   // The forms pick from a cached list: refresh it.
   const queryClient = useQueryClient();
+  const typed = nameKey(newName);
+  const shown = typed ? items.filter((i) => nameKey(i.name).includes(typed)) : items;
+  const same  = typed ? items.find((i) => nameKey(i.name) === typed) : undefined;
 
   const load = useCallback(async () => {
     try {
@@ -57,7 +67,7 @@ export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plu
   async function addItem(e: React.FormEvent) {
     e.preventDefault();
     const name = newName.trim();
-    if (!name) return;
+    if (!name || same) return;
 
     setAdding(true);
     try {
@@ -131,18 +141,20 @@ export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plu
           </button>
         </div>
 
-        <form onSubmit={addItem} className="flex items-center gap-2 px-5 py-3 border-b border-white/12 shrink-0">
+        <form onSubmit={addItem} className="px-5 py-3 border-b border-white/12 shrink-0">
+          <div className="flex items-center gap-2">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder={`Add a ${singular} name…`}
-            aria-label={`New ${singular} name`}
+            placeholder={`Search, or type a new ${singular}…`}
+            aria-label={`Search or add a ${singular}`}
+            aria-describedby={`${titleId}-match`}
             maxLength={200}
             className={inputCls}
           />
           <button
             type="submit"
-            disabled={adding || !newName.trim()}
+            disabled={adding || !newName.trim() || !!same}
             className={cn(
               'inline-flex items-center justify-center gap-1.5 min-h-11 px-3 rounded-lg shrink-0',
               'text-sm font-medium bg-brand-primary text-white hover:bg-brand-primary/90',
@@ -152,6 +164,11 @@ export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plu
             <Plus className="w-4 h-4" aria-hidden="true" />
             Add
           </button>
+          </div>
+          <p id={`${titleId}-match`} role="status" className={cn('text-xs mt-1.5 empty:hidden', same ? 'font-semibold text-[var(--glass-ink)]' : 'text-[var(--glass-muted)]')}>
+            {!typed || loading ? '' : same ? `Already on the list as ${same.name}`
+              : shown.length ? `Not on the list yet. ${shown.length} similar below: check it isn't one of them.` : 'Not on the list yet.'}
+          </p>
         </form>
 
         <div className="px-5 py-3 overflow-y-auto">
@@ -165,9 +182,11 @@ export default function ManageNamesModal({ title, subtitle, icon: Icon, url, plu
             <p className="text-sm text-[var(--glass-muted)] text-center py-6">
               No {plural} yet. Add the first one above.
             </p>
+          ) : shown.length === 0 ? (
+            <p className="text-sm text-[var(--glass-muted)] text-center py-6">No {plural} like that.</p>
           ) : (
             <ul className="divide-y divide-white/10">
-              {items.map((p) => (
+              {shown.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 py-2">
                   <span className="text-sm text-[var(--glass-ink)] truncate">{p.name}</span>
                   <button
