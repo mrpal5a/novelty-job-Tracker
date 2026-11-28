@@ -11,14 +11,14 @@
 //
 // Below lg the groups move into a sheet behind the hamburger, listed under
 // their group names. On phones a tab bar at the bottom carries Jobs, Job
-// Separation, a raised Search, Shade Cards and Dispatch Emails.
+// Separation, a raised Search, Shade Cards and Job Cards.
 
 import Link from 'next/link';
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { LIST_WARMUP } from '@/lib/listQueries';
-import { ChevronDown, LayoutDashboard, LogOut, Menu, MessageSquare, Palette, Printer, Search, Settings, SplitSquareHorizontal, Truck, X } from 'lucide-react';
+import { ChevronDown, ClipboardList, LayoutDashboard, LogOut, Menu, MessageSquare, Palette, Search, Settings, SplitSquareHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -398,7 +398,7 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
       </Exiting>}
 
       {/* Phone tab bar — below sm. Jobs, Job Separation, Shade Cards and
-          Dispatch Emails either side of a raised Search in the middle;
+          Job Cards either side of a raised Search in the middle;
           everything else is behind the hamburger. Notes sits in the bar up top. */}
       <nav
         aria-label="Quick sections"
@@ -406,15 +406,12 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
       >
         {(() => {
           const tab = 'relative flex min-h-[60px] min-w-0 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium';
-          const dispatch = groups.find((g) => g.key === 'dispatch')?.items.find((i) => i.href === '/admin/dispatch-notifications');
           const links = [
             { href: '/admin',                label: 'Jobs',        icon: LayoutDashboard },
             { href: '/admin/job-separation', label: 'Job Sep.',    icon: SplitSquareHorizontal, name: 'Job Separation' },
             null,
             { href: '/admin/shade-cards',    label: 'Shade Cards', icon: Palette },
-            dispatch
-              ? { href: dispatch.href, label: 'Dispatch', icon: Truck, name: 'Dispatch Emails', badge: dispatch.badge }
-              : { href: '/admin/slips', label: 'Slips', icon: Printer },
+            { href: '/admin/job-cards',      label: 'Job Cards',   icon: ClipboardList },
           ];
           return links.map((l) => {
             if (!l) return (
@@ -434,18 +431,12 @@ export default function AdminHeader({ dept, displayName, userName }: Props) {
               ? pathname === '/admin' || pathname.startsWith('/admin/jobs/')
               : isActiveHref(pathname, l.href));
             const Icon = l.icon;
-            const badge = 'badge' in l ? l.badge ?? 0 : 0;
             return (
               <Link key={l.href} href={l.href} aria-current={on ? 'page' : undefined}
                     aria-label={'name' in l ? l.name : undefined}
                     className={cn(tab, on ? 'font-semibold text-brand-primary' : 'text-brand-muted')}>
                 <Icon className="h-[22px] w-[22px]" aria-hidden="true" />
                 <span className="max-w-full truncate px-0.5">{l.label}</span>
-                {badge > 0 && (
-                  <span aria-hidden="true" className="absolute left-[54%] top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-300 px-1 font-mono text-[10px] font-semibold text-[#0A1F18]">
-                    {badge > 99 ? '99+' : badge}
-                  </span>
-                )}
               </Link>
             );
           });
