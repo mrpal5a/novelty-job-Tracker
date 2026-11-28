@@ -8,7 +8,7 @@
 // can have several. An issued card is shown as it was frozen.
 // ============================================================
 
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -688,8 +688,25 @@ function LinkOrder({ card, sources, unsaved, busy, onLink }: {
   );
 }
 
+/** The sheet (733 px) plus its frame's padding and border. */
+const SHEET_BOX_PX = 759;
+
 /** The card exactly as issued: the sheet that prints. */
 function IssuedCard({ details, card, number }: { details: PrintedCard; card: JobCardRow; number: string }) {
+  // On a narrow screen the whole sheet is shrunk to fit; "Actual size" scrolls sideways.
+  const box = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [actual, setActual] = useState(false);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const fit = () => setScale(Math.min(1, el.clientWidth / SHEET_BOX_PX));
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const shrunk = scale < 1;
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <p className="text-sm text-brand-muted">
@@ -698,9 +715,16 @@ function IssuedCard({ details, card, number }: { details: PrintedCard; card: Job
           ? <strong className="font-semibold text-brand-ink">Accepted {formatNumericDate(card.accepted_at)} by {card.accepted_by}. It can no longer be changed.</strong>
           : 'Later changes to the plate, die or shade card don’t alter it.'}
       </p>
-      {/* A fixed-width sheet: it scrolls sideways inside its own box on a phone. */}
-      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Job card sheet">
-        <div className="mx-auto w-fit border border-black/[0.08] bg-white p-3"><JobCardSheet number={number} card={details} /></div>
+      {shrunk && (
+        <Button size="sm" className="min-h-[44px]" aria-pressed={actual} onClick={() => setActual((a) => !a)}>
+          {actual ? 'Fit to screen' : 'Actual size'}
+        </Button>
+      )}
+      {/* zoom, not transform: the layout box shrinks too. The print copy is a separate portal, untouched. */}
+      <div ref={box} className="overflow-x-auto" tabIndex={0} role="region" aria-label="Job card sheet">
+        <div className="mx-auto w-fit border border-black/[0.08] bg-white p-3" style={shrunk && !actual ? { zoom: scale } : undefined}>
+          <JobCardSheet number={number} card={details} />
+        </div>
       </div>
       <JobCardPrint number={number} card={details} />
     </div>
