@@ -12,12 +12,12 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Plus, Check, Printer } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Printer, MessageSquareWarning } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
-import { ConfirmModal } from '@/components/admin/modals';
+import { ConfirmModal, PromptModal } from '@/components/admin/modals';
 import JobCardSheet, { JobCardPrint } from '@/components/admin/JobCardSheet';
 import PlateFinder from '@/components/admin/PlateFinder';
 import ArtworkBox from '@/components/admin/ArtworkBox';
@@ -26,7 +26,7 @@ import { inkColor } from '@/lib/pantone';
 import { useMaterials, useParties } from '@/hooks/useReferenceData';
 import { colorBoxes, DIRECTIONS, FORMS, MAX_COLORS } from '@/lib/plateDie';
 import {
-  JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, plateUpdates, resolveJobCard,
+  EDIT_NOTE_MAX, JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, plateUpdates, resolveJobCard,
   type Field, type JobCardInput, type JobCardRow, type JobCardSources, type Layout, type ManualOrder, type OverrideKey, type PrintedCard,
 } from '@/lib/jobCard';
 
@@ -148,7 +148,7 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
   const [stations, setStations] = useState<string[] | null>(null); // null: as on the plate
   const [acrossGap, setAcrossGap] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState<'issue' | 'reopen' | 'accept' | 'unaccept' | 'delete' | 'print' | null>(null);
+  const [confirm, setConfirm] = useState<'issue' | 'reopen' | 'accept' | 'ask' | 'unaccept' | 'delete' | 'print' | null>(null);
 
   // Set once created, so a retry after a failed plate save doesn't make a second card.
   const createdId = useRef(card?.id);
@@ -279,6 +279,7 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
             <>
               {canManage && !card!.accepted_at && <Button onClick={() => setConfirm('reopen')} disabled={!!busy}>Reopen</Button>}
               {canDelete && card!.accepted_at && <Button onClick={() => setConfirm('unaccept')} disabled={!!busy}>Cancel acceptance</Button>}
+              {toAccept && <Button icon={MessageSquareWarning} onClick={() => setConfirm('ask')} disabled={!!busy}>{card!.edit_request ? 'Change note' : 'Suggest edit'}</Button>}
               {toAccept && <Button intent="primary" icon={Check} onClick={() => setConfirm('accept')} disabled={!!busy}>Accept</Button>}
               <Button intent={toAccept ? undefined : 'primary'} icon={Printer} onClick={async () => { if (await artworkReady(issued)) window.print(); else setConfirm('print'); }} disabled={!!busy}>Print</Button>
             </>
@@ -291,6 +292,13 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
         </div>
       </header>
 
+      {card?.edit_request && (
+        <div role="status" className="mx-4 sm:mx-6 mt-4 rounded-xl border border-black/[0.12] bg-white px-4 py-3 space-y-1">
+          <StateChip dot={JOB_CARD_STATE.asked.color} label={`${card.edit_request.by} asked for an edit, ${formatNumericDate(card.edit_request.at)}`} />
+          <p className="text-sm text-brand-ink whitespace-pre-line [overflow-wrap:anywhere]">{card.edit_request.note}</p>
+          {canManage && <p className="text-xs text-brand-muted">{issued ? 'Reopen the card, change it and issue it again: the note goes away then.' : 'Issue the card again when it’s changed: the note goes away then.'}</p>}
+        </div>
+      )}
       {isNew && <MaybeAnOrder lines={sources.linkable} />}
       {card?.manual && canManage && (
         <LinkOrder card={card} sources={sources} unsaved={dirty && !issued} busy={!!busy}
@@ -411,6 +419,12 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
           message="Check every box first. Once accepted, nobody can change, reopen or delete this card. Only Admin can cancel the acceptance."
           onCancel={() => setConfirm(null)}
           onConfirm={() => run('accept', async () => { await send(`/api/job-cards/${card.id}`, 'PATCH', { action: 'accept', issued_at: card.issued_at }); return card.id; }, 'Job card accepted')} />
+      )}
+      {confirm === 'ask' && card && (
+        <PromptModal title={`Suggest an edit to ${number}`} label="What should Prepress change?" kind="textarea" required
+          description="The card goes back to Prepress with your note. You accept it once they issue it again."
+          initialValue={card.edit_request?.note ?? ''} confirmLabel={busy === 'ask' ? 'Sending…' : 'Send to Prepress'} onCancel={() => setConfirm(null)}
+          onConfirm={(note) => { if (!busy) run('ask', async () => { await send(`/api/job-cards/${card.id}`, 'PATCH', { action: 'ask', issued_at: card.issued_at, note: note.trim().slice(0, EDIT_NOTE_MAX) }); return card.id; }, 'Sent back to Prepress'); }} />
       )}
       {confirm === 'unaccept' && card && (
         <ConfirmModal title={`Cancel the acceptance of ${number}?`} confirmLabel="Cancel acceptance" busy={busy === 'unaccept'}

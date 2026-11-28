@@ -9,7 +9,9 @@
 //        / 'unlink'. Issuing fills the card here, on the server,
 //        from the records as they are now, and freezes it. { action: 'accept',
 //        issued_at } accepts the issue that was looked at: nothing changes it
-//        until Admin cancels that with { action: 'unaccept' }.
+//        until Admin cancels that with { action: 'unaccept' }. { action: 'ask',
+//        issued_at, note } sends it back to Prepress instead; issuing again
+//        or accepting clears the note.
 // DELETE /api/job-cards/[id] — remove a card, issued or not. Admin only; the
 //        Activity Log keeps what it said, and its number is free again.
 // PATCH needs job_card_edit, accepting job_card_accept. The rules themselves are the database's (107, 108, 113).
@@ -22,7 +24,7 @@ import { getDeptPermissions, canDeptEditJobCards } from '@/lib/constants/departm
 import { deptKeyOf } from '@/lib/identity';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { jobCardWriter, jobCardDbError, loadSourcesOfCard } from '@/lib/api/jobCardSources';
-import { freezeCard, jobCardFrom, resolveJobCard, type JobCardRow } from '@/lib/jobCard';
+import { EDIT_NOTE_MAX, freezeCard, jobCardFrom, resolveJobCard, type JobCardRow } from '@/lib/jobCard';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const body = await request.json().catch(() => null);
-  const writer = body?.action === 'accept' ? await jobCardWriter('accept')
+  const writer = body?.action === 'accept' || body?.action === 'ask' ? await jobCardWriter('accept')
     : body?.action === 'unaccept' ? await jobCardWriter('admin', 'Only Admin can cancel an acceptance') : await jobCardWriter();
   if ('denied' in writer) return writer.denied;
 
@@ -73,7 +75,21 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!card.issued_at || typeof body.issued_at !== 'string' || Date.parse(body.issued_at) !== Date.parse(card.issued_at)) {
       return refuse('This job card has changed since you opened it. Reload and check it again', 409);
     }
-    updates = { accepted_at: new Date().toISOString(), accepted_by: writer.username };
+    updates = { accepted_at: new Date().toISOString(), accepted_by: writer.username, edit_request: null };
+  } else if (action === 'ask') {
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    if (!note) return refuse('Write what should be changed', 400);
+    if (note.length > EDIT_NOTE_MAX) return refuse(`Keep the note under ${EDIT_NOTE_MAX} characters`, 400);
+    if (card.accepted_at) return refuse('This job card is already accepted', 409);
+    if (!card.issued_at || typeof body.issued_at !== 'string' || Date.parse(body.issued_at) !== Date.parse(card.issued_at)) {
+      return refuse('This job card has changed since you opened it. Reload and check it again', 409);
+    }
+    if (card.job_separation_id) {
+      const { data: line, error: lineError } = await db.from('job_separations').select('cancelled_at').eq('id', card.job_separation_id).maybeSingle();
+      if (lineError) return jobCardDbError(lineError);
+      if (line?.cancelled_at) return refuse('This line is cancelled', 409);
+    }
+    updates = { edit_request: { note, by: writer.username, at: new Date().toISOString() } };
   } else if (action === 'unaccept') {
     if (!card.accepted_at) return refuse('This job card is not accepted', 409);
     updates = { accepted_at: null, accepted_by: null };
@@ -86,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       if (!sources) return refuse('Job card not found', 404);
       const frozen = freezeCard(resolveJobCard(sources, card, card.id), writer.username, card.card_number !== null, card.manual !== null);
       if ('error' in frozen) return refuse(frozen.error, 400);
-      updates = { ...frozen.columns, details: frozen.details, issued_at: new Date().toISOString(), issued_by: writer.name };
+      updates = { ...frozen.columns, details: frozen.details, issued_at: new Date().toISOString(), issued_by: writer.name, edit_request: null };
     } catch (e) {
       console.error('[PATCH /api/job-cards/[id]] issue', e);
       return refuse('Failed to load job card details', 500);

@@ -59,10 +59,30 @@ describe('job cards: who may do what', () => {
     expect((await accept(null)).status).toBe(409);
     expect(writes('job_cards')).toHaveLength(0);
     expect((await accept()).status).toBe(200);
-    expect(writes('job_cards')[0].payload).toEqual({ accepted_at: expect.any(String), accepted_by: 'production' });
+    expect(writes('job_cards')[0].payload).toEqual({ accepted_at: expect.any(String), accepted_by: 'production', edit_request: null });
 
     respond(() => ({ data: CARD })); // a draft
     expect((await accept()).status).toBe(409);
+  });
+
+  it('Production sends the issue it looked at back with a note', async () => {
+    const issued_at = '2026-11-25T10:00:00.000+00:00';
+    const ask = (note: unknown, seen: unknown = issued_at) => patch({ action: 'ask', issued_at: seen, note });
+    for (const dept of ['Prepress', 'QC']) { signIn(dept); expect((await ask('x')).status).toBe(403); }
+
+    signIn('Production'); respond(() => ({ data: { ...CARD, issued_at } }));
+    expect((await ask('   ')).status).toBe(400);
+    expect((await ask(42)).status).toBe(400);
+    expect((await ask('x'.repeat(1001))).status).toBe(400);
+    expect((await ask('Die 93', '2026-11-25T09:00:00Z')).status).toBe(409);
+    expect(writes('job_cards')).toHaveLength(0);
+    expect((await ask('  Die should be 93  ')).status).toBe(200);
+    expect(writes('job_cards')[0].payload).toEqual({ edit_request: { note: 'Die should be 93', by: 'production', at: expect.any(String) } });
+
+    respond(() => ({ data: { ...CARD, issued_at, accepted_at: issued_at } }));
+    expect((await ask('late')).status).toBe(409);
+    respond(() => ({ data: { ...CARD, issued_at, cancelled_at: '2026-11-26' } })); // the line, as read
+    expect((await ask('x')).status).toBe(409);
   });
 
   it('only Admin cancels an acceptance', async () => {

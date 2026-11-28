@@ -35,9 +35,11 @@ export async function GET(request: NextRequest) {
     let query = supabase.from('job_cards').select(JOB_CARD_LIST, count ? { count } : undefined);
     if (!canDeptEditJobCards(perms)) query = query.not('issued_at', 'is', null);
     if (only === 'manual') query = query.not('manual', 'is', null);
-    if (only === 'waiting') query = query.not('issued_at', 'is', null).is('accepted_at', null);
-    // Not those of a cancelled order: they can't be issued any more.
-    if (only === 'draft') query = query.is('issued_at', null).is('job_separations.cancelled_at', null).or('job_separation_id.is.null,job_separations.not.is.null');
+    // Not those of a cancelled order: they can't be issued or accepted any more.
+    const live = (q: typeof query) => q.is('job_separations.cancelled_at', null).or('job_separation_id.is.null,job_separations.not.is.null');
+    if (only === 'waiting') query = live(query.not('issued_at', 'is', null).is('accepted_at', null).is('edit_request', null));
+    if (only === 'asked') query = live(query.not('edit_request', 'is', null));
+    if (only === 'draft') query = live(query.is('issued_at', null));
     if (terms) query = onSearchText(query, terms, asPhrase);
     else if (search) query = query.or(orContains(['card_number', 'party', 'job_name', 'pm_code', 'po_no'], search));
     return query.order('created_at', { ascending: false }).order('id').range(0, to);

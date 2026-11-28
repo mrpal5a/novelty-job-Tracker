@@ -22,7 +22,7 @@ import { useUrlSearch } from '@/hooks/useUrlSearch';
 import { useRefetchOnChange } from '@/hooks/useRefetchOnChange';
 import Link from 'next/link';
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
-import { ClipboardCheck, ClipboardList, ClipboardPen, ClipboardX, Lock, MoreHorizontal, Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, ClipboardPen, ClipboardX, Lock, MessageSquareWarning, MoreHorizontal, Search, Plus, Pencil, Copy, Ban, SplitSquareHorizontal, ArrowUp, ArrowDown, Users, FilePlus2, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { StateChip } from '@/components/ui/StateChip';
 import { JOB_CARD_STATE, isOpenCard, listNumber, type JobCardListRow } from '@/lib/jobCard';
@@ -214,9 +214,9 @@ function DispatchedFigure({ row }: { row: JobSeparation }) {
 }
 
 // The line's job card, its state in colour, icon and words: green issued, red
-// not made, purple open (made or reopened, not issued), amber edited, blue accepted by Production. Grey when the line needs none (Job Card Status
+// not made, purple open (made or reopened, not issued), amber edited, orange an edit asked by Production, blue accepted by Production. Grey when the line needs none (Job Card Status
 // N/A) or the state couldn't be read.
-const CARD_ICON = { none: ClipboardX, draft: ClipboardPen, issued: ClipboardCheck, reopened: ClipboardPen, edited: ClipboardPen, accepted: Lock };
+const CARD_ICON = { none: ClipboardX, draft: ClipboardPen, issued: ClipboardCheck, reopened: ClipboardPen, edited: ClipboardPen, asked: MessageSquareWarning, accepted: Lock };
 
 function cardMark(row: JobSeparation) {
   const notNeeded = /^n\/?a$/i.test(row.jc_status?.trim() ?? '') && row.job_card === 'none';

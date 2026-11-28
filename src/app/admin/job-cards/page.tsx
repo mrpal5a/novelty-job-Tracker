@@ -6,7 +6,7 @@
 import { notFound } from 'next/navigation';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
 import { getClaimsUser } from '@/lib/supabase/claims';
-import { getDeptPermissions, canDeptEditJobCards } from '@/lib/constants/departments';
+import { getDeptPermissions, canDeptAcceptJobCards, canDeptEditJobCards } from '@/lib/constants/departments';
 import { deptKeyOf } from '@/lib/identity';
 import JobCardsManager from '@/components/admin/JobCardsManager';
 
@@ -25,7 +25,7 @@ export default async function JobCardsPage() {
           Cards made from Job Separation and cards made by hand. Search by PM code, job name, party, PO or number.
         </p>
       </div>
-      <JobCardsManager canManage={canDeptEditJobCards(perms)} />
+      <JobCardsManager canManage={canDeptEditJobCards(perms)} canAccept={canDeptAcceptJobCards(perms)} />
     </div>
   );
 }

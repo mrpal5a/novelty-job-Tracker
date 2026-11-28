@@ -2,20 +2,24 @@
 // src/components/admin/JobCardsManager.tsx
 // The list behind /admin/job-cards. A row opens its card. "New manual card"
 // opens the same form, empty, for a job that isn't in Job Separation.
+// Production accepts an issued card, or sends it back with a note, from here
+// too; a strip on top counts what waits for whom.
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ClipboardList, Plus, Search } from 'lucide-react';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, ClipboardList, MessageSquareWarning, Plus, Search } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button, buttonClass } from '@/components/ui/Button';
 import { StateChip } from '@/components/ui/StateChip';
 import { SearchClearButton } from '@/components/ui/SearchClearButton';
+import { ConfirmModal, PromptModal } from '@/components/admin/modals';
 import { useDebouncedSearch } from '@/hooks/useDebouncedSearch';
 import { useIsDesk } from '@/hooks/useIsDesk';
 import { useUrlSearch } from '@/hooks/useUrlSearch';
-import { JOB_CARD_STATE, cardState, listNumber, type JobCardListRow } from '@/lib/jobCard';
+import { EDIT_NOTE_MAX, JOB_CARD_STATE, cardState, listNumber, type JobCardListRow } from '@/lib/jobCard';
 
 const PAGE = 100;
 const NONE: JobCardListRow[] = [];
@@ -24,11 +28,14 @@ const fieldCls = cn(
   'focus:outline-none focus:border-emerald-300/70 focus:shadow-[0_0_0_4px_rgba(124,240,190,0.22)] transition-all',
 );
 
-export default function JobCardsManager({ canManage }: { canManage: boolean }) {
+const FILTERS = ['manual', 'waiting', 'asked', 'draft'] as const;
+
+export default function JobCardsManager({ canManage, canAccept }: { canManage: boolean; canAccept: boolean }) {
   const [search, setSearch] = useState('');
   // Job Separation links here with ?only=draft.
-  const asked = useSearchParams().get('only');
-  const [only, setOnly] = useState(canManage && asked === 'draft' ? asked : '');
+  const linked = useSearchParams().get('only');
+  const [only, setOnly] = useState<string>(FILTERS.find((f) => f === linked && (f !== 'draft' || canManage)) ?? '');
+  const [deciding, setDeciding] = useState<{ card: JobCardListRow; kind: 'accept' | 'ask' } | null>(null);
   const [limit, setLimit] = useState(PAGE);
   useUrlSearch(setSearch);
   const debounced = useDebouncedSearch(search);
@@ -64,11 +71,17 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
           <option value="">All cards</option>
           <option value="manual">Made by hand</option>
           <option value="waiting">Waiting for Production</option>
+          <option value="asked">Edit asked by Production</option>
           {canManage && <option value="draft">Open, not issued</option>}
         </select>
         {canManage && (
           <Link href="/admin/job-cards/new" className={cn(buttonClass('primary'), 'max-sm:ml-auto')}><Plus className="w-4 h-4" aria-hidden="true" /> New manual card</Link>
         )}
+      </div>
+
+      <div className="flex flex-col gap-2 empty:hidden">
+        {canAccept && <Strip only="waiting" current={only} onPick={setOnly} words={(n) => n === 1 ? '1 job card is waiting for you to accept' : `${n} job cards are waiting for you to accept`} />}
+        {canManage && <Strip only="asked" current={only} onPick={setOnly} words={(n) => n === 1 ? 'Production asked for an edit on 1 job card' : `Production asked for edits on ${n} job cards`} />}
       </div>
 
       {!isLoading && total > 0 && (
@@ -96,7 +109,8 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
             <table className="w-full table-fixed border-collapse text-sm">
               <thead>
                 <tr>
-                  {[['Number', 'w-[15%]'], ['Party · job', ''], ['PM code', 'w-[15%]'], ['PO number', 'w-[13%]'], ['Made from', 'w-[13%]'], ['State', 'w-[17%]']].map(([label, width]) => (
+                  {[['Number', 'w-[14%]'], ['Party · job', ''], ['PM code', 'w-[13%]'], ['PO number', 'w-[11%]'], ['Made from', 'w-[12%]'], ['State', 'w-[18%]'],
+                    ...(canAccept ? [['Production', 'w-[19%]']] : [])].map(([label, width]) => (
                     <th key={label} scope="col" className={cn('sticky top-0 z-10 px-2.5 py-2 text-left bg-[var(--glass-bg-strong)] border-b border-white/12', width)}>{label}</th>
                   ))}
                 </tr>
@@ -117,6 +131,7 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
                     <td className="px-2.5 py-1.5 font-mono [overflow-wrap:anywhere]">{c.po_no ?? '—'}</td>
                     <td className="px-2.5 py-1.5 text-[var(--glass-muted)]">{madeFrom(c)}</td>
                     <td className="px-2.5 py-1.5"><State card={c} /></td>
+                    {canAccept && <td className="px-2.5 py-1.5"><Decide card={c} onPick={(kind) => setDeciding({ card: c, kind })} /></td>}
                   </tr>
                 ))}
               </tbody>
@@ -126,8 +141,8 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
       ) : (
         <ul className="space-y-3">
           {cards.map((c) => (
-            <li key={c.id}>
-              <Link href={`/admin/job-cards/${c.id}`} className="block glass rounded-xl p-4 space-y-1">
+            <li key={c.id} className="glass rounded-xl">
+              <Link href={`/admin/job-cards/${c.id}`} className="block p-4 space-y-1">
                 <span className="flex flex-wrap items-center justify-between gap-2">
                   <span className="font-mono text-sm font-semibold text-[var(--glass-ink)]">{listNumber(c) ?? 'No number yet'}</span>
                   <State card={c} />
@@ -136,6 +151,7 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
                 <span className="block text-xs font-mono text-[var(--glass-muted)] break-words">{[c.pm_code, c.po_no && `PO ${c.po_no}`].filter(Boolean).join(' · ')}</span>
                 <span className="block text-xs text-[var(--glass-muted)]">{madeFrom(c)}</span>
               </Link>
+              {canAccept && canDecide(c) && <div className="px-4 pb-4"><Decide card={c} onPick={(kind) => setDeciding({ card: c, kind })} /></div>}
             </li>
           ))}
         </ul>
@@ -144,7 +160,84 @@ export default function JobCardsManager({ canManage }: { canManage: boolean }) {
       {cards.length < total && (
         <div className="flex justify-center pt-1"><Button intent="ghost" onClick={() => setLimit((n) => n + PAGE)}>Show {Math.min(PAGE, total - cards.length)} more</Button></div>
       )}
+
+      {deciding && <Decision {...deciding} onClose={() => setDeciding(null)} />}
     </div>
+  );
+}
+
+/** Production's turn: issued, not accepted, its order not cancelled. */
+const canDecide = (c: JobCardListRow) => !!c.issued_at && !c.accepted_at && !c.job_separations?.cancelled_at;
+
+function Decide({ card, onPick }: { card: JobCardListRow; onPick: (kind: 'accept' | 'ask') => void }) {
+  if (!canDecide(card)) return null;
+  const name = listNumber(card) ?? card.job_name ?? 'this card';
+  // Above the row's link, which covers the whole row.
+  return (
+    <span className="relative z-[1] flex flex-wrap gap-1.5">
+      <Button icon={Check} onClick={() => onPick('accept')} aria-label={`Accept ${name}`}>Accept</Button>
+      <Button icon={MessageSquareWarning} onClick={() => onPick('ask')} aria-label={`Suggest an edit to ${name}`}>{card.edit_request ? 'Change note' : 'Suggest edit'}</Button>
+    </span>
+  );
+}
+
+/** Two steps: the button opens this, and it names the card being accepted or sent back. */
+function Decision({ card, kind, onClose }: { card: JobCardListRow; kind: 'accept' | 'ask'; onClose: () => void }) {
+  const queryClient = useQueryClient();
+  const [busy, setBusy] = useState(false);
+  const number = listNumber(card) ?? 'this job card';
+  const what = [card.party, card.job_name, card.part_name, card.pm_code].filter(Boolean).join(' · ');
+
+  async function send(body: Record<string, unknown>, done: string) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/job-cards/${card.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...body, issued_at: card.issued_at }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Something went wrong');
+      toast.success(done);
+      queryClient.invalidateQueries({ queryKey: ['job-cards'] });
+      queryClient.invalidateQueries({ queryKey: ['job-separations'] });
+      onClose();
+    } catch (e) {
+      toast.error((e as Error).message);
+      setBusy(false);
+    }
+  }
+
+  return kind === 'accept' ? (
+    <ConfirmModal title={`Accept job card ${number}?`} confirmLabel="Yes, accept" busy={busy} onCancel={onClose}
+      message={<>{what && <span className="block font-medium text-[var(--glass-ink)] mb-2 [overflow-wrap:anywhere]">{what}</span>}
+        Open the card and check it first if you haven’t. Once accepted, nobody can change, reopen or delete it. Only Admin can cancel the acceptance.</>}
+      onConfirm={() => send({ action: 'accept' }, `${number} accepted`)} />
+  ) : (
+    <PromptModal title={`Suggest an edit to ${number}`} label="What should Prepress change?" kind="textarea" required
+      description={<>{what && <span className="block font-medium text-[var(--glass-ink)] mb-1 [overflow-wrap:anywhere]">{what}</span>}
+        The card goes back to Prepress with your note. You accept it once they issue it again.</>}
+      initialValue={card.edit_request?.note ?? ''} confirmLabel={busy ? 'Sending…' : 'Send to Prepress'} onCancel={onClose}
+      onConfirm={(note) => { if (!busy) send({ action: 'ask', note: note.trim().slice(0, EDIT_NOTE_MAX) }, `Sent back to Prepress`); }} />
+  );
+}
+
+/** A count of cards waiting for someone, that filters the list to them. Hidden at none. */
+function Strip({ only, current, onPick, words }: { only: string; current: string; onPick: (only: string) => void; words: (n: number) => string }) {
+  const { data } = useQuery<{ total: number }>({
+    queryKey: ['job-cards', 'count', only],
+    queryFn: async () => {
+      const res = await fetch(`/api/job-cards?only=${only}&limit=1`);
+      if (!res.ok) throw new Error('Failed to count job cards');
+      return res.json();
+    },
+  });
+  if (!data?.total) return null;
+  const on = current === only;
+  return (
+    <button type="button" onClick={() => onPick(on ? '' : only)} aria-pressed={on}
+      className="flex flex-wrap items-center gap-x-3 gap-y-1 min-h-11 w-full text-left rounded-xl border border-black/[0.12] bg-white px-4 py-2 hover:bg-black/[0.03] transition-colors">
+      <StateChip dot={JOB_CARD_STATE[only === 'asked' ? 'asked' : 'issued'].color} label={words(data.total)} />
+      <span className="ml-auto text-[13px] font-semibold text-brand-primary underline underline-offset-2">{on ? 'Show all cards' : 'Show them'}</span>
+    </button>
   );
 }
 
@@ -158,6 +251,12 @@ function State({ card }: { card: JobCardListRow }) {
       <span className="text-xs font-mono text-[var(--glass-muted)]">
         {card.issued_at ? formatNumericDate(card.accepted_at ?? card.issued_at) : <><span className="font-sans">made </span>{formatNumericDate(card.created_at)}</>}
       </span>
+      {card.issued_at && !card.accepted_at && !card.edit_request && <span className="text-xs text-[var(--glass-muted)]">Waiting for Production</span>}
+      {card.edit_request && (
+        <span className="text-xs text-[var(--glass-ink)] line-clamp-3 [overflow-wrap:anywhere]" title={card.edit_request.note}>
+          <span className="text-[var(--glass-muted)]">{card.edit_request.by}: </span>{card.edit_request.note}
+        </span>
+      )}
     </span>
   );
 }
