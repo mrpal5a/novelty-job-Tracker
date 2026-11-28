@@ -56,6 +56,7 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
   // A line's only card has the line's own number: it isn't printed twice.
   const ownNumber = number !== p.sepLine;
   const perRoll = [p.labelsPerRoll, p.rollMetres].filter((v) => v != null).join(' / ');
+  const many = text(p.plateId).split('\n').length > 4;
 
   return (
     <article className="jc-sheet flex flex-col bg-white text-black" style={{ width: SHEET_PX, minHeight: p.artwork ? SHEET_MIN_PX : undefined }} aria-label={`Job card ${number}`}>
@@ -100,10 +101,21 @@ export default function JobCardSheet({ number, card: p }: { number: string; card
         <Cell label="Varnish" value={p.varnish} size={inkSize} valueClass={p.varnish ? 'bg-[#EBB7AC] text-[#2A3C8F]' : undefined} />
       </dl>
 
-      {/* A set can carry a dozen IDs: smaller and in two columns, so the artwork keeps its room. */}
-      {p.plateId && (
-        <p className={cn('whitespace-pre-line text-right font-bold text-[#A23B8C]',
-          text(p.plateId).split('\n').length > 4 ? 'mt-3 columns-2 text-[11px] leading-[15px]' : 'mt-6 text-[15px]')}>{text(p.plateId)}</p>
+      {/* Note left, plate ID right, side by side: a long note wraps in its own half, never under the ID.
+          A set can carry a dozen IDs: smaller and in two columns, so the artwork keeps its room. */}
+      {(p.note || p.plateId) && (
+        <div className={cn('flex items-start gap-6', many ? 'mt-3' : 'mt-6')}>
+          {p.note && (
+            <div className="min-w-0 flex-1 whitespace-pre-line text-[15px] font-bold leading-[20px] text-[#A23B8C] [overflow-wrap:anywhere]">
+              <p>Note:</p>
+              <p>{text(p.note)}</p>
+            </div>
+          )}
+          {p.plateId && (
+            <p className={cn('ml-auto whitespace-pre-line text-right font-bold text-[#A23B8C] [overflow-wrap:anywhere]',
+              many ? cn('columns-2 text-[11px] leading-[15px]', p.note ? 'w-1/2 shrink-0' : 'w-full') : cn('text-[15px]', p.note && 'max-w-[45%]'))}>{text(p.plateId)}</p>
+          )}
+        </div>
       )}
       <div className={cn('jc-artwork relative flex-1', p.artwork && 'mt-2')}>
         {/* Out of the flow: it can’t push the card to a second page. At the foot, so any space left over is above it, for notes. */}

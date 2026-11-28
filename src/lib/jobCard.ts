@@ -77,8 +77,12 @@ export type JobCardInput = {
   material: string | null; material_width_mm: number | null;
   labels_per_roll: number | null; delivery_date: string | null;
   manual: ManualOrder | null;    // NULL on a card made from a line
-  overrides: Partial<Record<OverrideKey, string>>;
+  // Boxes typed over, plus `note`: the creator's note to everyone, printed beside the plate ID.
+  overrides: Partial<Record<OverrideKey | 'note', string>>;
 };
+
+/** Longest note a card prints. */
+export const CARD_NOTE_MAX = 500;
 
 /** One row of job_cards (migration 107). */
 /** Production sent the card back: what to change, who asked, when. */
@@ -385,7 +389,8 @@ export function resolveJobCard(s: JobCardSources, card: Partial<JobCardInput> = 
     labelsPerRoll,
     deliveryDate:  field(card.delivery_date, 'picked'),
     partName:      field(card.part_name, 'picked'),
-    artwork:       field(artwork, 'auto', plateHit.note),
+    note:          field(card.overrides?.note?.trim() || null, 'picked'),
+    artwork:      field(artwork, 'auto', plateHit.note),
 
     warnings,
   };
@@ -418,7 +423,7 @@ export function cardNumberOf(srNo: string | null, card: Pick<JobCardRow, 'part' 
 
 const PRINTED_KEYS = ['sepLine', 'poNumber', 'poDate', 'party', 'pmCode', 'jobName', 'labelQty', 'plateNo', 'plateId',
   'labelSize', 'cylinder', 'gap', 'metres', 'dieNumber', 'shadeCardNumber', 'material', 'materialWidth',
-  'rollMetres', 'colors', 'varnish', 'rollSheet', 'direction', 'labelsPerRoll', 'deliveryDate', 'partName'] as const;
+  'rollMetres', 'colors', 'varnish', 'rollSheet', 'direction', 'labelsPerRoll', 'deliveryDate', 'partName', 'note'] as const;
 
 export type PrintedCard = Record<(typeof PRINTED_KEYS)[number], string | number | (string | null)[] | null>
   & { preparedBy: string; edited?: boolean; artwork?: { id: string; width: number; height: number } }; // edited: issued again after a reopen
@@ -594,6 +599,9 @@ export function jobCardFrom(body: unknown): { columns: Partial<JobCardInput> } |
     out.overrides = Object.fromEntries(OVERRIDE_KEYS
       .filter((k) => typeof given[k] === 'string' && (given[k] as string).trim())
       .map((k) => [k, (given[k] as string).trim().slice(0, 100)]));
+    if (given.note != null && typeof given.note !== 'string') return { error: 'The note must be text' };
+    const note = (given.note as string | undefined)?.trim().slice(0, CARD_NOTE_MAX);
+    if (note) out.overrides.note = note;
   }
   return { columns: out };
 }

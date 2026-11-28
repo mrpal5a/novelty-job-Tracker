@@ -12,7 +12,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Plus, Check, Printer, MessageSquareWarning } from 'lucide-react';
+import { ArrowLeft, Plus, Check, Printer, MessageSquareWarning, StickyNote } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { cn, formatNumericDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -26,7 +26,7 @@ import { inkColor } from '@/lib/pantone';
 import { useMaterials, useParties } from '@/hooks/useReferenceData';
 import { colorBoxes, DIRECTIONS, FORMS, MAX_COLORS } from '@/lib/plateDie';
 import {
-  EDIT_NOTE_MAX, JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, plateUpdates, resolveJobCard,
+  CARD_NOTE_MAX, EDIT_NOTE_MAX, JOB_CARD_STATE, artworkRow, cardNumberOf, cardState, dieLabel, plateUpdates, resolveJobCard,
   type Field, type JobCardInput, type JobCardRow, type JobCardSources, type Layout, type ManualOrder, type OverrideKey, type PrintedCard,
 } from '@/lib/jobCard';
 
@@ -395,6 +395,12 @@ function CardEditor({ canManage, canEditPlates, canAccept, canDelete, sources, c
           <Colours locked={!onCard && !!plate && !canEditPlates} where={onCard ? 'card' : plate ? 'plate' : null} stations={!onCard ? stationList : input.manual!.colors?.map((c) => c ?? '') ?? []}
             onChange={!onCard ? setStations : (s) => setManual({ colors: s.map((c) => c.trim() || null) })} varnish={d.varnish} onVarnish={override('varnish')} />
 
+          <CardNote value={input.overrides.note ?? ''} onChange={(v) => setInput((c) => {
+            const overrides = { ...c.overrides };
+            if (v.trim()) overrides.note = v; else delete overrides.note;
+            return { ...c, overrides };
+          })} />
+
           <ArtworkBox
             uploadTo={plate ? `/api/plates/${plate.id}/artwork` : card?.manual ? `/api/job-cards/${card.id}/artwork` : null} onCard={!plate}
             waiting={isNew ? 'Save the draft first, then attach the artwork.' : 'Artwork is saved on the plate. Pick the plate first.'}
@@ -490,6 +496,20 @@ function Label({ children, needs }: { children: React.ReactNode; needs?: boolean
 
 const Note = ({ children }: { children?: React.ReactNode }) =>
   (children ? <span className="block mt-1 text-xs text-brand-muted">{children}</span> : null);
+
+/** Optional: a note to everyone, printed on the card beside the plate ID. */
+function CardNote({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  if (!open && !value) return <Button icon={StickyNote} onClick={() => setOpen(true)}>Add note</Button>;
+  return (
+    <label className="block">
+      <Label>Note on the card (optional)</Label>
+      <textarea className={cn(boxCls, 'min-h-[88px] py-2 font-sans')} value={value} maxLength={CARD_NOTE_MAX} autoFocus={open && !value}
+        onChange={(e) => onChange(e.target.value)} placeholder="e.g. Send one roll as a sample for approval before running the rest." />
+      <Note>Printed in pink under the colours, beside the plate ID. {value.length}/{CARD_NOTE_MAX}</Note>
+    </label>
+  );
+}
 
 /** From the line itself: corrected on Job Separation, not here. */
 function Read({ label, f, wide }: { label: string; f: Field<unknown>; wide?: boolean }) {

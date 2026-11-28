@@ -244,6 +244,16 @@ describe('saving and repeating', () => {
     }
   });
 
+  it('keeps the creator’s note (trimmed, capped) and prints it', () => {
+    const long = 'x'.repeat(600);
+    expect(jobCardFrom({ overrides: { note: '  Send one roll for approval  ' } })).toEqual({ columns: { overrides: { note: 'Send one roll for approval' } } });
+    expect((jobCardFrom({ overrides: { note: long } }) as { columns: Partial<JobCardRow> }).columns.overrides?.note).toHaveLength(500);
+    expect(jobCardFrom({ overrides: { note: '   ' } })).toEqual({ columns: { overrides: {} } });
+    expect(jobCardFrom({ overrides: { note: 5 } })).toHaveProperty('error');
+    const f = freezeCard(resolveJobCard(centurion(), { overrides: { note: 'Sample first' } }), 'x');
+    expect('details' in f && f.details.note).toBe('Sample first');
+  });
+
   it('teaches the plate without wiping a die: link first and alone, gap after', () => {
     const roto = (d: Die) => ({ type: 'ROTO' as const, id: d.id, die: d });
     expect(plateUpdates(plate(), roto(die('three', 3)), { colors: ['CYAN', 'NVZ-GL'], acrossGap: 5 })).toEqual([
