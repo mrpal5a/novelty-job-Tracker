@@ -11,6 +11,10 @@
 //   `q`      — optional search: notes whose text contains it (2+ chars),
 //              across all notes, not just the newest page.
 //
+//   Only notes posted since the caller's login was made: a new member
+//   starts with an empty feed, not years of the team's chat (a job's own
+//   notes still show on that job).
+//
 //   Returns { notes: NoteFeedItem[], unread: number }.
 //   `unread` counts notes in this page that are unread and not the
 //   caller's own. One round trip per poll: the list and the badge
@@ -58,6 +62,23 @@ type JoinedRow = {
   } | null;
 };
 
+// When each login was made. It never changes, so it is remembered per server
+// instance rather than asked of Auth on every poll.
+const joinedAt = new Map<string, string>();
+
+async function joinedAtOf(userId: string): Promise<string | null> {
+  const known = joinedAt.get(userId);
+  if (known) return known;
+  const { data, error } = await createAdminClient().auth.admin.getUserById(userId);
+  if (error || !data.user?.created_at) {
+    console.error('[GET /api/notes/feed] joined at', error);
+    return null; // shows the whole feed rather than none
+  }
+  if (joinedAt.size > 1000) joinedAt.clear();
+  joinedAt.set(userId, data.user.created_at);
+  return data.user.created_at;
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await createServerSupabaseClient();
 
@@ -72,13 +93,15 @@ export async function GET(request: NextRequest) {
     ? Math.min(Math.max(rawLimit, 1), MAX_LIMIT)
     : DEFAULT_LIMIT;
 
-  const query = supabase
+  const since = await joinedAtOf(user.id);
+  let query = supabase
     .from('stage_comments')
     // `*` rather than a column list: edited_at (079) is picked up once the
     // column exists, and the feed keeps working before the migration runs.
     .select('*, jobs ( job_name, pm_code, po_number, party, status )')
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (since) query = query.gte('created_at', since);
   const q = params.get('q')?.trim() ?? '';
   const { data, error } = await (q.length >= 2 ? query.ilike('comment', containsPattern(q)) : query);
 

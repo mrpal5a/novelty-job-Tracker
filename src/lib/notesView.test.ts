@@ -4,7 +4,7 @@ import { mentions, filterNotes, dayLabel, groupByDay, parseNoteId, canEditNote, 
 describe('receiptsOf', () => {
   it('splits the team into seen (earliest first) and not yet, leaving out the author', () => {
     const r = receiptsOf(
-      { created_by_email: 'Ravi@x.in', seen_by: [
+      { created_by_email: 'Ravi@x.in', created_at: '2026-10-22T06:00:00Z', seen_by: [
         { email: 'b@x.in', read_at: '2026-10-22T09:00:00Z' },
         { email: 'a@x.in', read_at: '2026-10-22T08:00:00Z' },
         { email: 'ravi@x.in', read_at: '2026-10-22T07:00:00Z' },
@@ -13,6 +13,17 @@ describe('receiptsOf', () => {
     );
     expect(r.seen.map((s) => s.email)).toEqual(['a@x.in', 'b@x.in']);
     expect(r.notSeen).toEqual(['c@x.in']);
+  });
+
+  it('leaves out whoever joined after the note', () => {
+    const note = { created_by_email: 'a@x.in', created_at: '2026-10-22T06:00:00Z', seen_by: [] };
+    const r = receiptsOf(note, [
+      { email: 'old@x.in', joined_at: '2025-01-01T00:00:00Z' },
+      { email: 'same@x.in', joined_at: '2026-10-22T06:00:00Z' },
+      { email: 'new@x.in', joined_at: '2026-11-28T00:00:00Z' },
+      { email: 'unknown@x.in' },
+    ]);
+    expect(r.notSeen).toEqual(['old@x.in', 'same@x.in', 'unknown@x.in']);
   });
 });
 

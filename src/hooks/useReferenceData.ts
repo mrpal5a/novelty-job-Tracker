@@ -62,7 +62,7 @@ export function useParties() {
 
 export const TEAM_DIRECTORY_KEY = ['team', 'directory'] as const;
 
-export type DirectoryPerson = { id: string; email: string; username: string; department: string | null };
+export type DirectoryPerson = { id: string; email: string; username: string; department: string | null; joined_at?: string };
 type Directory = { people: DirectoryPerson[]; departments: { key: string; display_name: string }[] };
 
 /**

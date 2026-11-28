@@ -15,6 +15,8 @@ export type DirectoryPerson = {
   email:      string;
   username:   string;
   department: string | null;
+  /** When the login was made: notes from before it aren't theirs to read. */
+  joined_at:  string;
 };
 export type DirectoryDept = { key: string; display_name: string };
 
@@ -30,6 +32,7 @@ export async function loadDirectory(): Promise<{ people: DirectoryPerson[]; depa
     email:      u.email ?? '',
     username:   usernameOf(appMetaOf(u), u.email),
     department: deptKeyOf(u) ?? null,
+    joined_at:  u.created_at,
   }));
   return { people, departments: (depts.data ?? []) as DirectoryDept[] };
 }

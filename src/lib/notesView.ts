@@ -77,14 +77,16 @@ export function filterNotes<T extends NoteLike>(
  * yet" is everyone with a login but the author.
  */
 export function receiptsOf(
-  note: { created_by_email: string | null; seen_by: { email: string; read_at: string }[] },
-  people: readonly { email: string }[],
+  note: { created_by_email: string | null; created_at: string; seen_by: { email: string; read_at: string }[] },
+  people: readonly { email: string; joined_at?: string }[],
 ): { seen: { email: string; read_at: string }[]; notSeen: string[] } {
   const key = (e: string | null | undefined) => (e ?? '').trim().toLowerCase();
   const author = key(note.created_by_email);
   const seen = note.seen_by.filter((s) => key(s.email) !== author).sort((a, b) => a.read_at.localeCompare(b.read_at));
   const done = new Set(seen.map((s) => key(s.email)));
-  const notSeen = people.map((p) => p.email).filter((e) => e && key(e) !== author && !done.has(key(e)));
+  // Someone who joined after the note never gets it (the feed starts at their joining).
+  const notSeen = people.filter((p) => !p.joined_at || Date.parse(p.joined_at) <= Date.parse(note.created_at))
+    .map((p) => p.email).filter((e) => e && key(e) !== author && !done.has(key(e)));
   return { seen, notSeen };
 }
 
